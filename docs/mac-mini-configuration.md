@@ -1,6 +1,6 @@
 # Mac mini configuration
 
-Verified October 19, 2026. The Mia Mac mini is the intended local execution host for Code Assist. OrbStack and a fresh PostgreSQL 18 installation are running; the application runtime and repository validation still need to be built and proven. Product requirements remain in [the standalone brief](initial/standalone-brief.md).
+Verified October 19, 2026. The Mia Mac mini hosts the initial Code Assist SvelteKit shell at **http://100.91.0.83:3000**. OrbStack and a fresh PostgreSQL 18 installation are running. Durable jobs and managed-repository validation are not implemented yet. Product requirements remain in [the standalone brief](initial/standalone-brief.md); application operation is documented in [deployment](deployment.md).
 
 This reference contains machine specifications and operational settings only. Login credentials, provider keys, tokens, and database connection secrets are excluded. Versions and disk availability are a dated snapshot.
 
@@ -29,6 +29,8 @@ The following critical services are configured to start when the operating macOS
 | OrbStack | Enabled through `app.start_at_login=true` | OrbStack reports `true`; macOS records its login item as enabled and allowed for the operating user |
 | PostgreSQL 18 | Enabled through Homebrew's user LaunchAgent | `RunAtLoad=true`; `sh.brew.postgresql@18` is loaded and running |
 | Tailscale | Enabled through its login helper | macOS records `io.tailscale.ipn.macsys.login-item-helper` as enabled and allowed; Tailscale reports `Running` |
+| Code Assist web | User LaunchAgent `com.code-assist.web` | `RunAtLoad=true`, `KeepAlive=true`; deployed shell and Tailscale listener verified |
+| Code Assist updater | User LaunchAgent `com.code-assist.updater` | `RunAtLoad=true`, `StartInterval=60`; fetches and validates published `main` releases |
 
 OrbStack login startup was enabled at Tim's request on October 19, 2026. PostgreSQL and Tailscale already had their login startup registered. All three services were running after verification. These are login-start settings; unattended recovery before login and an actual logout/login or reboot cycle have not been tested.
 
@@ -86,9 +88,9 @@ The fresh instance passed a localhost connection check and a transactional creat
 | Tool | Observed installation |
 | --- | --- |
 | Homebrew | `/opt/homebrew/bin/brew` |
-| Node.js | 25.1.0, through NVM at `~/.nvm/versions/node/v25.1.0/bin` |
-| npm | 11.6.2 |
-| pnpm | 10.20.0 |
+| Node.js | Code Assist uses 24.22.0 through NVM; the existing 25.1.0 installation remains |
+| npm | 11.19.1 alongside Node 24.22.0; the older Node installation retains its own npm |
+| pnpm | Code Assist uses 10.28.0 alongside Node 24.22.0; the existing 10.20.0 installation remains |
 | Codex CLI | Present at `~/.local/bin/codex` |
 | Claude CLI | Present at `~/.local/bin/claude` |
 
@@ -115,7 +117,7 @@ df -h /System/Volumes/Data
 - Test the configured login startup and recovery after logout, reboot, and power interruption, including whether manual login is needed before services become available.
 - Select the first supported repository and prove its unchanged full validation, Docker services, and browser workflows through both SDKs.
 - Prove isolation between two simultaneous workspaces, including databases, container resources, ports, and browser profiles.
-- Choose supervision, persistent storage locations, and backup/restore for Code Assist. No ongoing database backup schedule was configured during this setup.
+- Web supervision and release locations are configured; choose worker supervision, durable-job storage and backup/restore when implementing the engine. No ongoing database backup schedule was configured during this setup.
 - Implement the application's access boundary. Tailscale and SSH access alone do not define authentication for the future web UI.
 
 Optional optimizations and controls introduced by this documentation: none.

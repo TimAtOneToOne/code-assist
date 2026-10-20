@@ -21,6 +21,10 @@
 				<dd>SvelteKit</dd>
 			</div>
 			<div>
+				<dt>Components</dt>
+				<dd>shadcn-svelte</dd>
+			</div>
+			<div>
 				<dt>Deployment target</dt>
 				<dd>Mia Mac mini</dd>
 			</div>

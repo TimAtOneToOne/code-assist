@@ -2,6 +2,8 @@
 
 The initial application is a SvelteKit shell in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, Configuration and `/health` routes. The durable worker, database integration, Linear intake and agent execution are not implemented yet.
 
+The shell uses shadcn-svelte Button, Card and Badge components installed through its CLI. AI Elements and AG-UI preferences are recorded in `AGENTS.md` for future agent/chat features.
+
 ## Development
 
 Use Node 24 LTS and pnpm 10.28.0. The repository is a pnpm workspace; add future applications under `apps/`.
@@ -66,5 +68,14 @@ launchctl kickstart -k "gui/$(id -u)/com.code-assist.web"
 Older releases are retained. There is no automatic rollback or release cleanup. To roll back operationally, first unload the updater, then atomically point `current` to the chosen existing release and restart the web service. Fix `main` before re-enabling automatic updates. Runtime health failures are logged; successful compilation alone does not prove that a future release is healthy.
 
 These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. No worker exists yet, so this version restarts only the web app. Add the planned worker checkpoint/drain protocol before deploying long-running jobs through this mechanism.
+
+## Initial verification — October 19, 2026
+
+- `make verify` passed locally and during the first production build on Mia.
+- Home → Configuration navigation worked in Chrome on Tim's computer over Tailscale, with no browser warnings or errors observed.
+- `/health` reported the exact deployed Git commit, and the process listened only on `100.91.0.83:3000`.
+- After terminating the web process, launchd started a new process serving the same healthy release.
+- The scheduled updater authenticated to GitHub and completed a check successfully from its own launchd context.
+- An isolated deployment probe activated a successful fixture commit, then verified that a deliberately failing build left that active release unchanged. The probe used disposable local repositories and did not alter production.
 
 Optional optimizations and controls: none. The requested automatic updater uses a documented 60-second polling interval and validates a release before activation.
