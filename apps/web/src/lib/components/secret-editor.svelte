@@ -48,6 +48,11 @@
 		>
 	</Card.Header>
 	<Card.Content class="p-0">
+		{#if secret?.aliases?.length}
+			<p class="mb-4 text-sm text-muted-foreground">
+				Also Known As: {secret.aliases.map((alias) => alias.name).join(', ')}
+			</p>
+		{/if}
 		<form
 			method="POST"
 			action="?/saveSecret"

@@ -14,6 +14,7 @@ export type SecretMetadata = {
   name: string;
   description: string;
   updatedAt: string;
+  aliases?: { id: string; name: string }[];
 };
 type Secret = SecretMetadata & { value: string };
 export type Mapping = {
@@ -60,9 +61,20 @@ function read(directory: string): Store {
       )
         throw new Error();
     }
+    const identities = data.secrets.flatMap((s) => [s, ...(s.aliases ?? [])]);
     if (
-      new Set(data.secrets.map((s) => s.id)).size !== data.secrets.length ||
-      new Set(data.secrets.map((s) => s.name)).size !== data.secrets.length
+      identities.some(
+        (s) =>
+          typeof s.id !== "string" ||
+          !s.id ||
+          typeof s.name !== "string" ||
+          !s.name.trim(),
+      )
+    )
+      throw new Error();
+    if (
+      new Set(identities.map((s) => s.id)).size !== identities.length ||
+      new Set(identities.map((s) => s.name)).size !== identities.length
     )
       throw new Error();
     const pairs = new Set<string>();
@@ -110,18 +122,23 @@ export function listConfiguration(directory: string): {
 } {
   const store = read(directory);
   return {
-    secrets: store.secrets.map(({ id, name, description, updatedAt }) => ({
-      id,
-      name,
-      description,
-      updatedAt,
-    })),
+    secrets: store.secrets.map(
+      ({ id, name, description, updatedAt, aliases }) => ({
+        id,
+        name,
+        description,
+        updatedAt,
+        ...(aliases?.length ? { aliases } : {}),
+      }),
+    ),
     mappings: store.mappings,
   };
 }
 
 export function revealSecret(directory: string, id: string): string {
-  const secret = read(directory).secrets.find((s) => s.id === id);
+  const secret = read(directory).secrets.find(
+    (s) => s.id === id || s.aliases?.some((a) => a.id === id),
+  );
   if (!secret) throw new SecretInputError("Secret not found.");
   return secret.value;
 }
@@ -139,7 +156,13 @@ export function saveSecret(
   if (input.id && !existing) throw new SecretInputError("Secret not found.");
   const name = input.name.trim();
   if (!name) throw new SecretInputError("Enter a secret name.");
-  if (store.secrets.some((s) => s.name === name && s.id !== existing?.id))
+  if (
+    store.secrets.some(
+      (s) =>
+        (s.name === name && s.id !== existing?.id) ||
+        s.aliases?.some((a) => a.name === name),
+    )
+  )
     throw new SecretInputError("That secret name already exists.");
   const value = input.value || existing?.value;
   if (!value) throw new SecretInputError("Enter a secret value.");
@@ -151,6 +174,7 @@ export function saveSecret(
     description: input.description,
     value,
     updatedAt: new Date().toISOString(),
+    ...(existing?.aliases ? { aliases: existing.aliases } : {}),
   };
   if (existing) store.secrets[store.secrets.indexOf(existing)] = secret;
   else store.secrets.push(secret);
@@ -221,5 +245,66 @@ export function resolveRepositoryEnvironment(
         m.variable,
         store.secrets.find((s) => s.id === m.secretId)!.value,
       ]),
+  );
+}
+
+// Retain old identities so settings and in-flight workers can resolve their saved
+// references while the values and repository mappings change in one atomic write.
+export function consolidateSecrets(directory: string): {
+  removed: number;
+  mappingsUpdated: number;
+} {
+  const store = read(directory);
+  const byValue = new Map<string, Secret>();
+  const replacements = new Map<string, string>();
+  for (const secret of store.secrets) {
+    const canonical = byValue.get(secret.value);
+    if (!canonical) {
+      byValue.set(secret.value, secret);
+      continue;
+    }
+    canonical.aliases = [
+      ...(canonical.aliases ?? []),
+      { id: secret.id, name: secret.name },
+      ...(secret.aliases ?? []),
+    ];
+    if (secret.description)
+      canonical.description +=
+        (canonical.description ? "\n" : "") +
+        secret.name +
+        ": " +
+        secret.description;
+    canonical.updatedAt = new Date().toISOString();
+    replacements.set(secret.id, canonical.id);
+  }
+  let mappingsUpdated = 0;
+  for (const mapping of store.mappings) {
+    const id = replacements.get(mapping.secretId);
+    if (id) {
+      mapping.secretId = id;
+      mappingsUpdated++;
+    }
+  }
+  if (replacements.size) {
+    store.secrets = [...byValue.values()];
+    write(directory, store);
+  }
+  return { removed: replacements.size, mappingsUpdated };
+}
+
+export function findSecretByName(
+  directory: string,
+  name: string,
+): SecretMetadata | undefined {
+  return listConfiguration(directory).secrets.find(
+    (s) => s.name === name || s.aliases?.some((a) => a.name === name),
+  );
+}
+
+export function canonicalSecretId(directory: string, id: string): string {
+  return (
+    listConfiguration(directory).secrets.find(
+      (s) => s.id === id || s.aliases?.some((a) => a.id === id),
+    )?.id ?? id
   );
 }

@@ -3,7 +3,7 @@ import { readModelSettings } from "./model-settings.ts";
 import { dirname, join } from "node:path";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
-import { listConfiguration, revealSecret } from "@code-assist/secrets";
+import { findSecretByName, revealSecret } from "@code-assist/secrets";
 import { runAgentProcess } from "./discovery-agent.ts";
 import {
   assumePlanningRole,
@@ -56,16 +56,12 @@ export async function registerPlanningWorker(
     let stage = "configuration";
     try {
       const model = readModelSettings(directory)[provider];
-      const secret = listConfiguration(directory).secrets.find(
-        (s) => s.name === secretName,
-      );
+      const secret = findSecretByName(directory, secretName);
       if (!secret) throw new Error(`Save ${secretName} in Secrets.`);
       const apiKey = revealSecret(directory, secret.id);
       const workspaceSecret =
         provider === "claude"
-          ? listConfiguration(directory).secrets.find(
-              (s) => s.name === "ANTHROPIC_WORKSPACE_ID",
-            )
+          ? findSecretByName(directory, "ANTHROPIC_WORKSPACE_ID")
           : undefined;
       const anthropicWorkspaceId = workspaceSecret
         ? revealSecret(directory, workspaceSecret.id)

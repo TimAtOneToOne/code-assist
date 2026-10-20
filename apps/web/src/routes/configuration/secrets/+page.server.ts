@@ -1,5 +1,6 @@
 import { fail, type RequestEvent } from '@sveltejs/kit';
 import {
+	consolidateSecrets,
 	deleteMapping,
 	deleteSecret,
 	listConfiguration,
@@ -47,6 +48,10 @@ async function mutate(
 }
 
 export const actions = {
+	consolidate: async (event) => {
+		await requireSettingsAccess(event);
+		return { consolidated: consolidateSecrets(dataDirectory()) };
+	},
 	saveSecret: (event) =>
 		mutate(event, (field) => {
 			saveSecret(dataDirectory(), {

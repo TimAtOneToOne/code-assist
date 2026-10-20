@@ -18,6 +18,21 @@
 <h1>Secrets & Environment</h1>
 <p class="intro">Save shared keys, then map them to each repository’s environment variables.</p>
 
+<form method="POST" action="?/consolidate" use:enhance class="mb-6 space-y-2">
+	<Button type="submit" variant="outline">Consolidate Duplicate Secrets</Button>
+	<p class="text-sm text-muted-foreground">
+		Combine identical values into one saved secret and keep all mappings. Future rotations apply to
+		every mapping that shares it.
+	</p>
+</form>
+{#if form?.consolidated}
+	<p role="status" class="mb-5">
+		{form.consolidated.removed === 0
+			? 'No duplicate secrets found.'
+			: `Consolidated ${form.consolidated.removed} duplicate secrets and updated ${form.consolidated.mappingsUpdated} mappings.`}
+	</p>
+{/if}
+
 {#if form?.error}<p role="alert" class="mb-5 text-destructive">{form.error}</p>{/if}
 {#if form?.saved}<p role="status" class="mb-5">Configuration saved.</p>{/if}
 

@@ -13,7 +13,7 @@ import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
 import { artifactPath } from "@code-assist/observability/artifacts";
 import {
-  listConfiguration,
+  findSecretByName,
   revealSecret,
   resolveRepositoryEnvironment,
 } from "@code-assist/secrets";
@@ -294,12 +294,12 @@ export async function registerCodingWorker(
       if (step.kind === "implement" || step.kind === "review") {
         const provider = step.kind === "implement" ? "codex" : "claude",
           name = provider === "codex" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
-        const saved = listConfiguration(directory).secrets,
-          secret = saved.find((s) => s.name === name);
+        const secret = findSecretByName(directory, name);
         if (!secret) throw new Error(`Save ${name} in Secrets.`);
         const apiKey = revealSecret(directory, secret.id),
-          workspaceSecret = saved.find(
-            (s) => s.name === "ANTHROPIC_WORKSPACE_ID",
+          workspaceSecret = findSecretByName(
+            directory,
+            "ANTHROPIC_WORKSPACE_ID",
           );
         log = createLogger(
           "coding",

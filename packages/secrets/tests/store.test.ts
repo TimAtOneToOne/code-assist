@@ -178,3 +178,73 @@ test("invalid changes do not overwrite saved configuration or reveal credentials
     '{"private-synthetic-secret": invalid}',
   );
 });
+
+test("consolidation atomically preserves exact values, aliases, mappings and future rotations", async (t) => {
+  const { consolidateSecrets, findSecretByName, canonicalSecretId } =
+    await import("../src/store.ts");
+  const directory = fixture(t);
+  const a = saveSecret(directory, {
+    name: "First",
+    description: "First source",
+    value: "same\n",
+  });
+  const b = saveSecret(directory, {
+    name: "OPENAI_API_KEY",
+    description: "Second source",
+    value: "same\n",
+  });
+  const c = saveSecret(directory, {
+    name: "Whitespace differs",
+    description: "",
+    value: "same",
+  });
+  for (const [variable, secretId] of [
+    ["A", a.id],
+    ["B", b.id],
+    ["C", c.id],
+  ])
+    saveMapping(directory, { repository: directory, variable, secretId });
+  const before = resolveRepositoryEnvironment(directory, directory);
+  assert.deepEqual(consolidateSecrets(directory), {
+    removed: 1,
+    mappingsUpdated: 1,
+  });
+  assert.deepEqual(resolveRepositoryEnvironment(directory, directory), before);
+  assert.equal(listConfiguration(directory).secrets.length, 2);
+  assert.equal(findSecretByName(directory, "OPENAI_API_KEY")?.id, a.id);
+  assert.equal(canonicalSecretId(directory, b.id), a.id);
+  assert.equal(revealSecret(directory, b.id), "same\n");
+  assert.match(
+    listConfiguration(directory).secrets[0].description,
+    /Second source/,
+  );
+  assert.deepEqual(consolidateSecrets(directory), {
+    removed: 0,
+    mappingsUpdated: 0,
+  });
+  saveSecret(directory, { ...a, value: "rotated" });
+  assert.equal(revealSecret(directory, b.id), "rotated");
+  assert.deepEqual(resolveRepositoryEnvironment(directory, directory), {
+    A: "rotated",
+    B: "rotated",
+    C: "same",
+  });
+  assert.throws(
+    () =>
+      saveSecret(directory, { name: b.name, description: "", value: "new" }),
+    /already exists/,
+  );
+  assert.throws(() => deleteSecret(directory, a.id), /Remove.*mappings/);
+  const d = saveSecret(directory, {
+    name: "Third",
+    description: "",
+    value: "rotated",
+  });
+  consolidateSecrets(directory);
+  assert.equal(revealSecret(directory, d.id), "rotated");
+  assert.equal(revealSecret(directory, b.id), "rotated");
+  assert.equal(
+    statSync(join(directory, "secrets/store.json")).mode & 0o777,
+    0o600,
+  );
+});

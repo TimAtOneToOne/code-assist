@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { listConfiguration } from "@code-assist/secrets";
+import { canonicalSecretId, listConfiguration } from "@code-assist/secrets";
 
 export type IntakeSettings = {
   linearSecretId: string;
@@ -23,7 +23,18 @@ export function readSettings(directory: string): IntakeSettings | null {
       readFileSync(join(directory, "intake.json"), "utf8"),
     );
     validate(settings);
-    return settings;
+    return {
+      ...settings,
+      linearSecretId: canonicalSecretId(directory, settings.linearSecretId),
+      teamsWebhookSecretId: canonicalSecretId(
+        directory,
+        settings.teamsWebhookSecretId,
+      ),
+      teamsConversationSecretId: canonicalSecretId(
+        directory,
+        settings.teamsConversationSecretId,
+      ),
+    };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw new Error("Intake configuration is invalid.", { cause: error });

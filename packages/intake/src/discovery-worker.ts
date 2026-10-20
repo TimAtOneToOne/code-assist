@@ -3,7 +3,7 @@ import { readModelSettings } from "./model-settings.ts";
 import { dirname, join } from "node:path";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
-import { listConfiguration, revealSecret } from "@code-assist/secrets";
+import { findSecretByName, revealSecret } from "@code-assist/secrets";
 import { discoverRepositories } from "./repositories.ts";
 import {
   discoveryQueue,
@@ -42,9 +42,7 @@ export async function registerDiscoveryWorker(
     let pending = Promise.resolve();
     try {
       const model = readModelSettings(directory).codex;
-      const secret = listConfiguration(directory).secrets.find(
-        (s) => s.name === "OPENAI_API_KEY",
-      );
+      const secret = findSecretByName(directory, "OPENAI_API_KEY");
       if (!secret)
         throw new Error(
           "Save OPENAI_API_KEY in Secrets before running discovery.",

@@ -81,3 +81,54 @@ Optional optimizations and controls: none.
 The [ICU workspace provisioner](workspaces.md) now supplies those attempt-local
 settings and resolves these mappings during preparation. Automatic coding-worker
 integration remains the next step.
+
+## Consolidating Duplicate Secrets
+
+The **Consolidate Duplicate Secrets** button at the top of the page combines saved
+entries whose values match exactly, including whitespace and case. It keeps the
+first saved entry in each group, combines its notes, and redirects repository
+mappings to that entry. The result reports removed entries and updated mappings;
+clicking again without new duplicates makes no changes.
+
+Old names and IDs remain as metadata aliases, shown under **Also Known As**. They
+contain no duplicate values. This preserves provider-name lookups, saved Linear,
+Teams and AWS settings, and references already read by a worker. The value,
+aliases and repository mappings are saved together in one atomic store update.
+Settings pages show the surviving entry. Rotating that entry subsequently changes
+all variables that share it. Matching uses values only: even differently named
+variables with identical values consolidate, as Tim requested. Values are neither
+returned by the action nor exposed in page data.
+
+## Assigned Repository Import — October 20, 2026
+
+All nonempty variables in the following local files were mapped to their matching
+Mia source clones under `/Users/miasocci/CODE/repos/OnetoOneHealth`. Local paths
+below are relative to `/Users/tim/Desktop/CODE`. This supersedes the earlier
+partial ICU import above, including its exclusion of explicitly named staging
+and production variants.
+
+| Repository | Local Source | Mapped Variables |
+| --- | --- | ---: |
+| internal-chat-ui | `internal-chat-ui/sveltekit/.env` | 27 |
+| workplace-agents | `workplace-agents/.env`, plus additional keys from `workplace-agents/apps/portal/.env` | 70 |
+| medusa-api | `medusa/medusa-api/.env` | 77 |
+| windmill | `windmill/.env` | 7 |
+| windmill-work | `windmill-work/.env` | 14 |
+| elation_companion | Checkout at `elation_companion/elation_companion`; no `.env` found | 0 |
+
+The primary checkouts were used rather than older copies under `repos/`,
+`medusa/another/`, or temporary worktrees. Workplace Agents keeps root values
+where its portal file repeats a variable, matching its existing mappings;
+workspace preparation overrides database, origin and auth-secret values for the
+isolated attempt. Existing matching secret values were reused during import.
+All 195 resolved variables were compared with their source values without
+printing credentials. Existing secret values and unrelated mappings were retained.
+
+Mappings take effect when a workspace is prepared; existing processes are not
+reconfigured. Importing configuration does not provision external services or
+establish a signed-in browser session. No external provider calls were made to
+validate these imported credentials.
+
+Optional optimizations and controls: exact-value consolidation is user-requested
+and runs only when clicked. It shares future rotations across all consolidated
+mappings. No automatic background consolidation was added.

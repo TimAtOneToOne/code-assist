@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { listConfiguration } from "@code-assist/secrets";
+import { canonicalSecretId, listConfiguration } from "@code-assist/secrets";
 
 export type AwsSettings = {
   accessKeySecretId: string;
@@ -49,7 +49,17 @@ export function readAwsSettings(directory: string): AwsSettings | null {
   try {
     const settings = JSON.parse(text);
     validate(settings);
-    return settings;
+    return {
+      ...settings,
+      accessKeySecretId: canonicalSecretId(
+        directory,
+        settings.accessKeySecretId,
+      ),
+      secretAccessKeySecretId: canonicalSecretId(
+        directory,
+        settings.secretAccessKeySecretId,
+      ),
+    };
   } catch {
     throw new AwsSettingsError(
       "AWS staging configuration is invalid. Save it again in Configuration.",
