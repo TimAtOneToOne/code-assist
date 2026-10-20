@@ -128,7 +128,7 @@ As of October 20, 2026, [Playwright MCP](browser-testing.md) is pinned in Code A
 
 - Test the configured login startup and recovery after logout, reboot, and power interruption, including whether manual login is needed before services become available.
 - Select the first supported repository and prove its unchanged full validation, Docker services, and browser workflows through both SDKs.
-- Prove isolation between two simultaneous workspaces, including databases, container resources, ports, and browser profiles.
+- The October 20 [concurrent isolation proof](concurrent-isolation-proof.md) passed unchanged ICU validation, same-port operation, separate storage and browser sessions in two OrbStack machines. Network blocking failed, including cross-machine database access; the agent access boundary remains unresolved.
 - Web and worker supervision, release locations and pg-boss storage are configured. Define and test backup/restore before real jobs; no ongoing database backup schedule is configured.
 - Home, ticket pages and settings require the configured owner's Tailscale identity. Future approval routes must preserve that boundary.
 
