@@ -124,14 +124,18 @@
 									? 'Repositories Selected'
 									: 'Needs Repositories'}</Badge
 				>
-				<p class="text-sm">
-					{#if item.selected_repositories.length}Selected: {item.selected_repositories
-							.map((path) => path.split('/').at(-1))
-							.join(', ')}{:else if item.suggestions.length}Suggested: {item.suggestions
-							.map((s) => s.repository.name)
-							.join(', ')}{:else}No explicit repository reference found. Choose from Mia’s
-						repositories.{/if}
-				</p>
+				{#if item.selected_repositories.length}
+					{#each item.selected_repositories as repository (repository)}
+						<Badge variant="secondary">{repository.split('/').at(-1)}</Badge>
+					{/each}
+				{:else}
+					<p class="text-sm">
+						{#if item.suggestions.length}Suggested: {item.suggestions
+								.map((s) => s.repository.name)
+								.join(', ')}{:else}No explicit repository reference found. Choose from Mia’s
+							repositories.{/if}
+					</p>
+				{/if}
 				{#if !item.eligible}<Badge variant="outline">Plan Trigger No Longer Present</Badge>{/if}
 			</div>
 		</div>
