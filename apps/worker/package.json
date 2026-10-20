@@ -1,0 +1,20 @@
+{
+  "name": "@code-assist/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.ts",
+    "probe": "node src/cli.ts",
+    "check": "tsc --noEmit",
+    "test:integration": "node --test tests/*.integration.ts",
+    "lint": "eslint src tests && prettier --check .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "pg": "8.23.1",
+    "pg-boss": "12.38.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}

@@ -10,9 +10,9 @@
     "test": "pnpm --filter @code-assist/web test",
     "dev": "pnpm --filter @code-assist/web dev",
     "build": "pnpm --filter @code-assist/web build",
-    "check": "pnpm --filter @code-assist/web check && tsc -p tsconfig.ops.json",
-    "lint": "pnpm --filter @code-assist/web lint && eslint ops && prettier --check ops package.json pnpm-workspace.yaml tsconfig.ops.json eslint.config.js",
-    "format": "pnpm --filter @code-assist/web format && prettier --write ops package.json pnpm-workspace.yaml tsconfig.ops.json eslint.config.js"
+    "check": "pnpm --filter @code-assist/web check && pnpm --filter @code-assist/worker check && tsc -p tsconfig.ops.json",
+    "lint": "pnpm --filter @code-assist/web lint && pnpm --filter @code-assist/worker lint && eslint ops && prettier --check ops package.json pnpm-workspace.yaml tsconfig.ops.json eslint.config.js",
+    "format": "pnpm --filter @code-assist/web format && pnpm --filter @code-assist/worker format && prettier --write ops package.json pnpm-workspace.yaml tsconfig.ops.json eslint.config.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

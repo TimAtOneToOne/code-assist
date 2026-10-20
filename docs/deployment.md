@@ -1,6 +1,6 @@
 # Mac mini deployment
 
-The application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, Configuration, Mac mini settings and `/health` routes. The durable worker, database integration, Linear intake and agent execution are not implemented yet.
+The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, Configuration, Mac mini settings and `/health` routes. The separate pg-boss process in `apps/worker` runs a durable confirmation probe against local PostgreSQL. See [worker operation and limits](worker.md). Linear intake and agent execution are not implemented yet.
 
 The shell uses shadcn-svelte Button, Card and Badge components installed through its CLI. AI Elements and AG-UI preferences are recorded in `AGENTS.md` for future agent/chat features.
 
@@ -29,8 +29,8 @@ The installation is under `~/Library/Application Support/CodeAssist/`:
 | `source.git/` | Bare Git repository used to fetch published `main` |
 | `releases/<commit>/` | Source, locked dependencies and validated production build for an exact commit |
 | `current` | Symlink to the active release |
-| `logs/` | Web and updater stdout/stderr |
-| `runtime.env` | Operator-managed runtime settings, including `CODE_ASSIST_ADMIN_TAILSCALE_USER`; mode 600, outside Git |
+| `logs/` | Web, worker and updater stdout/stderr |
+| `runtime.env` | Operator-managed runtime settings, including `CODE_ASSIST_ADMIN_TAILSCALE_USER` and `CODE_ASSIST_DATABASE_URL`; mode 600, outside Git |
 | `data/mac-mini.json` | Saved Mac mini configuration; preserved across releases |
 
 ## Mac mini settings
@@ -43,14 +43,15 @@ Local development permits loopback access and uses the repository's gitignored `
 
 ## Login services and updates
 
-The installer, `ops/install.ts`, is run once as Mia's logged-in operating user using Node 24. It builds published `main` and registers two user LaunchAgents:
+Provision the local `code_assist` database and `runtime.env` before installation. The installer, `ops/install.ts`, is run once as Mia's logged-in operating user using Node 24. It builds published `main` and registers three user LaunchAgents:
 
 | Service | Behavior |
 | --- | --- |
 | `com.code-assist.web` | Starts at login; launchd keeps the web server running |
+| `com.code-assist.worker` | Starts at login; launchd keeps the pg-boss worker running |
 | `com.code-assist.updater` | Runs at login and checks `main` every 60 seconds |
 
-The updater uses Mia's existing SSH GitHub identity. It installs frozen dependencies and runs `make verify` in a separate staging directory while the old web release stays up. Only a successful build becomes a release; activation replaces `current` atomically and restarts the web service. The page header, Configuration page and `/health` report the running commit. On subsequent passes, the updater checks that `/health` matches the active commit.
+The updater uses Mia's existing SSH GitHub identity. It installs frozen dependencies and runs `make verify` in a separate staging directory while the old web release stays up. Only a successful build becomes a release; activation replaces `current` atomically and restarts the web service. It signals the worker to drain its current step, exit and restart under launchd using the new release. The page header, Configuration page and `/health` report the web commit; worker startup/checkpoint logs report the worker commit. On subsequent passes, the updater checks that `/health` matches the active commit.
 
 No public webhook or GitHub Actions runner is needed. A local commit must be pushed to `main` to be picked up. If several commits arrive between polls, the updater builds the head observed by its fetch. Failed builds leave the current release running; a later scheduled pass attempts the current head again. Logs record failures. The update process does not modify PostgreSQL, OrbStack data or any agent workspace.
 
@@ -61,6 +62,7 @@ On Mia:
 ```sh
 launchctl print "gui/$(id -u)/com.code-assist.web"
 launchctl print "gui/$(id -u)/com.code-assist.updater"
+launchctl print "gui/$(id -u)/com.code-assist.worker"
 curl --fail http://100.91.0.83:3000/health
 tail -n 60 "$HOME/Library/Application Support/CodeAssist/logs/com.code-assist.updater.error.log"
 ```
@@ -77,9 +79,9 @@ To restart the web process:
 launchctl kickstart -k "gui/$(id -u)/com.code-assist.web"
 ```
 
-Older releases are retained. There is no automatic rollback or release cleanup. To roll back operationally, first unload the updater, then atomically point `current` to the chosen existing release and restart the web service. Fix `main` before re-enabling automatic updates. Runtime health failures are logged; successful compilation alone does not prove that a future release is healthy.
+Older releases are retained. There is no automatic rollback or release cleanup. To roll back operationally, first unload the updater, then atomically point `current` to a compatible existing release, restart the web service and signal the worker with `launchctl kill SIGTERM "gui/$(id -u)/com.code-assist.worker"`. Fix `main` before re-enabling automatic updates. Do not roll the worker back to a release without worker code, or reverse database state during code rollback. Runtime health failures are logged; successful compilation alone does not prove that a future release is healthy.
 
-These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. No worker exists yet, so this version restarts only the web app. Add the planned worker checkpoint/drain protocol before deploying long-running jobs through this mechanism.
+These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. Worker draining currently covers the short SQL-only diagnostic workflow. Add and prove agent-process interruption, ownership and checkpoint recovery before deploying long-running agent work.
 
 ## Initial verification — October 19, 2026
 

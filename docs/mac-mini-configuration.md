@@ -1,6 +1,6 @@
 # Mac mini configuration
 
-Verified October 19, 2026. The Mia Mac mini hosts the initial Code Assist SvelteKit shell at **http://100.91.0.83:3000**. OrbStack and a fresh PostgreSQL 18 installation are running. Durable jobs and managed-repository validation are not implemented yet. Product requirements remain in [the standalone brief](initial/standalone-brief.md); application operation is documented in [deployment](deployment.md).
+Verified October 19, 2026. The Mia Mac mini hosts Code Assist at **http://100.91.0.83:3000**. OrbStack and PostgreSQL 18 are running. A separate pg-boss worker runs the [durable diagnostic workflow](worker.md); Linear intake, agent execution and managed-repository validation are not implemented yet. Product requirements remain in [the standalone brief](initial/standalone-brief.md); application operation is documented in [deployment](deployment.md).
 
 This reference contains machine specifications and operational settings only. Login credentials, provider keys, tokens, and database connection secrets are excluded. Versions and disk availability are a dated snapshot.
 
@@ -30,6 +30,7 @@ The following critical services are configured to start when the operating macOS
 | PostgreSQL 18 | Enabled through Homebrew's user LaunchAgent | `RunAtLoad=true`; `sh.brew.postgresql@18` is loaded and running |
 | Tailscale | Enabled through its login helper | macOS records `io.tailscale.ipn.macsys.login-item-helper` as enabled and allowed; Tailscale reports `Running` |
 | Code Assist web | User LaunchAgent `com.code-assist.web` | `RunAtLoad=true`, `KeepAlive=true`; deployed shell and Tailscale listener verified |
+| Code Assist worker | User LaunchAgent `com.code-assist.worker` | `RunAtLoad=true`, `KeepAlive=true`; Node process backed by the `code_assist` database |
 | Code Assist updater | User LaunchAgent `com.code-assist.updater` | `RunAtLoad=true`, `StartInterval=60`; fetches and validates published `main` releases |
 
 OrbStack login startup was enabled at Tim's request on October 19, 2026. PostgreSQL and Tailscale already had their login startup registered. All three services were running after verification. These are login-start settings; unattended recovery before login and an actual logout/login or reboot cycle have not been tested.
@@ -77,9 +78,9 @@ The Docker smoke test passed image building, Compose startup and health checks, 
 | Locale and encoding | `en_US.UTF-8`, UTF-8 |
 | Data checksums | Enabled |
 | Authentication | Fresh `initdb` defaults: local connections use `trust` |
-| Databases | `postgres`, `template0`, `template1` only |
+| Application database | `code_assist`, owned by the non-superuser `code_assist` login role; pg-boss and diagnostic state |
 
-PostgreSQL 16 was uninstalled. At Tim's direction, PostgreSQL 18 was then reinitialized from scratch: both former Hint Lite databases, migrated roles, old PostgreSQL 16 data, and the upgrade backup were deleted. There is no retained backup of those old databases. Only the local installation administrator and PostgreSQL's built-in roles remain.
+PostgreSQL 16 was uninstalled. At Tim's direction, PostgreSQL 18 was then reinitialized from scratch: both former Hint Lite databases, migrated roles, old PostgreSQL 16 data, and the upgrade backup were deleted. There is no retained backup of those old databases. Code Assist subsequently received its own database and local application role.
 
 The fresh instance passed a localhost connection check and a transactional create/insert/read test that was rolled back. The shell's PostgreSQL path now points to version 18.
 
@@ -119,7 +120,7 @@ df -h /System/Volumes/Data
 - Test the configured login startup and recovery after logout, reboot, and power interruption, including whether manual login is needed before services become available.
 - Select the first supported repository and prove its unchanged full validation, Docker services, and browser workflows through both SDKs.
 - Prove isolation between two simultaneous workspaces, including databases, container resources, ports, and browser profiles.
-- Web supervision and release locations are configured; choose worker supervision, durable-job storage and backup/restore when implementing the engine. No ongoing database backup schedule was configured during this setup.
+- Web and worker supervision, release locations and pg-boss storage are configured. Define and test backup/restore before real jobs; no ongoing database backup schedule is configured.
 - Mac mini settings require the configured owner's Tailscale identity. Extend required authorization to future private ticket and approval routes as they are introduced.
 
 Optional optimizations and controls introduced by this documentation: none.

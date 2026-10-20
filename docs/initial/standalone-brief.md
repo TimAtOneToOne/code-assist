@@ -25,7 +25,7 @@ Approval should clearly authorize implementation, branch creation and PR publica
 
 ## Durable State and Recovery
 
-Use a small TypeScript state machine backed by local PostgreSQL, advanced by a supervised local worker. The browser records commands and displays state; long-running agent work runs outside HTTP requests. The Mac process manager and database packaging still need selection and proof.
+Use a small TypeScript state machine backed by local PostgreSQL, advanced by a supervised local worker. Tim selected pg-boss for durable job execution on October 19, 2026. Native PostgreSQL 18 and launchd host the initial worker; see [the diagnostic proof and current limitations](../worker.md). The browser records commands and displays state; long-running agent work runs outside HTTP requests.
 
 Preserve these behavioral requirements:
 

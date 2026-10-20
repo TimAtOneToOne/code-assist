@@ -56,3 +56,4 @@ for (const [label, script, schedule] of [
   });
 }
 console.log("Installed Code Assist web and updater login services.");
+await import("./install-worker.ts");

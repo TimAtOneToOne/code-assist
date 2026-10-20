@@ -18,6 +18,7 @@ import {
   repository,
   root,
   webLabel,
+  workerLabel,
 } from "./settings.ts";
 
 function run(command: string, args: string[], cwd = root) {
@@ -88,6 +89,8 @@ export async function deploy(restart = true) {
   renameSync(next, current);
   if (restart) {
     run("/bin/launchctl", ["kickstart", "-k", `${domain}/${webLabel}`]);
+    // The worker drains its current step; launchd then starts the new release.
+    run("/bin/launchctl", ["kill", "SIGTERM", `${domain}/${workerLabel}`]);
   }
   console.log(`${new Date().toISOString()} Activated ${commit}`);
 }
