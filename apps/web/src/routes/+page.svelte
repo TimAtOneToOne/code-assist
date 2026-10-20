@@ -32,16 +32,18 @@
 			: 'Checks run when requested.'} New tickets need Plan and must not have Code.
 	</p>{/if}
 {#if data.scan}
-	<Card.Root class="panel"
-		><Card.Title>Latest Linear check: {data.scan.status}</Card.Title>
-		<p>
-			{date(data.scan.created_at)}{#if data.scan.issue_count !== null}
-				· {data.scan.issue_count} tickets observed{/if}
-		</p>
+	<Card.Root class="mb-5 gap-2 px-4 py-3">
+		<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+			<Card.Title class="text-sm">Latest Linear check: {data.scan.status}</Card.Title>
+			<p class="text-sm">
+				{date(data.scan.created_at)}{#if data.scan.issue_count !== null}
+					· {data.scan.issue_count} tickets observed{/if}
+			</p>
+		</div>
 		{#if data.scan.error}<p role="alert" class="text-destructive">
 				{data.scan.error}
-			</p>{/if}</Card.Root
-	>
+			</p>{/if}
+	</Card.Root>
 {/if}
 {#if data.notifications.length}
 	<Card.Root class="panel"
@@ -60,27 +62,31 @@
 		<p>Run a Linear check to bring in tickets labeled Plan.</p></Card.Root
 	>{/if}
 {#each data.issues as item (item.id)}
-	<Card.Root class="panel">
-		<div class="flex flex-wrap items-center gap-3">
-			<Badge variant={item.selected_repositories.length ? 'secondary' : 'default'}
-				>{item.selected_repositories.length ? 'Repositories selected' : 'Needs repositories'}</Badge
+	<Card.Root class="mb-2 gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+		<div class="min-w-0 space-y-1">
+			<div class="flex flex-wrap items-center gap-2">
+				<Badge variant={item.selected_repositories.length ? 'secondary' : 'default'}
+					>{item.selected_repositories.length
+						? 'Repositories selected'
+						: 'Needs repositories'}</Badge
+				>
+				{#if !item.eligible}<Badge variant="outline">Plan trigger no longer present</Badge
+					>{/if}<span class="text-sm text-muted-foreground">{item.ticket.identifier}</span>
+			</div>
+			<Card.Title
+				><a href={resolve('/tickets/[id]', { id: item.id })}>{item.ticket.title}</a></Card.Title
 			>
-			{#if !item.eligible}<Badge variant="outline">Plan trigger no longer present</Badge>{/if}<span
-				class="text-sm text-muted-foreground">{item.ticket.identifier}</span
-			>
+			<p class="text-sm">
+				{#if item.selected_repositories.length}Selected: {item.selected_repositories
+						.map((path) => path.split('/').at(-1))
+						.join(', ')}{:else if item.suggestions.length}Suggested: {item.suggestions
+						.map((s) => s.repository.name)
+						.join(', ')}{:else}No explicit repository reference found. Choose from Mia’s
+					repositories.{/if}
+			</p>
 		</div>
-		<Card.Title
-			><a href={resolve('/tickets/[id]', { id: item.id })}>{item.ticket.title}</a></Card.Title
-		>
-		<p class="text-sm">
-			{#if item.selected_repositories.length}Selected: {item.selected_repositories
-					.map((path) => path.split('/').at(-1))
-					.join(', ')}{:else if item.suggestions.length}Suggested: {item.suggestions
-					.map((s) => s.repository.name)
-					.join(', ')}{:else}No explicit repository reference found. Choose from Mia’s repositories.{/if}
-		</p>
-		<div>
-			<Button href={resolve('/tickets/[id]', { id: item.id })} variant="outline"
+		<div class="shrink-0">
+			<Button href={resolve('/tickets/[id]', { id: item.id })} variant="outline" size="sm"
 				>Review ticket →</Button
 			>
 		</div>
