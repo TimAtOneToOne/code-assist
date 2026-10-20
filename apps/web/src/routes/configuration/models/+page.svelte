@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Input } from '#lib/components/ui/input/index.js';
+	import ModelPicker from '#lib/components/model-picker.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
@@ -40,47 +40,34 @@
 <Card.Root class="max-w-2xl gap-5 p-5">
 	<Card.Title>Model Selection</Card.Title>
 	<Card.Description
-		>Choose a suggestion or enter a model ID. Suggestions were verified on October 20, 2026; access
-		depends on the saved provider account.</Card.Description
+		>Choose a model, or select Custom Model to enter another ID. Suggestions were verified on
+		October 20, 2026; access depends on the saved provider account.</Card.Description
 	>
 	{#key `${data.settings.codex}:${data.settings.claude}`}
 		<form method="POST" action="?/save" use:enhance class="space-y-6">
 			<div class="space-y-2">
-				<label for="codex-model" class="text-sm font-medium">Codex Model</label>
-				<Input
+				<ModelPicker
 					id="codex-model"
 					name="codex"
+					label="Codex Model"
 					value={data.settings.codex}
-					list="codex-models"
-					required
-					autocomplete="off"
-					spellcheck={false}
-					aria-describedby="codex-description"
+					options={codexSuggestions}
+					descriptionId="codex-description"
 				/>
-				<datalist id="codex-models"
-					>{#each codexSuggestions as model (model)}<option value={model}></option>{/each}</datalist
-				>
 				<p id="codex-description" class="text-sm text-muted-foreground">
 					Used for initial discovery and plan drafting and revision. This selection will also be
 					used by the coding runner when it is added.
 				</p>
 			</div>
 			<div class="space-y-2">
-				<label for="claude-model" class="text-sm font-medium">Claude Model</label>
-				<Input
+				<ModelPicker
 					id="claude-model"
 					name="claude"
+					label="Claude Model"
 					value={data.settings.claude}
-					list="claude-models"
-					required
-					autocomplete="off"
-					spellcheck={false}
-					aria-describedby="claude-description"
+					options={claudeSuggestions}
+					descriptionId="claude-description"
 				/>
-				<datalist id="claude-models"
-					>{#each claudeSuggestions as model (model)}<option value={model}
-						></option>{/each}</datalist
-				>
 				<p id="claude-description" class="text-sm text-muted-foreground">
 					Used for adversarial plan review.
 				</p>

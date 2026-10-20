@@ -1,8 +1,9 @@
 # Agent Models
 
 Open [Configuration → Agent Models](http://100.91.0.83:3000/configuration/models)
-to change the model IDs used by Codex and Claude. The page suggests models verified
-with the saved provider accounts on October 20, 2026 and accepts other model IDs.
+to change the model IDs used by Codex and Claude. Each field is a dropdown listing
+models verified with the saved provider accounts on October 20, 2026. Choose
+**Custom Model…** to enter another ID; saved custom IDs remain editable after reload.
 Suggestions are not a live provider catalog. Saving validates the fields without
 making a model request; an unavailable model fails its agent step normally.
 
