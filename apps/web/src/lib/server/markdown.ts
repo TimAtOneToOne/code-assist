@@ -8,6 +8,7 @@ export function renderMarkdown(markdown: string): string {
 			...sanitizeHtml.defaults.allowedAttributes,
 			img: ['src', 'alt', 'title', 'width', 'height'],
 			code: ['class'],
+			ol: ['start'],
 			input: ['type', 'checked', 'disabled']
 		},
 		transformTags: {

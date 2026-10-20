@@ -49,3 +49,13 @@ Optional optimizations and controls:
 - No other optional optimization or control is introduced. Exact approval checks, scope fencing and read-only tool authorization enforce the requested planning workflow and permissions.
 
 References: [Anthropic workspace selection](https://platform.claude.com/docs/en/manage-claude/authentication), [Claude environment variables](https://code.claude.com/docs/en/env-vars), [native permission hooks](https://code.claude.com/docs/en/agent-sdk/permissions), [structured output](https://code.claude.com/docs/en/agent-sdk/structured-outputs).
+
+## Comparing plan versions
+
+For v2 and later, **Show changes since vN** is enabled by default and compares the selected version with its immediate predecessor in the same planning run. Added or rewritten paragraphs, headings and list items are yellow. Code blocks, tables and other compound blocks are compared as complete sections. Unchanged content keeps its normal appearance. Turning the toggle off shows the clean plan.
+
+**Removed text** contains previous wording removed or replaced by that revision, including the old text of rewritten sections. Moved sections can appear as a removal and addition. This is a literal rendered-content comparison, not an AI judgment about whether a change is significant; broad rewrites may highlight much of a plan. V1 has no comparison, and identical rendered revisions show “No content changes.” Downloads remain the original saved Markdown.
+
+Comparison runs on the server using the same sanitized Markdown renderer. Only generated display markers are added to its output; saved plans, hashes, reviews and approvals are unchanged. The ordered-list start attribute is retained so numbered steps render accurately in both the plan and removed text.
+
+Optional optimizations and controls for comparison: Tim requested and approved the display toggle and removed-text disclosure. They affect only presentation: turning highlighting off hides comparison annotations, while the saved version remains visible. No caching, truncation, semantic filtering or workflow controls were added.

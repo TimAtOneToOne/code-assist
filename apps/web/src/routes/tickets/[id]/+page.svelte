@@ -83,6 +83,7 @@
 {#if planning && !data.item.removed_at}<PlanningPanel
 		run={planning}
 		html={data.planHtml}
+		changes={data.planChanges}
 		editable={data.item.eligible}
 	/>{/if}
 {#each data.item.planning.filter((run) => run.id !== planning?.id || data.item.removed_at) as previous (previous.id)}<details
@@ -90,7 +91,12 @@
 	>
 		<summary class="cursor-pointer text-sm text-muted-foreground"
 			>Earlier planning · {new Date(previous.created_at).toLocaleString()} · {previous.status}</summary
-		><PlanningPanel run={previous} html={data.planHtml} editable={false} />
+		><PlanningPanel
+			run={previous}
+			html={data.planHtml}
+			changes={data.planChanges}
+			editable={false}
+		/>
 	</details>{/each}
 {#if discovery && !data.item.removed_at}
 	<details open={!planning} class="mb-5">

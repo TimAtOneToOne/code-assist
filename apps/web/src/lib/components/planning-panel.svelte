@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import type { PlanChanges } from '#lib/server/plan-changes.js';
 	import type { PlanningDetail } from '@code-assist/intake/planning';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -10,10 +11,18 @@
 	let {
 		run,
 		html,
+		changes,
 		editable
-	}: { run: PlanningDetail; html: Record<string, string>; editable: boolean } = $props();
+	}: {
+		run: PlanningDetail;
+		html: Record<string, string>;
+		changes: Record<string, PlanChanges & { previousVersion: number }>;
+		editable: boolean;
+	} = $props();
+	let showChanges = $state(true);
 	let selected = $state<number | null>(null);
 	let version = $derived(run.versions.find((v) => v.number === (selected ?? run.current_version)));
+	let comparison = $derived(version ? changes[`${run.id}:${version.number}`] : undefined);
 	let current = $derived(version?.number === run.current_version);
 	let review = $derived(version?.review);
 	let approval = $derived(run.approvals.find((a) => a.version === version?.number));
@@ -79,11 +88,36 @@
 						version: String(version.number)
 					})}>Download plan_v{version.number}.md</Button
 				>{/if}
+			{#if comparison}<label class="flex items-center gap-2 text-sm"
+					><input type="checkbox" bind:checked={showChanges} />Show changes since v{comparison.previousVersion}</label
+				>{/if}
 		</div>{/if}
 	{#if version}
 		{#key `${run.id}:${version.number}`}
 			<p class="text-sm text-muted-foreground">{version.document.changeSummary}</p>
-			<Markdown html={html[`${run.id}:${version.number}`] ?? ''} />
+			{#if showChanges && comparison}<p class="text-sm text-muted-foreground" role="status">
+					{#if comparison.addedCount || comparison.removedCount}Yellow marks added or changed
+						sections since v{comparison.previousVersion}. {comparison.addedCount} added or changed · {comparison.removedCount}
+						removed or replaced.{:else}No content changes since v{comparison.previousVersion}.{/if}
+				</p>{/if}
+			<Markdown
+				html={showChanges && comparison
+					? comparison.html
+					: (html[`${run.id}:${version.number}`] ?? '')}
+			/>
+			{#if showChanges && comparison?.removedHtml.length}<details class="rounded-lg border p-3">
+					<summary class="cursor-pointer text-sm font-medium"
+						>Removed text from v{comparison.previousVersion} · {comparison.removedCount} sections</summary
+					>
+					<p class="mt-3 text-sm text-muted-foreground">
+						Previous wording that was removed or replaced in this version.
+					</p>
+					<div class="mt-3 divide-y">
+						{#each comparison.removedHtml as removed, index (index)}<div class="py-3">
+								<Markdown html={removed} />
+							</div>{/each}
+					</div>
+				</details>{/if}
 			{#if version.document.responses.length}<details>
 					<summary class="cursor-pointer text-sm font-medium"
 						>Codex responses to review findings</summary

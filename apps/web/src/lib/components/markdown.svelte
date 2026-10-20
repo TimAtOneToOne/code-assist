@@ -3,7 +3,7 @@
 </script>
 
 <div class="markdown">
-	<!-- eslint-disable-next-line svelte/no-at-html-tags -- HTML is sanitized by server/markdown.ts. -->
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- HTML is sanitized by server/markdown.ts; plan-changes.ts adds only generated highlight markers. -->
 	{@html html}
 </div>
 
@@ -96,6 +96,15 @@
 	}
 	.markdown :global(input[type='checkbox']) {
 		margin-right: 0.4em;
+	}
+	.markdown :global([data-plan-change='added']) {
+		background: #fef08a;
+		color: #422006;
+		border-radius: 3px;
+		box-shadow: -3px 0 0 #eab308;
+	}
+	.markdown :global([data-plan-change='added'] code) {
+		background: transparent;
 	}
 	.markdown :global(> :first-child) {
 		margin-top: 0;

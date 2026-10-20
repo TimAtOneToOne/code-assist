@@ -17,6 +17,7 @@ import { discoverRepositories } from '@code-assist/intake/repositories';
 import { withController } from '#lib/server/intake.js';
 import { dataDirectory } from '#lib/server/data-directory.js';
 import { requireSettingsAccess } from '#lib/server/settings-access.js';
+import { renderPlanChanges } from '#lib/server/plan-changes.js';
 import { renderMarkdown } from '#lib/server/markdown.js';
 import type { Actions, PageServerLoad } from './$types';
 function issueId(id: string) {
@@ -34,6 +35,26 @@ export const load: PageServerLoad = async (event) => {
 	if (!item) error(404, 'Ticket not found.');
 	return {
 		item,
+		planChanges: Object.fromEntries(
+			item.planning.flatMap((run) =>
+				run.versions.flatMap((version, index) =>
+					index === 0
+						? []
+						: [
+								[
+									`${run.id}:${version.number}`,
+									{
+										previousVersion: run.versions[index - 1].number,
+										...renderPlanChanges(
+											run.versions[index - 1].document.markdown,
+											version.document.markdown
+										)
+									}
+								]
+							]
+				)
+			)
+		),
 		planHtml: Object.fromEntries(
 			item.planning.flatMap((run) =>
 				run.versions.flatMap((v) => {

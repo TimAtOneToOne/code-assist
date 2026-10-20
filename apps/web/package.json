@@ -52,7 +52,9 @@
 		"@code-assist/secrets": "workspace:*",
 		"@opentelemetry/api": "1.9.1",
 		"bits-ui": "2.19.5",
+		"diff": "9.0.0",
 		"marked": "18.1.1",
+		"parse5": "8.0.1",
 		"sanitize-html": "2.18.1"
 	}
 }
