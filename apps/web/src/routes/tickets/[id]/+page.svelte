@@ -6,6 +6,7 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import RepositoryPicker from '#lib/components/repository-picker.svelte';
 	import Markdown from '#lib/components/markdown.svelte';
+	import PageJump from '#lib/components/page-jump.svelte';
 	import PlanningPanel from '#lib/components/planning-panel.svelte';
 	import DiscoveryPanel from '#lib/components/discovery-panel.svelte';
 	import type { PageProps } from './$types';
@@ -156,3 +157,5 @@
 			{new Date(event.created_at).toLocaleString()} · {eventText(event)}
 		</p>{/each}
 </Card.Root>
+
+<PageJump />
