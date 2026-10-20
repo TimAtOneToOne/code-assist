@@ -11,6 +11,7 @@ import { dataDirectory } from '#lib/server/data-directory.js';
 import { requireSettingsAccess } from '#lib/server/settings-access.js';
 import { listRepositories } from '#lib/server/repositories.js';
 import type { Actions, PageServerLoad } from './$types';
+import { readAwsSettings } from '@code-assist/intake/aws-settings';
 import { readSettings } from '@code-assist/intake/settings';
 
 export const load: PageServerLoad = async (event) => {
@@ -70,6 +71,11 @@ export const actions = {
 					'Choose a different secret in intake settings before deleting this one.'
 				);
 			}
+			const aws = readAwsSettings(dataDirectory());
+			if (aws && [aws.accessKeySecretId, aws.secretAccessKeySecretId].includes(field('id')))
+				throw new SecretInputError(
+					'Choose a different key in AWS staging settings before deleting this one.'
+				);
 			deleteSecret(dataDirectory(), field('id'));
 		}),
 	saveMapping: (event) =>

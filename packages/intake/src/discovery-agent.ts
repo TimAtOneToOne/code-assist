@@ -3,6 +3,7 @@ import { mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { writePlanningAwsProfile, type PlanningAws } from "./planning-aws.ts";
 import { Codex } from "@openai/codex-sdk";
 import type { ThreadEvent } from "@openai/codex-sdk";
 import type {
@@ -165,6 +166,7 @@ export type AgentEvent = {
 };
 export type AgentInput = {
   apiKey: string;
+  aws?: PlanningAws;
   workspace: string;
   home: string;
   prompt: string;
@@ -181,8 +183,21 @@ export async function runCodex(
     temporary = join(input.home, "tmp");
   await mkdir(codexHome, { recursive: true, mode: 0o700 });
   await mkdir(temporary, { recursive: true, mode: 0o700 });
+  const awsEnvironment = input.aws
+    ? await writePlanningAwsProfile(input.home, input.aws)
+    : {};
+  const path = input.aws
+    ? `/opt/homebrew/bin:/usr/local/bin:${agentPath}`
+    : agentPath;
+  const shellEnvironment = {
+    PATH: path,
+    HOME: input.home,
+    TMPDIR: temporary,
+    ...awsEnvironment,
+  };
   const environment = {
-    PATH: agentPath,
+    ...shellEnvironment,
+    PATH: path,
     HOME: input.home,
     CODEX_HOME: codexHome,
     TMPDIR: temporary,
@@ -192,14 +207,22 @@ export async function runCodex(
     env: environment,
     config: {
       default_permissions: "discovery",
-      permissions: { discovery: { network: { enabled: false } } },
+      ...(input.aws ? { features: { network_proxy: true } } : {}),
+      permissions: {
+        discovery: {
+          network: input.aws ? { enabled: true } : { enabled: false },
+        },
+      },
       shell_environment_policy: {
         inherit: "none",
-        set: { PATH: agentPath, HOME: input.home, TMPDIR: temporary },
+        set: shellEnvironment,
       },
     },
     configOverrides: [
-      `permissions.discovery.filesystem={":minimal"="read",${JSON.stringify(input.workspace)}="read"}`,
+      ...(input.aws
+        ? ['permissions.discovery.network.domains={"*.amazonaws.com"="allow"}']
+        : []),
+      `permissions.discovery.filesystem={":minimal"="read",${JSON.stringify(input.workspace)}="read"${input.aws ? `,${JSON.stringify(join(input.home, ".aws"))}="read","/opt/homebrew/bin"="read","/opt/homebrew/Cellar"="read","/opt/homebrew/opt"="read","/opt/homebrew/etc/openssl@3"="read","/usr/local/bin"="read","/usr/local/aws-cli"="read"` : ""}}`,
     ],
   });
   const thread = codex.startThread({

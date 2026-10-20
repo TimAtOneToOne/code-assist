@@ -33,3 +33,7 @@ The UI and resolver are implemented; the agent runner is still pending. Saving a
 The October 20, 2026 browser probe on Mia exercised adding a secret, Reveal/Hide, mapping it to a repository variable, rotating it, preventing deletion while mapped, removing the mapping and deleting the secret. It also checked initial HTML omission, non-cacheable reveal responses, runtime resolution and cross-origin mutation rejection. Only synthetic keys were revealed in browser evidence.
 
 Optional optimizations and controls: none. Owner authorization, non-cacheable secret responses, private file permissions and mapping validation implement credential confidentiality and data integrity.
+
+## AWS staging planning connection
+
+The AWS staging page selects saved source credentials by ID. The imported names are `STAGING_AGENT_AWS_ACCESS_KEY_ID` and `STAGING_AGENT_AWS_SECRET_ACCESS_KEY`. They are used by the worker to assume the configured read-only role, not injected as repository environment variables. Account, role, region and profile are non-secret connection settings. The original IAM user ARN and source-profile name describe the source installation and are not needed by the worker, which passes the selected keys explicitly to STS. See [planning](planning.md#aws-staging-evidence) for runtime behavior and verification.

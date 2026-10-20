@@ -41,6 +41,13 @@
 		>
 	</div>
 </Card.Root>
+<Card.Root class="panel">
+	<Card.Title>AWS staging</Card.Title>
+	<Card.Description>Configure read-only AWS access for Codex and Claude planning.</Card.Description>
+	<div>
+		<Button href={resolve('/configuration/aws')} variant="outline">Configure AWS staging →</Button>
+	</div>
+</Card.Root>
 <Card.Root class="panel" aria-labelledby="deployment-title">
 	<Card.Header class="panel-heading p-0">
 		<Card.Title id="deployment-title">Application</Card.Title>

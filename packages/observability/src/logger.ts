@@ -26,9 +26,9 @@ type Options = {
 };
 
 const sensitiveKey =
-  /^(?:.*[_-])?(?:password|passwd|pswd|secret|token|api[_-]?key|authorization|cookie|connection[_-]?string)$/i;
+  /^(?:.*[_-])?(?:password|passwd|pswd|secret|token|(?:secret[_-]?)?access[_-]?key(?:[_-]?id)?|api[_-]?key|authorization|cookie|connection[_-]?string)$/i;
 const secretField =
-  /^(password|passwd|pswd|secret|token|accessToken|refreshToken|apiKey|api_key|authorization|cookie|connectionString)$/i;
+  /^(password|passwd|pswd|secret|token|accessToken|refreshToken|sessionToken|SessionToken|accessKeyId|AccessKeyId|secretAccessKey|SecretAccessKey|apiKey|api_key|authorization|cookie|connectionString)$/i;
 
 export function createLogger(
   service: string,

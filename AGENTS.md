@@ -2,7 +2,7 @@
 
 ## Project Scope
 
-Code Assist is a standalone application deployed to a Mac mini. Run the UI, controller, Codex SDK, Claude Agent SDK, database, workspaces, test services and browsers locally. Do not introduce AWS infrastructure or dependencies on Workplace Agents services. External integrations are Linear, GitHub, OpenAI, Anthropic and the configured Teams notification endpoint.
+Code Assist is a standalone application deployed to a Mac mini. Run the UI, controller, Codex SDK, Claude Agent SDK, database, workspaces, test services and browsers locally. Do not introduce AWS infrastructure or dependencies on Workplace Agents services. External integrations are Linear, GitHub, OpenAI, Anthropic the configured Teams notification endpoint, and Tim’s read-only AWS staging role for planning evidence. This AWS inspection capability does not move any Code Assist runtime or infrastructure into AWS.
 
 Start with `docs/initial/README.md` and `docs/initial/standalone-brief.md`. The interactive prototype in `docs/initial/index.html` is a visual reference with simulated data, not a backend implementation. Tim expanded intake on October 20, 2026 to multiple user-confirmed repositories per ticket. Prefill the searchable multi-select with suggestions; preserve saved choices. Tim approves plans and merges PRs. An observed merge means Done.
 

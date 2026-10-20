@@ -3,6 +3,13 @@ import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
 import { listConfiguration, revealSecret } from "@code-assist/secrets";
 import { runAgentProcess } from "./discovery-agent.ts";
+import {
+  assumePlanningRole,
+  verifyPlanningIdentity,
+  awsEvidenceContext,
+  removePlanningAwsProfile,
+} from "./planning-aws.ts";
+import { readAwsSettings } from "./aws-settings.ts";
 import { planningPrompt } from "./planning-agent.ts";
 import {
   planningQueue,
@@ -42,6 +49,7 @@ export async function registerPlanningWorker(
         ticket_id: step.input.discovery.ticket.identifier,
       },
     );
+    const home = join(directory, "planning", step.run_id, step.id, "home");
     let pending = Promise.resolve();
     let stage = "configuration";
     try {
@@ -71,7 +79,41 @@ export async function registerPlanningWorker(
       const snapshots = step.input.discovery.snapshots;
       if (!snapshots?.length)
         throw new Error("Planning has no recorded source snapshots.");
-      const prompt = planningPrompt(step);
+      const awsSettings = readAwsSettings(directory);
+      stage = "AWS staging connection";
+      const aws = await assumePlanningRole(
+        directory,
+        "code-assist-" + step.id,
+        signal,
+        awsSettings,
+      );
+      if (aws) {
+        log = createLogger(
+          "planning",
+          {
+            environment: {
+              ...process.env,
+              [secretName]: apiKey,
+              AWS_ACCESS_KEY_ID: aws.credentials.accessKeyId,
+              AWS_SECRET_ACCESS_KEY: aws.credentials.secretAccessKey,
+              AWS_SESSION_TOKEN: aws.credentials.sessionToken,
+            },
+          },
+          {
+            attempt_id: step.id,
+            job_id: job.id,
+            ticket_id: step.input.discovery.ticket.identifier,
+          },
+        );
+        const identity = await verifyPlanningIdentity(aws, signal);
+        log.event(
+          "info",
+          "planning.aws.connected",
+          "AWS staging role assumed for this step",
+          { ...awsEvidenceContext(aws), identity },
+        );
+      }
+      const prompt = planningPrompt(step, aws);
       log.payload(
         "planning.input",
         `${provider} ${step.kind} for plan v${step.version}`,
@@ -84,7 +126,8 @@ export async function registerPlanningWorker(
           provider,
           anthropicWorkspaceId,
           workspace: dirname(snapshots[0].directory),
-          home: join(directory, "planning", step.run_id, step.id, "home"),
+          home,
+          aws,
           prompt,
           outputSchema: step.kind === "draft" ? planSchema : reviewSchema,
         },
@@ -153,6 +196,8 @@ export async function registerPlanningWorker(
       await failPlanningStep(boss, step, message);
       // eslint-disable-next-line preserve-caught-error -- Raw provider errors may contain credentials; the redacted artifact retains diagnostics.
       throw new Error(message);
+    } finally {
+      await removePlanningAwsProfile(home);
     }
   });
 }

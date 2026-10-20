@@ -83,3 +83,37 @@ test("reject traversal and report unavailable evidence storage instead of claimi
     ensureStorageDirectory("/Volumes/code-assist-nonexistent-test-volume/data"),
   );
 });
+
+test("AWS session credentials are redacted from structured fields and embedded tool output", (t) => {
+  const root = mkdtempSync(join(temporary, "aws-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const logger = createLogger("test", {
+    logDirectory: root,
+    artifactDirectory: join(root, "artifacts"),
+    environment: {
+      AWS_ACCESS_KEY_ID: "synthetic-aws-id",
+      AWS_SECRET_ACCESS_KEY: "synthetic-aws-secret",
+      AWS_SESSION_TOKEN: "synthetic-aws-token",
+    },
+  });
+  const result = logger.payload("aws.event", "AWS tool output", {
+    output: "synthetic-aws-id synthetic-aws-secret synthetic-aws-token",
+    credentials: {
+      AccessKeyId: "another-id",
+      SecretAccessKey: "another-secret",
+      SessionToken: "another-token",
+    },
+  });
+  const payload = JSON.parse(
+    readFileSync(
+      artifactPath(join(root, "artifacts"), result.artifact_id),
+      "utf8",
+    ),
+  );
+  assert.equal(payload.output, "[REDACTED] [REDACTED] [REDACTED]");
+  assert.deepEqual(payload.credentials, {
+    AccessKeyId: "[REDACTED]",
+    SecretAccessKey: "[REDACTED]",
+    SessionToken: "[REDACTED]",
+  });
+});
