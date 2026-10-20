@@ -16,7 +16,7 @@ import {
   requestScan,
   recordScan,
   readWorkItem,
-  selectRepository,
+  selectRepositories,
   dashboard,
   requeuePendingNotifications,
   notificationQueue,
@@ -95,16 +95,37 @@ test("durable intake, selection, rollback and notification delivery across resta
       (await readWorkItem(boss.getDb(), ticket.id))?.events.length,
       1,
     );
-    await selectRepository(
+    // Reproduce a database from the single-repository release.
+    await boss
+      .getDb()
+      .executeSql(
+        "ALTER TABLE code_assist.intake_issue DROP COLUMN selected_repositories",
+      );
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.intake_issue SET selected_repository=$2 WHERE id=$1",
+        [ticket.id, "/repos/repo-one"],
+      );
+    await initializeIntake(boss);
+    assert.deepEqual(
+      (await readWorkItem(boss.getDb(), ticket.id))?.selected_repositories,
+      ["/repos/repo-one"],
+    );
+    await selectRepositories(
       boss,
       ticket.id,
-      "/repos/repo-one",
+      ["/repos/repo-two", "/repos/repo-one"],
       ticket.updatedAt,
     );
-    await selectRepository(
+    await assert.rejects(
+      selectRepositories(boss, ticket.id, [], ticket.updatedAt),
+      /one or more/,
+    );
+    await selectRepositories(
       boss,
       ticket.id,
-      "/repos/repo-one",
+      ["/repos/repo-one", "/repos/repo-two"],
       ticket.updatedAt,
     );
     await boss.stop();
@@ -112,9 +133,9 @@ test("durable intake, selection, rollback and notification delivery across resta
     boss.on("error", () => {});
     await boss.start();
     await initializeIntake(boss);
-    assert.equal(
-      (await readWorkItem(boss.getDb(), ticket.id))?.selected_repository,
-      "/repos/repo-one",
+    assert.deepEqual(
+      (await readWorkItem(boss.getDb(), ticket.id))?.selected_repositories,
+      ["/repos/repo-two", "/repos/repo-one"],
     );
     const changed = {
       ...ticket,
@@ -123,14 +144,17 @@ test("durable intake, selection, rollback and notification delivery across resta
     };
     await recordScan(boss, scan, [changed], repositories);
     await assert.rejects(
-      selectRepository(boss, ticket.id, "/repos/other", ticket.updatedAt),
+      selectRepositories(boss, ticket.id, ["/repos/other"], ticket.updatedAt),
       /ticket changed/,
     );
     await recordScan(boss, scan, [], repositories);
     await recordScan(boss, scan, [ticket], repositories);
     const item = await readWorkItem(boss.getDb(), ticket.id);
     assert.equal(item?.eligible, false);
-    assert.equal(item?.selected_repository, "/repos/repo-one");
+    assert.deepEqual(item?.selected_repositories, [
+      "/repos/repo-two",
+      "/repos/repo-one",
+    ]);
     assert.equal(item?.events.length, 2);
     await recordScan(
       boss,

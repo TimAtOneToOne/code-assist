@@ -33,7 +33,7 @@ export function attentionMessage(
     dateStyle: "medium",
     timeStyle: "long",
   }).format(date);
-  return `<p><b>Code Assist · ${html(identifier)}</b><br><b>🔎 Ready for review · Choose a repository</b><br><br><b>Time:</b> ${html(timestamp)}<br><br>${html(title)}<br><br>This Plan ticket is waiting for your repository selection. Review the suggested repositories and their supporting references, or select another repository from Mia's clones. Planning has not started.<br><br><b>Action needed:</b> Choose the repository on the ticket page.<br><br><a href="${applicationOrigin}/tickets/${encodeURIComponent(id)}">Review ${html(identifier)}</a></p>`;
+  return `<p><b>Code Assist · ${html(identifier)}</b><br><b>🔎 Ready for review · Choose repositories</b><br><br><b>Time:</b> ${html(timestamp)}<br><br>${html(title)}<br><br>This Plan ticket is waiting for your repository selection. Review the prefilled selection and add or remove repositories from Mia's clones. Planning has not started.<br><br><b>Action needed:</b> Confirm the applicable repositories on the ticket page.<br><br><a href="${applicationOrigin}/tickets/${encodeURIComponent(id)}">Review ${html(identifier)}</a></p>`;
 }
 
 export async function reconcileSchedule(boss: PgBoss, directory: string) {

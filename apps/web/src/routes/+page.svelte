@@ -62,8 +62,8 @@
 {#each data.issues as item (item.id)}
 	<Card.Root class="panel">
 		<div class="flex flex-wrap items-center gap-3">
-			<Badge variant={item.selected_repository ? 'secondary' : 'default'}
-				>{item.selected_repository ? 'Repository selected' : 'Needs repository'}</Badge
+			<Badge variant={item.selected_repositories.length ? 'secondary' : 'default'}
+				>{item.selected_repositories.length ? 'Repositories selected' : 'Needs repositories'}</Badge
 			>
 			{#if !item.eligible}<Badge variant="outline">Plan trigger no longer present</Badge>{/if}<span
 				class="text-sm text-muted-foreground">{item.ticket.identifier}</span
@@ -73,9 +73,9 @@
 			><a href={resolve('/tickets/[id]', { id: item.id })}>{item.ticket.title}</a></Card.Title
 		>
 		<p class="text-sm">
-			{#if item.selected_repository}Selected: {item.selected_repository
-					.split('/')
-					.at(-1)}{:else if item.suggestions.length}Suggested: {item.suggestions
+			{#if item.selected_repositories.length}Selected: {item.selected_repositories
+					.map((path) => path.split('/').at(-1))
+					.join(', ')}{:else if item.suggestions.length}Suggested: {item.suggestions
 					.map((s) => s.repository.name)
 					.join(', ')}{:else}No explicit repository reference found. Choose from Mia’s repositories.{/if}
 		</p>

@@ -14,12 +14,16 @@ export type WorkItem = {
   id: string;
   ticket: Ticket;
   suggestions: Suggestion[];
-  selected_repository: string | null;
+  selected_repositories: string[];
   selected_at: Date | null;
   eligible: boolean;
   created_at: Date;
   observed_at: Date;
 };
+
+// Read existing single-repository choices until the user saves a new selection.
+const issueColumns =
+  "*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories";
 
 export async function withIntake<T>(
   connectionString: string,
@@ -58,6 +62,7 @@ export async function initializeIntake(boss: PgBoss) {
       issue_id uuid NOT NULL REFERENCES code_assist.intake_issue(id),
       type text NOT NULL, details jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now()
     );
+    ALTER TABLE code_assist.intake_issue ADD COLUMN IF NOT EXISTS selected_repositories text[];
     CREATE TABLE IF NOT EXISTS code_assist.intake_scan (
       job_id uuid PRIMARY KEY, status text NOT NULL,
       started_at timestamptz, finished_at timestamptz, issue_count integer, error text,
@@ -168,7 +173,9 @@ export async function recordScan(
 export async function dashboard(boss: PgBoss) {
   const db = boss.getDb();
   const { rows: issues } = await db.executeSql(
-    "SELECT * FROM code_assist.intake_issue ORDER BY (selected_repository IS NULL) DESC,created_at DESC,id",
+    `SELECT ${issueColumns} FROM code_assist.intake_issue ORDER BY
+     (cardinality(COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL))) = 0) DESC,
+     created_at DESC,id`,
   );
   const { rows: scans } = await db.executeSql(
     "SELECT * FROM code_assist.intake_scan ORDER BY created_at DESC,job_id DESC LIMIT 1",
@@ -189,7 +196,7 @@ export async function dashboard(boss: PgBoss) {
 
 export async function readWorkItem(db: Db, id: string) {
   const { rows } = await db.executeSql(
-    "SELECT * FROM code_assist.intake_issue WHERE id=$1",
+    `SELECT ${issueColumns} FROM code_assist.intake_issue WHERE id=$1`,
     [id],
   );
   if (!rows.length) return null;
@@ -200,34 +207,42 @@ export async function readWorkItem(db: Db, id: string) {
   return { ...(rows[0] as WorkItem), events };
 }
 
-export async function selectRepository(
+export async function selectRepositories(
   boss: PgBoss,
   id: string,
-  repository: string,
+  repositories: string[],
   expectedUpdatedAt: string,
 ) {
+  if (
+    !repositories.length ||
+    new Set(repositories).size !== repositories.length
+  )
+    throw new Error("Choose one or more distinct repositories.");
   const tx = await boss.getDb().beginTransaction!();
   try {
     const { rows } = await tx.db.executeSql(
-      "SELECT * FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE",
+      `SELECT ${issueColumns} FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE`,
       [id],
     );
     const item = rows[0] as WorkItem | undefined;
     if (!item) throw new Error("Ticket not found.");
     if (item.ticket.updatedAt !== expectedUpdatedAt)
       throw new SelectionConflict(
-        "The ticket changed. Refresh and review it before choosing a repository.",
+        "The ticket changed. Refresh and review it before choosing repositories.",
       );
-    if (item.selected_repository !== repository) {
+    if (
+      item.selected_repositories.length !== repositories.length ||
+      repositories.some((path) => !item.selected_repositories.includes(path))
+    ) {
       await tx.db.executeSql(
-        "UPDATE code_assist.intake_issue SET selected_repository=$2,selected_at=now() WHERE id=$1",
-        [id, repository],
+        "UPDATE code_assist.intake_issue SET selected_repositories=$2,selected_at=now() WHERE id=$1",
+        [id, repositories],
       );
       await tx.db.executeSql(
-        "INSERT INTO code_assist.intake_event(issue_id,type,details) VALUES($1,'repository_selected',$2)",
+        "INSERT INTO code_assist.intake_event(issue_id,type,details) VALUES($1,'repositories_selected',$2)",
         [
           id,
-          JSON.stringify({ repository, ticketUpdatedAt: expectedUpdatedAt }),
+          JSON.stringify({ repositories, ticketUpdatedAt: expectedUpdatedAt }),
         ],
       );
     }

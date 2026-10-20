@@ -13,7 +13,7 @@ Build the observability application in SvelteKit and serve it from the Mia Mac m
 ## First-Release Workflow
 
 1. Poll all pages of Linear issues with `Plan` and without `Code`. Use the stable issue UUID to maintain one tracked work record. Keep observing tracked work when its labels change; a partial poll cannot establish removal. Five minutes was proposed, not finalized.
-2. Tim selects one repository from a manifest. Start with one supported repository selected by Tim. Repository inference and multi-repository orchestration were deferred.
+2. Tim confirms all applicable repositories. On October 20, 2026, he expanded intake to a searchable multi-select, prefilled with suggestions and without explanatory suggestion cards. Saved choices take precedence. Cross-repository planning, execution dependencies and coordinated PRs remain to be implemented; selecting repositories does not approve GitOps changes.
 3. Read the ticket and repository, ask needed questions in the application and persist the answers. `Plan` authorizes planning, not implementation. Do not automatically comment on Linear, change its labels or move tickets between states.
 4. Codex drafts a versioned plan; Claude reviews; Codex revises; Claude reviews again. Preserve every version and review. Before presentation, address all critical/high and most medium concerns; show remaining medium findings for Tim's decision. Do not invent a numeric meaning for “most.”
 5. Present the plan and receive feedback. Revise and review again until critical/high concerns are addressed. Tim approves the exact current plan version, bound to requirements and repository; stale approval must fail. Scope changes require new approval.
