@@ -1,0 +1,31 @@
+.env
+.DS_Store
+/.pnpm-store/
+.tmp/*
+!.tmp/.gitkeep
+
+# Terraform local state and operator-only values. Dependency lock files remain tracked.
+**/.terraform/*
+**/.terraform-backendless/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+infra/env/*/*.zip
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Patient demo payloads must stay local.
+/apps/portal/src/lib/server/elation-companion/demo-patient.html
+
+# Standalone module validation copies the staging provider lock.
+/infra/modules/agentcore-mysterium/.terraform.lock.hcl
+/infra/modules/patient-agent/.terraform.lock.hcl
+/infra/modules/agentcore-mcp/.terraform.lock.hcl
+/infra/modules/api-gateway/.terraform.lock.hcl

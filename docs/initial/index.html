@@ -1,0 +1,2042 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Code Assist · Development Support</title>
+    <meta name="prototype-scope" content="Standalone Mac mini application. One user-selected repository per ticket. Local workers run Codex and Claude SDKs. An observed human merge completes the work." />
+    <meta name="prototype-change-rationale" content="Preserve the attention-centered Home and ticket timeline. Align the example with single-repository scope and merge-to-Done completion." />
+    <meta name="prototype-limitations" content="Browser-local demonstration only. Agent work, PRs and findings are simulated. No backend, polling, provider calls or notifications run in this page." />
+    <style>
+      :root {
+        --ink: #243246;
+        --muted: #718096;
+        --line: #e1e7ee;
+        --bg: #f5f7fa;
+        --blue: #4864df;
+        --blue-light: #eef1ff;
+        --green: #287f65;
+        --amber: #9b6419;
+        --red: #a84847;
+        --nav: #182533;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.55 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      button,
+      a,
+      input,
+      textarea,
+      select,
+      summary {
+        outline-offset: 4px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      a {
+        color: var(--blue);
+        text-decoration: none;
+      }
+      button {
+        color: inherit;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: 29px;
+        line-height: 1.25;
+        letter-spacing: -1px;
+      }
+      h2 {
+        font-size: 17px;
+        letter-spacing: -0.25px;
+      }
+      h3 {
+        font-size: 14px;
+      }
+      small,
+      .muted {
+        color: var(--muted);
+      }
+      small {
+        font-size: 12px;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        border-radius: 7px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 195px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+      .nav {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        background: var(--nav);
+        color: #a9b9cb;
+        padding: 27px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .brand {
+        font-size: 22px;
+        letter-spacing: -0.8px;
+        font-weight: 650;
+        color: white;
+        padding: 0 10px 25px;
+      }
+      .brand b {
+        display: inline-grid;
+        place-items: center;
+        border: 1px solid #647a96;
+        border-radius: 7px;
+        font-size: 19px;
+        width: 28px;
+        height: 28px;
+        color: #c1ccff;
+        margin-right: 7px;
+        transform: rotate(-5deg);
+      }
+      .nav button {
+        border: 0;
+        background: none;
+        color: inherit;
+        text-align: left;
+        padding: 12px;
+        font-size: 13px;
+      }
+      .nav button.active,
+      .nav button:hover {
+        background: #2c4059;
+        color: #fff;
+      }
+      .nav-footer {
+        margin-top: auto;
+        padding: 12px;
+        font-size: 11px;
+        color: #8296ac;
+      }
+      .nav-footer .flex {
+        flex-wrap: nowrap;
+        gap: 4px;
+        font-size: 10px;
+      }
+      .nav-footer p {
+        margin-top: 12px;
+      }
+      .top {
+        height: 68px;
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 38px;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .top button {
+        border: 0;
+        background: none;
+        padding: 8px;
+        color: var(--blue);
+      }
+      .prototype {
+        font-size: 11px;
+        letter-spacing: 0.15px;
+        color: #896c44;
+        background: #f7f1e7;
+        border-radius: 5px;
+        padding: 4px 8px;
+      }
+      .avatar {
+        border-radius: 50%;
+        background: #edf0f6;
+        padding: 8px;
+        color: #66758b;
+        font-size: 11px;
+      }
+      .page {
+        max-width: 1220px;
+        margin: auto;
+        padding: 28px 38px 50px;
+      }
+      .disclosure {
+        font-size: 11px;
+        color: #8b7858;
+        margin-bottom: 28px;
+      }
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        margin-bottom: 25px;
+      }
+      .hero p {
+        color: var(--muted);
+        margin-top: 9px;
+      }
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        font-weight: 650;
+        color: #74849a;
+        margin-bottom: 9px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 1px solid var(--line);
+        background: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 9px 13px;
+        white-space: nowrap;
+      }
+      .btn.primary {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: white;
+      }
+      .btn.quiet {
+        background: transparent;
+        border: 0;
+        color: var(--blue);
+      }
+      .flex {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .between {
+        justify-content: space-between;
+      }
+      .tag {
+        font-size: 10px;
+        font-weight: 650;
+        padding: 3px 7px;
+        border-radius: 4px;
+        background: #eef1f6;
+        color: #64748c;
+        white-space: nowrap;
+      }
+      .tag.blue {
+        background: var(--blue-light);
+        color: var(--blue);
+      }
+      .tag.green {
+        background: #e8f4ee;
+        color: var(--green);
+      }
+      .tag.amber {
+        background: #fcf1df;
+        color: var(--amber);
+      }
+      .tag.red {
+        background: #fbeceb;
+        color: var(--red);
+      }
+      .group {
+        margin-bottom: 24px;
+      }
+      .group-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 11px;
+      }
+      .group-head h2 {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+      .count {
+        font-size: 12px;
+        font-weight: 500;
+        color: #7e8b9c;
+      }
+      .list {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        background: white;
+      }
+      .ticket-row {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(210px, 1.1fr) minmax(230px, 1.2fr) auto;
+        gap: 22px;
+        align-items: center;
+        text-align: left;
+        padding: 19px 21px;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        background: #fff;
+      }
+      .ticket-row:last-child {
+        border-bottom: 0;
+      }
+      .ticket-row:hover {
+        background: #fafbff;
+      }
+      .ticket-row .id {
+        font-size: 11px;
+        color: #7988a0;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        margin-bottom: 4px;
+      }
+      .ticket-title {
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.45;
+      }
+      .row-action {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .row-note {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .row-end {
+        font-size: 11px;
+        color: #8a97aa;
+        text-align: right;
+      }
+      .row-end span {
+        display: block;
+        color: var(--blue);
+        font-size: 19px;
+        margin-top: 3px;
+      }
+      .dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        background: var(--blue);
+        border-radius: 50%;
+        margin-right: 7px;
+      }
+      .dot.amber {
+        background: #c59143;
+      }
+      .empty {
+        background: #fff;
+        border: 1px dashed var(--line);
+        border-radius: 9px;
+        padding: 16px 20px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .activity {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 5px 20px;
+      }
+      .activity-row {
+        display: flex;
+        gap: 17px;
+        justify-content: space-between;
+        padding: 13px 0;
+        border-bottom: 1px solid #edf0f5;
+        font-size: 12px;
+      }
+      .activity-row:last-child {
+        border-bottom: 0;
+      }
+      .activity-row button {
+        border: 0;
+        background: none;
+        padding: 0;
+        color: var(--blue);
+        font-size: 11px;
+      }
+      .activity-row small {
+        white-space: nowrap;
+      }
+      .summary-line {
+        padding: 16px 19px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        margin-bottom: 28px;
+        font-size: 13px;
+        display: flex;
+        gap: 9px 28px;
+        flex-wrap: wrap;
+      }
+      .summary-line b {
+        margin-right: 6px;
+      }
+      .summary-line .next {
+        color: var(--muted);
+      }
+      .story {
+        max-width: 880px;
+        margin: auto;
+        position: relative;
+        padding-left: 31px;
+      }
+      .story:before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 17px;
+        bottom: 35px;
+        width: 1px;
+        background: #dbe2ec;
+      }
+      .step {
+        position: relative;
+        margin-bottom: 18px;
+      }
+      .step:before {
+        content: "✓";
+        position: absolute;
+        left: -31px;
+        top: 16px;
+        width: 19px;
+        height: 19px;
+        background: #e6f2ed;
+        color: var(--green);
+        border: 3px solid var(--bg);
+        border-radius: 50%;
+        font-size: 10px;
+        text-align: center;
+        line-height: 13px;
+        z-index: 1;
+      }
+      .step.current:before {
+        content: "";
+        background: var(--blue);
+        top: 22px;
+      }
+      .step.blocked:before {
+        background: var(--red);
+      }
+      .card,
+      .step details {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      .card-head {
+        padding: 18px 23px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .card-body {
+        padding: 23px;
+      }
+      .card p + p {
+        margin-top: 10px;
+      }
+      .card .subtitle {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 5px;
+      }
+      .step summary {
+        padding: 15px 19px;
+        font-size: 12px;
+        cursor: pointer;
+        color: #5f6e82;
+      }
+      .step summary strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .step details[open] summary {
+        border-bottom: 1px solid var(--line);
+      }
+      .detail-body {
+        padding: 20px;
+      }
+      .detail-body p {
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      .detail-body small {
+        display: block;
+        margin-top: 8px;
+      }
+      .scope-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 23px;
+      }
+      .scope-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        font-size: 12px;
+      }
+      .scope-item strong {
+        display: block;
+        overflow-wrap: anywhere;
+      }
+      .scope-item small {
+        display: block;
+        margin-top: 7px;
+      }
+      .question {
+        margin: 20px 0 11px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .agent {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .symbol {
+        display: inline-grid;
+        place-items: center;
+        width: 23px;
+        height: 23px;
+        border-radius: 6px;
+        background: #e8f2ef;
+        color: #3d8675;
+      }
+      .symbol.claude {
+        background: #f8eee8;
+        color: #af795c;
+      }
+      textarea,
+      input,
+      select {
+        padding: 10px 12px;
+        border: 1px solid #dbe2ed;
+        background: #fff;
+        color: var(--ink);
+        max-width: 100%;
+      }
+      textarea {
+        width: 100%;
+        min-height: 87px;
+        resize: vertical;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      input[type="checkbox"] {
+        accent-color: var(--blue);
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        margin: 9px 0;
+      }
+      .form-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        margin-top: 12px;
+      }
+      .agent-live {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .agent-live h3 {
+        font-size: 16px;
+        margin-bottom: 6px;
+      }
+      .agent-live p {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .rounds {
+        margin-top: 21px;
+        border-top: 1px solid var(--line);
+      }
+      .round {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 13px;
+        padding: 13px 0;
+        border-bottom: 1px solid #edf0f5;
+        font-size: 12px;
+      }
+      .round:last-child {
+        border-bottom: 0;
+      }
+      .round-title {
+        font-weight: 600;
+      }
+      .round p {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 3px;
+      }
+      .round .outcome {
+        color: var(--ink);
+      }
+      .document {
+        font-size: 13px;
+        line-height: 1.8;
+      }
+      .document h3 {
+        margin: 21px 0 6px;
+        font-size: 13px;
+      }
+      .document h2 {
+        font-size: 22px;
+        margin: 8px 0 11px;
+        line-height: 1.35;
+      }
+      .document ul {
+        padding-left: 19px;
+        margin: 6px 0;
+      }
+      .document .byline {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .finding {
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 12px;
+      }
+      .finding:last-child {
+        border: 0;
+      }
+      .finding strong {
+        display: block;
+        margin-top: 7px;
+      }
+      .finding p {
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .nested {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        margin-top: 16px;
+      }
+      .nested summary {
+        cursor: pointer;
+        padding: 12px 14px;
+        font-size: 12px;
+      }
+      .nested[open] summary {
+        border-bottom: 1px solid var(--line);
+      }
+      .nested .inner {
+        padding: 16px;
+      }
+      .checkpoint-label {
+        color: var(--blue);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        font-weight: 650;
+        margin-bottom: 6px;
+      }
+      .decision {
+        position: sticky;
+        bottom: 13px;
+        z-index: 3;
+        width: calc(100% - 31px);
+        max-width: 849px;
+        margin: 25px auto 0;
+        transform: translateX(15.5px);
+        background: #fff;
+        box-shadow: 0 6px 25px #20345412;
+        border: 1px solid #dce3ef;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        padding: 14px 18px;
+      }
+      .decision strong {
+        font-size: 13px;
+      }
+      .decision small {
+        display: block;
+        margin-top: 3px;
+      }
+      .notice {
+        padding: 13px 16px;
+        border: 1px solid #e9d3d1;
+        background: #fff7f6;
+        color: #8e4343;
+        border-radius: 7px;
+        font-size: 12px;
+        margin-bottom: 17px;
+      }
+      .footer {
+        font-size: 10px;
+        color: #8b99ad;
+        display: flex;
+        justify-content: space-between;
+        margin-top: 35px;
+      }
+      .completed summary {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 15px 0;
+        cursor: pointer;
+      }
+      .pill-nav {
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 20px;
+        margin-bottom: 22px;
+      }
+      .pill-nav button {
+        border: 0;
+        background: none;
+        padding: 0 0 12px;
+        font-size: 12px;
+      }
+      .pill-nav .selected {
+        color: var(--blue);
+        border-bottom: 2px solid var(--blue);
+      }
+      dialog {
+        max-width: 610px;
+        width: calc(100% - 28px);
+        max-height: 85vh;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0;
+        color: var(--ink);
+        box-shadow: 0 18px 80px #14223835;
+      }
+      dialog::backdrop {
+        background: #19263866;
+      }
+      .modal-head {
+        padding: 19px 23px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-body {
+        padding: 23px;
+      }
+      .close {
+        border: 0;
+        background: none;
+        font-size: 22px;
+        color: var(--muted);
+      }
+      .settings-row {
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .settings-row p {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 5px;
+      }
+      .settings-row input {
+        width: 90px;
+      }
+      .controls {
+        border: 1px dashed #c9d2e0;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 20px;
+      }
+      .controls p {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 7px 0 14px;
+      }
+      .controls .btn {
+        margin: 3px;
+      }
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 24px;
+        max-width: 400px;
+        border-radius: 8px;
+        background: #23354b;
+        color: white;
+        padding: 13px 18px;
+        font-size: 12px;
+        z-index: 8;
+        box-shadow: 0 8px 30px #23354b35;
+      }
+      .version-select {
+        font-size: 12px;
+        padding: 6px 9px;
+      }
+      code {
+        font-size: 12px;
+        background: #f0f3f8;
+        padding: 2px 5px;
+        border-radius: 3px;
+        overflow-wrap: anywhere;
+      }
+      .mobile-home {
+        display: none;
+      }
+      .caption {
+        font-size: 11px;
+        color: var(--muted);
+        margin: 10px 0;
+      }
+      .break {
+        overflow-wrap: anywhere;
+      }
+      .log-time {
+        white-space: nowrap;
+      }
+      .group-head .btn {
+        padding: 5px 8px;
+      }
+      .progress-note {
+        margin-top: 13px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .blocker-form {
+        margin-top: 18px;
+      }
+      .scenario-label {
+        font-size: 11px;
+        color: var(--muted);
+        margin: 15px 0 4px;
+      }
+      .archive-summary {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 17px;
+      }
+      @media (min-width: 1500px) {
+        .page {
+          padding-top: 35px;
+        }
+        .ticket-row {
+          padding: 22px;
+        }
+      }
+      @media (max-width: 1000px) {
+        .layout {
+          grid-template-columns: 160px minmax(0, 1fr);
+        }
+        .page {
+          padding: 24px;
+        }
+        .top {
+          padding: 0 24px;
+        }
+        .ticket-row {
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        .row-end {
+          display: none;
+        }
+        .scope-grid {
+          grid-template-columns: 1fr;
+        }
+        .story {
+          padding-left: 25px;
+        }
+        .step:before {
+          left: -25px;
+        }
+        .story:before {
+          left: 9px;
+        }
+        .decision {
+          width: calc(100% - 25px);
+          max-width: 855px;
+          transform: translateX(12.5px);
+        }
+        .nav {
+          padding: 23px 9px;
+        }
+        .brand {
+          font-size: 20px;
+          padding-left: 5px;
+        }
+      }
+      @media (max-width: 680px) {
+        .layout {
+          display: block;
+        }
+        .nav {
+          display: none;
+        }
+        .top {
+          height: 72px;
+          padding: 0 16px;
+        }
+        .top .avatar {
+          display: none;
+        }
+        .mobile-home {
+          display: inline;
+        }
+        .page {
+          padding: 20px 16px 30px;
+        }
+        .disclosure {
+          font-size: 10px;
+          margin-bottom: 22px;
+        }
+        .hero {
+          gap: 10px;
+        }
+        h1 {
+          font-size: 24px;
+        }
+        .hero .btn {
+          font-size: 11px;
+          padding: 8px;
+        }
+        .ticket-row {
+          grid-template-columns: 1fr;
+          padding: 17px;
+          gap: 10px;
+        }
+        .row-note {
+          font-size: 11px;
+        }
+        .card-head,
+        .card-body {
+          padding: 17px;
+        }
+        .story {
+          padding-left: 22px;
+        }
+        .step:before {
+          left: -22px;
+        }
+        .story:before {
+          left: 9px;
+        }
+        .summary-line {
+          font-size: 12px;
+          padding: 13px;
+          gap: 6px;
+        }
+        .round {
+          grid-template-columns: 85px 1fr;
+          gap: 8px;
+        }
+        .round-title,
+        .round p {
+          font-size: 11px;
+        }
+        .decision {
+          width: calc(100% - 22px);
+          max-width: 858px;
+          transform: translateX(11px);
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 10px;
+          bottom: 8px;
+          padding: 12px;
+        }
+        .decision .btn {
+          width: 100%;
+        }
+        .form-foot {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .form-foot .btn {
+          width: 100%;
+        }
+        .activity-row {
+          gap: 9px;
+        }
+        .activity-row small {
+          font-size: 10px;
+        }
+        .document h2 {
+          font-size: 19px;
+        }
+        .card-head {
+          flex-wrap: wrap;
+        }
+        .top button {
+          font-size: 11px;
+        }
+        .toast {
+          left: 16px;
+          right: 16px;
+          bottom: 13px;
+        }
+        .footer {
+          gap: 10px;
+        }
+        .agent-live {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="nav" aria-label="Main Navigation">
+        <div class="brand"><b>c</b>code assist</div>
+        <button data-action="home" class="active">⌂ &nbsp; Home</button
+        ><button data-action="all-work">▤ &nbsp; All Work</button
+        ><button data-action="settings" style="margin-top: 16px">
+          ⚙ &nbsp; Settings
+        </button>
+        <div class="nav-footer">
+          <div class="flex">
+            <span class="symbol">⌘</span> Codex <span>↔</span
+            ><span class="symbol claude">✳</span> Claude
+          </div>
+          <p>Development support<br />You steer. Agents carry the work.</p>
+        </div>
+      </aside>
+      <div>
+        <header class="top">
+          <div id="breadcrumb">Development / Home</div>
+          <div class="flex">
+            <span class="prototype">Mac Mini · Local Prototype</span
+            ><button data-action="controls">Prototype Controls</button
+            ><span class="avatar">You</span>
+          </div>
+        </header>
+        <main class="page" id="app"></main>
+      </div>
+    </div>
+    <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+    <div class="toast" role="status" id="toast" hidden></div>
+    <script>
+      const esc = (s) =>
+        String(s ?? "").replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      const clone = (x) => structuredClone(x),
+        now = () => Date.now();
+      const phases = {
+        drafting: ["Codex", "Drafting the plan"],
+        "plan-review": ["Claude", "Reviewing the plan"],
+        "plan-revision": ["Codex", "Addressing plan findings"],
+        implementing: ["Codex", "Implementing the approved plan"],
+        "code-review": ["Claude", "Reviewing the implementation"],
+        "code-revision": ["Codex", "Addressing code findings"],
+        publishing: ["Codex", "Publishing the reviewed change"],
+      };
+      const makeTicket = (id, title, repo, goal, real = false) => ({
+        id,
+        title,
+        repo,
+        goal,
+        real,
+        phase: "questions",
+        phaseAt: now(),
+        scopeConfirmed: false,
+        answer: "",
+        versions: [],
+        approved: null,
+        implementation: 0,
+        codeRounds: [],
+        codePass: false,
+        prs: [],
+        blocker: null,
+        feedback: "",
+        prFeedback: "",
+        events: [],
+
+      });
+      function plan(t, n) {
+        return {
+          n,
+          by: "Codex",
+          reviewer: null,
+          reviewed: false,
+          note:
+            n === 1
+              ? "Proposed the smallest change and initial validation."
+              : t.feedback ||
+                "Added the missing edge case and acceptance evidence.",
+          answer: t.answer,
+          findings: [],
+          at: now(),
+        };
+      }
+      function clearFindings(t) {
+        return [
+          {
+            severity: "High",
+            title: t.real
+              ? "Both Companion frame paths need regression coverage"
+              : "The secondary path needs explicit regression coverage",
+            by: "Claude",
+            state: "Resolved",
+            detail:
+              "The revised plan includes the missing path and its acceptance test.",
+          },
+          {
+            severity: "Medium",
+            title: t.real
+              ? "Verify copying in the actual cross-origin embed"
+              : "Prove the behavior in the actual user workflow",
+            by: "Claude",
+            state: "Resolved",
+            detail: "The plan now requires the end-to-end workflow evidence.",
+          },
+          {
+            severity: "Medium",
+            title: "Scope boundary recorded",
+            by: "Claude",
+            state: "Decided",
+            detail: t.answer,
+          },
+        ];
+      }
+      function seed() {
+        const t = makeTicket(
+          "ONE-5190",
+          "Fix Clipboard Permission for Embedded Companion Copy Buttons",
+          "elation_companion",
+          "Copy a public lab address inside the Elation Companion iframe without granting clipboard-read or weakening the existing sandbox.",
+          true,
+        );
+        const a = makeTicket(
+          "SAMPLE-01",
+          "Validate a Batch of Invitations Before Sending",
+          "sample-console",
+          "Show row-level validation for a batch of invitations before the user confirms sending.",
+        );
+        const b = makeTicket(
+          "SAMPLE-02",
+          "Keep Exported Dates Consistent Across Time Zones",
+          "sample-reports",
+          "Export the same calendar dates shown in the report across supported time zones.",
+        );
+        const c = makeTicket(
+          "SAMPLE-03",
+          "Remember Filters When Returning to the List",
+          "sample-console",
+          "Restore the user’s selected filters when they return from a detail page.",
+        );
+        for (const x of [a, b, c]) {
+          x.scopeConfirmed = true;
+          x.answer =
+            "Keep this change within the existing user workflow; handle broader enhancements separately.";
+          x.versions = [plan(x, 1), plan(x, 2)];
+          x.versions[0].reviewed = true;
+          x.versions[0].reviewer = "Claude";
+          x.versions[0].findings = [
+            {
+              severity: "High",
+              title: "Cover the secondary path",
+              by: "Claude",
+              state: "Open",
+              detail: "The initial plan missed an edge case.",
+            },
+          ];
+          x.versions[1].reviewed = true;
+          x.versions[1].reviewer = "Claude";
+          x.versions[1].findings = clearFindings(x);
+          x.phase = "approval";
+          x.phaseAt = now() - 12 * 60000;
+        }
+        b.approved = 2;
+        b.implementation = 2;
+        b.phase = "code-review";
+        b.phaseAt = now() - 6 * 60000;
+        b.codeRounds = [
+          {
+            agent: "Claude",
+            implementation: 1,
+            note: "Found a boundary-date regression.",
+            high: 1,
+          },
+          {
+            agent: "Codex",
+            implementation: 2,
+            note: "Added a timezone-boundary regression and corrected the conversion.",
+          },
+        ];
+        c.approved = 2;
+        c.implementation = 2;
+        c.codePass = true;
+        c.phase = "github";
+        c.phaseAt = now() - 25 * 60000;
+        c.codeRounds = [
+          {
+            agent: "Claude",
+            implementation: 1,
+            note: "Found a navigation-state edge case.",
+            high: 1,
+          },
+          {
+            agent: "Codex",
+            implementation: 2,
+            note: "Preserved filters across detail navigation.",
+          },
+          {
+            agent: "Claude",
+            implementation: 2,
+            note: "Required findings resolved; workflow evidence captured.",
+            high: 0,
+          },
+        ];
+        c.prs = [
+          {
+            id: 1,
+            version: 2,
+            implementation: 2,
+            state: "review",
+            checks: "passing",
+
+          },
+        ];
+        const tickets = [t, a, b, c];
+        for (const [i, x] of tickets.entries()) {
+          x.events = [
+            {
+              text:
+                i === 0
+                  ? "You selected the repository; Codex asked about browser scope."
+                  : i === 1
+                    ? "Claude finished reviewing plan v2. It is ready for your approval."
+                    : i === 2
+                      ? "Codex fixed the date-boundary issue. Claude is verifying the change."
+                      : "The reviewed change is published. Checks are passing.",
+              at: now() - (i + 1) * 4 * 60000,
+            },
+          ];
+        }
+        return {
+          schemaVersion: 4,
+          tickets,
+          selected: null,
+          pollMinutes: 5,
+          lastVisit: now(),
+          allWork: false,
+        };
+      }
+      let data,
+        firstVisit = false,
+        storageWarning = "",
+        preserveStorage = false;
+      const key = "code-assist-local-prototype-v1";
+      try {
+        const saved = localStorage.getItem(key);
+        firstVisit = !saved;
+        data = JSON.parse(saved) || seed();
+        if (
+          data.schemaVersion !== 4 ||
+          !Array.isArray(data.tickets) ||
+          data.tickets.length !== 4 ||
+          data.tickets.some(
+            (t) => !Array.isArray(t.versions) || !Array.isArray(t.events),
+          )
+        )
+          throw Error("Saved state shape");
+      } catch {
+        data = seed();
+        preserveStorage = true;
+        storageWarning =
+          "Saved data could not be loaded. It is preserved; this session uses the example workspace.";
+      }
+      const previousVisit = firstVisit ? 0 : data.lastVisit;
+      data.lastVisit = now();
+      let selectedVersion = null,
+        toastTimer;
+      function save() {
+        if (preserveStorage) return;
+        try {
+          localStorage.setItem(key, JSON.stringify(data));
+        } catch {
+          storageWarning =
+            "Browser storage is unavailable. Changes remain in this session.";
+        }
+      }
+      function ticket() {
+        return data.tickets.find((t) => t.id === data.selected);
+      }
+      function latest(t) {
+        return t.versions.at(-1);
+      }
+      function currentPr(t) {
+        return (
+          t.prs.find(
+            (p) =>
+              p.version === t.approved && p.implementation === t.implementation,
+          ) || null
+        );
+      }
+      function elapsed(ts) {
+        const m = Math.max(0, Math.floor((now() - ts) / 60000));
+        return m < 1
+          ? "Just now"
+          : m < 60
+            ? `${m}m ago`
+            : `${Math.floor(m / 60)}h ${m % 60}m ago`;
+      }
+      function duration(ts) {
+        const m = Math.max(0, Math.floor((now() - ts) / 60000));
+        return m < 1 ? "Started just now" : `Running ${m}m`;
+      }
+      function clock(ts) {
+        return new Date(ts).toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      }
+      function log(t, text) {
+        t.events.push({ text, at: now() });
+      }
+      function phase(t, value) {
+        t.phase = value;
+        t.phaseAt = now();
+      }
+      function summary(t) {
+        if (t.blocker)
+          return {
+            group: "needs",
+            action:
+              t.blocker.kind === "env"
+                ? "Provide Missing Configuration"
+                : t.blocker.kind === "review"
+                  ? "Resolve a Review Question"
+                  : "Help Resolve a Failing Check",
+            now: t.blocker.title,
+            next: "You unblock the work",
+            detail: t.blocker.detail,
+          };
+        if (t.phase === "questions")
+          return {
+            group: "needs",
+            action: "Confirm Scope & Answer 1 Question",
+            now: "Your repository is selected; browser scope needs your answer",
+            next: "Codex drafts the first plan",
+            detail: t.repo,
+          };
+        if (t.phase === "approval")
+          return {
+            group: "needs",
+            action: `Approve Plan v${latest(t).n}`,
+            now: `Claude reviewed plan v${latest(t).n} · 0 critical/high open`,
+            next: "You approve or leave feedback",
+            detail: "Required concerns addressed · scope decision recorded",
+          };
+        if (t.phase === "done")
+          return {
+            group: "done",
+            action: "Merged · Done",
+            now: "Your merge was observed for the reviewed implementation",
+            next: "Work retained for reference",
+            detail: `Plan v${t.approved} · reviewed implementation · merged PR`,
+          };
+        if (t.phase === "github") {
+          const p = currentPr(t);
+          return {
+            group: "github",
+            action:
+              p?.state === "changes"
+                ? "Changes Requested"
+                : "Review the Pull Request",
+            now:
+              p?.checks === "passing"
+                ? "PR awaits your review · checks passing"
+                : "PR awaits your review · checks pending",
+            next: "You review the PR on GitHub",
+            detail: `PR ${p.id} · checks ${p.checks} · awaiting your review`,
+          };
+        }
+        const [agent, work] = phases[t.phase] || ["Codex", "Working"];
+        return {
+          group: "working",
+          action: `${agent} · ${work}`,
+          now: `${agent} is ${work.toLowerCase()}${t.phase.startsWith("plan-") ? ` v${latest(t)?.n || 1}` : ""}${t.phase === "code-review" ? ` · round ${t.codeRounds.filter((r) => r.agent === "Claude").length + 1}` : ""}`,
+          next:
+            t.phase === "publishing"
+              ? "You review the PR"
+              : t.phase.includes("code") || t.phase === "implementing"
+                ? "Agents prepare the PR when review clears"
+                : "You approve the reviewed plan",
+          detail:
+            t.phase === "plan-revision"
+              ? "1 high open · Codex is revising"
+              : t.phase === "code-review" && t.codeRounds.length
+                ? "Prior finding fixed; Claude is verifying"
+                : duration(t.phaseAt),
+        };
+      }
+      function button(label, action, primary = false, disabled = false) {
+        return `<button class="btn ${primary ? "primary" : ""}" data-action="${action}" ${disabled ? "disabled" : ""}>${label}</button>`;
+      }
+      function toast(text) {
+        const e = document.getElementById("toast");
+        e.textContent = text;
+        e.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => (e.hidden = true), 4500);
+      }
+      function modal(title, body) {
+        document.getElementById("dialog").innerHTML =
+          `<div class="modal-head"><h2 id="dialog-title">${title}</h2><button class="close" data-action="close" aria-label="Close Dialog">×</button></div><div class="modal-body">${body}</div>`;
+        document.getElementById("dialog").showModal();
+      }
+      function close() {
+        document.getElementById("dialog").close();
+      }
+      function openTicket(id) {
+        data.selected = id;
+        selectedVersion = null;
+        save();
+        render();
+        window.scrollTo({ top: 0 });
+      }
+      function render() {
+        const t = ticket();
+        document.getElementById("breadcrumb").innerHTML =
+          `<button data-action="home">Development / Home</button>${t ? `<span> / ${esc(t.id)}</span>` : ""}`;
+        document
+          .querySelectorAll(".nav button")
+          .forEach((b) =>
+            b.classList.toggle(
+              "active",
+              b.dataset.action === (data.allWork ? "all-work" : "home"),
+            ),
+          );
+        document.getElementById("app").innerHTML =
+          `<div class="disclosure"><b>Local Prototype.</b> ONE-5190 is a real ticket snapshot; the other three tickets are fictional examples. All agent activity, PRs, and results are simulated.</div>${storageWarning ? `<div class="notice">${esc(storageWarning)}</div>` : ""}${t ? ticketView(t) : homeView()}<footer class="footer"><span>Saved in this browser · Conversation stays in this workspace</span><span>Code Assist · Mac Mini</span></footer>`;
+      }
+      function homeView() {
+        const counts = Object.fromEntries(
+          ["needs", "working", "github", "done"].map((g) => [
+            g,
+            data.tickets.filter((t) => summary(t).group === g).length,
+          ]),
+        );
+        return `<div class="hero"><div><div class="eyebrow">Development Support</div><h1>${data.allWork ? "All Work" : "Your Attention, in One Place"}</h1><p>${counts.needs} ${counts.needs === 1 ? "ticket needs" : "tickets need"} you. ${counts.working} ${counts.working === 1 ? "agent is" : "agents are"} working. ${counts.github} ${counts.github === 1 ? "PR is" : "PRs are"} waiting on GitHub.</p></div>${button("Refresh View", "refresh")}</div>${[
+          ["needs", "Needs You"],
+          ["working", "Agents Working"],
+          ["github", "Waiting on GitHub"],
+        ]
+          .map(
+            ([g, title]) =>
+              `<section class="group" aria-label="${title}"><div class="group-head"><h2>${title}<span class="count">${counts[g]}</span></h2>${g === "needs" ? "<small>Your next decisions</small>" : ""}</div>${
+                counts[g]
+                  ? `<div class="list">${data.tickets
+                      .filter((t) => summary(t).group === g)
+                      .map(ticketRow)
+                      .join("")}</div>`
+                  : `<div class="empty">${g === "needs" ? "Nothing needs your input right now." : g === "working" ? "No agent steps are active." : "No pull requests are waiting."}</div>`
+              }</section>`,
+          )
+          .join(
+            "",
+          )}<details class="completed" ${data.allWork ? "open" : ""}><summary>Completed <span class="count">${counts.done}</span></summary>${
+          counts.done
+            ? `<div class="list">${data.tickets
+                .filter((t) => summary(t).group === "done")
+                .map(ticketRow)
+                .join("")}</div>`
+            : '<p class="caption">Merged work will appear here.</p>'
+        }</details>${activityView()}`;
+      }
+      function ticketRow(t) {
+        const s = summary(t);
+        return `<button class="ticket-row" data-ticket="${t.id}"><div><div class="id">${t.id}${!t.real ? '<span class="tag">Fictional Example</span>' : ""}</div><div class="ticket-title">${esc(t.title)}</div></div><div><div class="row-action">${s.group === "working" ? '<span class="dot"></span>' : s.group === "needs" ? '<span class="dot amber"></span>' : ""}${esc(s.action)}</div><div class="row-note">${esc(s.detail)}</div></div><div class="row-end">${s.group === "working" ? duration(t.phaseAt) : elapsed(t.events.at(-1).at)}<span>→</span></div></button>`;
+      }
+      function activityView() {
+        const events = data.tickets
+            .flatMap((t) => t.events.map((e) => ({ ...e, id: t.id })))
+            .sort((a, b) => b.at - a.at),
+          recent = events.filter((e) => e.at > previousVisit),
+          older = events.filter((e) => e.at <= previousVisit);
+        const rows = (arr) =>
+          arr
+            .map(
+              (e) =>
+                `<div class="activity-row"><div><button data-ticket="${e.id}">${e.id}</button><p>${esc(e.text)}</p></div><small title="${esc(new Date(e.at).toLocaleString())}">${elapsed(e.at)}</small></div>`,
+            )
+            .join("");
+        return `<section class="group" style="margin-top:29px"><div class="group-head"><h2>While You Were Away</h2><small>${firstVisit ? "Recent example activity" : "Since your previous visit"}</small></div>${recent.length ? `<div class="activity">${rows(recent)}</div>` : '<div class="empty">No new activity since your previous visit.</div>'}<details class="nested" ${recent.length ? "" : "open"}><summary>Recent History · ${older.length} Earlier Events</summary><div class="activity" style="border:0">${rows(older) || '<p class="caption">No earlier activity.</p>'}</div></details></section>`;
+      }
+      function doneStep(title, body) {
+        return `<div class="step"><details><summary><strong>${title}</strong></summary><div class="detail-body">${body}</div></details></div>`;
+      }
+      function currentStep(title, body, label = "Agent Work", blocked = false) {
+        return `<section class="step current ${blocked ? "blocked" : ""}"><div class="card"><div class="card-head"><div><div class="checkpoint-label" ${blocked ? 'style="color:var(--red)"' : ""}>${label}</div><h2>${title}</h2></div></div><div class="card-body">${body}</div></div></section>`;
+      }
+      function scope(t) {
+        return `<div class="scope-grid"><div class="scope-item"><span class="tag blue">Selected Repository</span><strong style="margin-top:8px">${esc(t.repo)}</strong><small>You selected this repository for implementation and validation.</small></div></div>`;
+      }
+      function questionCard(t) {
+        return currentStep(
+          "Confirm Scope & Answer the Open Question",
+          `${scope(t)}<form data-form="requirements"><div class="agent"><span class="symbol">⌘</span>Codex</div><p class="question">${t.real ? "Should this feature cover browsers beyond Chrome inside the actual Elation embed?" : "What scope boundary should the implementation keep?"}</p><label for="answer">Your Answer</label><textarea id="answer" name="answer" required placeholder="For example: Chrome in the actual embed is sufficient. Broader coverage can follow separately.">${esc(t.answer)}</textarea><label><input type="checkbox" name="scope" required ${t.scopeConfirmed ? "checked" : ""}> The repository scope above is correct</label><div class="form-foot"><small>No plan yet. Your answer becomes the planning baseline.</small><button class="btn primary" type="submit">Confirm Scope & Send Answer →</button></div></form>`,
+          "Your Checkpoint",
+        );
+      }
+      function planTracker(t) {
+        if (!t.versions.length)
+          return '<p class="progress-note">Codex is preparing the first version from your requirements.</p>';
+        return `<div class="rounds">${t.versions.map((v) => `<div class="round"><div class="round-title">Codex · v${v.n}</div><div><p class="outcome">${esc(v.note)}</p><p>${v.reviewed ? `Claude → ${v.findings.filter((f) => f.severity === "High" && f.state === "Open").length} high open${v.findings.some((f) => f.state === "Decided") ? " · scope decision recorded" : ""}` : v.n === latest(t).n && t.phase === "plan-review" ? "Claude is reviewing this version" : "Awaiting Claude review"}</p></div></div>`).join("")}</div>`;
+      }
+      function codeTracker(t) {
+        return `<div class="rounds">${t.codeRounds.map((r) => `<div class="round"><div class="round-title">${r.agent} · Code ${r.implementation}</div><div><p class="outcome">${esc(r.note)}</p>${r.high !== undefined ? `<p>${r.high} high open${r.high === 0 ? " · all required findings addressed" : ""}</p>` : ""}</div></div>`).join("")}</div>`;
+      }
+      function findings(v) {
+        return `<div>${v.findings.map((f) => `<div class="finding"><div class="flex between"><span class="tag ${f.severity === "High" ? "red" : "amber"}">${f.severity}</span><span class="tag ${f.state === "Open" ? "red" : "green"}">${f.state}</span></div><strong>${esc(f.title)}</strong><p>${esc(f.detail)}</p><small>Raised by ${f.by} · plan v${v.n}</small></div>`).join("") || '<p class="caption">Findings are unknown until this version is reviewed.</p>'}</div>`;
+      }
+      function planDoc(t, v) {
+        return `<article class="document"><div class="byline">Plan v${v.n} · Prepared by ${v.by} · ${v.reviewed ? "Reviewed by Claude" : "Awaiting Claude review"}</div><h2>${esc(t.title)}</h2><h3>Outcome</h3><p>${esc(t.goal)}</p><h3>Scope</h3><p>${esc(t.repo)}${t.real ? " owns the permission change and its regression coverage." : " owns the implementation and regression coverage."}</p><h3>Implementation</h3><ul><li>Read the repository instructions and inspect the existing behavior.</li><li>${t.real ? "Delegate clipboard-write in hosted and local modes; preserve local-network-access and sandbox restrictions." : "Make the smallest change that meets the agreed outcome using existing project patterns."}</li>${v.n > 1 ? `<li>${t.real ? "Cover both patient and home iframe paths and verify the parent policy." : "Cover the secondary path and boundary case identified during review."}</li>` : ""}</ul><h3>Acceptance & Validation</h3><ul><li>${t.real ? "Copy a public lab address inside the actual Elation cross-origin embed." : "Exercise the requested behavior through the actual user workflow."}</li><li>Run formatting, linting, and relevant regression tests before publishing the PR.</li></ul><h3>Your Scope Decision</h3><p>${esc(v.answer)}</p>${v.note ? `<h3>What Changed in This Version</h3><p>${esc(v.note)}</p>` : ""}<p class="caption">Optional optimizations and controls: none.</p></article>`;
+      }
+      function planArtifacts(t, full = false) {
+        const v = t.versions.find((v) => v.n === selectedVersion) || latest(t);
+        if (!v) return "";
+        return `<div class="flex between" style="margin-bottom:15px"><small>${t.versions.length} preserved ${t.versions.length === 1 ? "version" : "versions"}</small><label>Version <select class="version-select" data-setting="version">${t.versions.map((p) => `<option value="${p.n}" ${p.n === v.n ? "selected" : ""}>Plan v${p.n}${p.n === latest(t).n ? " · Current" : ""}</option>`).join("")}</select></label></div>${v.n !== latest(t).n ? '<div class="notice">Historical plan. Approval always applies to the latest reviewed version.</div>' : ""}${full ? planDoc(t, v) : `<details class="nested"><summary>Read Plan v${v.n}</summary><div class="inner">${planDoc(t, v)}</div></details>`}<details class="nested"><summary>Review Findings · ${v.reviewed ? v.findings.length : "Not Reviewed"}</summary><div class="inner">${findings(v)}</div></details>`;
+      }
+      function approvalCard(t) {
+        return currentStep(
+          `Approve Plan v${latest(t).n}`,
+          `${planTracker(t)}<div style="margin-top:20px">${planArtifacts(t, true)}</div><details class="nested"><summary>Send Feedback Instead</summary><div class="inner"><form data-form="plan-feedback"><label for="feedback">What Should Change?</label><textarea id="feedback" name="feedback" required></textarea><div class="form-foot"><small>Creates a new version and another review.</small><button class="btn" type="submit">Send Feedback</button></div></form></div></details>`,
+          "Your Checkpoint",
+        );
+      }
+      function activeAgent(t) {
+        const [agent, work] = phases[t.phase];
+        return currentStep(
+          work,
+          `<div class="agent-live"><div><div class="agent"><span class="symbol ${agent === "Claude" ? "claude" : ""}">${agent === "Claude" ? "✳" : "⌘"}</span>${agent}</div><p style="margin-top:10px">${esc(summary(t).detail)}</p></div><span class="tag blue">${duration(t.phaseAt)}</span></div>${t.phase.startsWith("plan-") || t.phase === "drafting" ? planTracker(t) + planArtifacts(t) : codeTracker(t)}<p class="progress-note">${esc(summary(t).next)}.</p>`,
+        );
+      }
+      function prCard(t) {
+        const p = currentPr(t);
+        return currentStep(
+          "Review the Pull Request",
+          `<div class="flex between"><h3>${esc(t.title)}</h3><span class="tag ${p.checks === "passing" ? "green" : ""}">Checks ${p.checks}</span></div><p class="subtitle">${esc(t.repo)} · PR ${p.id} · Plan v${p.version}</p><p style="margin-top:18px">${esc(t.goal)}</p><details class="nested" id="pr-details"><summary>Change Summary & Validation Evidence</summary><div class="inner"><p>The implementation follows plan v${p.version}, includes regression coverage, and passed the required adversarial code review.</p>${codeTracker(t)}<p class="caption">Formatting, linting, regression checks and workflow evidence are attached in this example.</p></div></details><details class="nested"><summary>Leave Review Feedback</summary><div class="inner"><form data-form="pr-feedback"><label for="pr-feedback">Requested Changes</label><textarea id="pr-feedback" name="feedback" required></textarea><div class="form-foot"><small>Agents address this on the existing PR.</small><button class="btn" type="submit">Send to the Agents</button></div></form></div></details><p class="caption">You own the merge. GitHub status is observed separately.</p>`,
+          "Your Checkpoint",
+        );
+      }
+      function blockerCard(t) {
+        const b = t.blocker;
+        return currentStep(
+          b.title,
+          `<div class="notice">${esc(b.detail)}</div><p class="subtitle">${esc(b.before)} · work is retained</p><form class="blocker-form" data-form="unblock">${b.kind === "env" ? `<p>Set <code>TEST_SERVICE_TOKEN</code> for <b>${esc(t.repo)}</b> in its existing operator-managed configuration. Do not paste the value here.</p><label><input type="checkbox" name="ready" required> Configuration is ready for the agent to check</label>` : `<label for="unblock-answer">${b.kind === "review" ? "Your Direction" : "What Changed or What Should the Agent Try?"}</label><textarea id="unblock-answer" name="answer" required></textarea>`}<div class="form-foot"><small>Resume the interrupted step with this input.</small><button class="btn primary" type="submit">${b.kind === "env" ? "Check Configuration & Resume" : "Send Direction & Resume"}</button></div></form>`,
+          "Needs You",
+          true,
+        );
+      }
+      function ticketView(t) {
+        const s = summary(t);
+        let story = doneStep(
+          "Picked Up from Linear · Repository Selected by You",
+          `<p>${esc(t.goal)}</p>${scope(t)}${t.real ? '<a href="https://linear.app/onetoonehealth/issue/ONE-5190/fix-clipboard-permission-for-embedded-companion-copy-buttons" target="_blank" rel="noopener noreferrer">Read the Linear Ticket ↗</a>' : "<small>This is a fictional example ticket, not a Linear record.</small>"}`,
+        );
+        if (t.scopeConfirmed)
+          story += doneStep(
+            "Scope Confirmed · You Answered the Planning Question",
+            `<p>${esc(t.answer)}</p>`,
+          );
+        if (t.approved)
+          story += doneStep(
+            `Plan v${t.approved} Approved`,
+            `${planTracker(t)}${planArtifacts(t)}`,
+          );
+        if (t.codePass)
+          story += doneStep(
+            "Implementation & Code Review Complete",
+            codeTracker(t),
+          );
+        if (t.phase === "done")
+          story += doneStep(
+            "PR Merged by You",
+            `<p>The merge covers plan v${currentPr(t).version} and implementation ${currentPr(t).implementation}.</p>`,
+          );
+        if (t.blocker) story += blockerCard(t);
+        else if (t.phase === "questions") story += questionCard(t);
+        else if (phases[t.phase]) story += activeAgent(t);
+        else if (t.phase === "approval") story += approvalCard(t);
+        else if (t.phase === "github") story += prCard(t);
+        else if (t.phase === "done")
+          story += doneStep(
+            "Done",
+            `<p>The reviewed PR was merged by you.</p><small>This record does not claim deployment or production acceptance. Additional work needs its own decision.</small>`,
+          );
+        const actions = t.events
+          .map(
+            (e) =>
+              `<div class="activity-row"><p>${esc(e.text)}</p><small class="log-time">${clock(e.at)}</small></div>`,
+          )
+          .join("");
+        return `<div class="hero"><div><div class="eyebrow">${t.id} ${t.real ? "· 121 Engineering" : "· Fictional Example"}</div><h1>${esc(t.title)}</h1></div>${button("← Home", "home")}</div><div class="summary-line"><span><b>Now</b>${esc(s.now)}</span><span class="next"><b>Next</b>${esc(s.next)}</span></div><div class="story">${story}<details class="nested"><summary>Activity · ${t.events.length} Events</summary><div class="inner">${actions}</div></details></div>${decision(t)}`;
+      }
+      function decision(t) {
+        const s = summary(t);
+        let label = "Back to Home",
+          action = "home",
+          note = "You can watch other work while the agents continue.";
+        if (t.blocker) {
+          label = "Resolve Interruption";
+          action = "focus-blocker";
+          note = t.blocker.detail;
+        } else if (t.phase === "questions") {
+          label = "Answer the Question";
+          action = "focus-question";
+          note =
+            "Confirm the selected repository and give Codex the missing scope decision.";
+        } else if (t.phase === "approval") {
+          label = `Approve Plan v${latest(t).n}`;
+          action = "approve";
+          note = `Approving plan v${latest(t).n}. Agents will implement this version.`;
+        } else if (t.phase === "github") {
+          label = "Review Pull Request";
+          action = "focus-pr";
+          note = "Read the change and leave feedback. You own the merge.";
+        } else if (t.phase === "done") {
+          note = "The record is retained under Completed.";
+        }
+        return `<div class="decision"><div><strong>${s.group === "working" ? "No Input Needed Right Now" : s.action}</strong><small>${esc(note)}</small></div>${button(label, action, true)}</div>`;
+      }
+      function settings() {
+        modal(
+          "Settings",
+          `<form data-form="settings"><div class="settings-row"><h3>Linear Intake</h3><p>Tickets with Plan and without Code. Labels are not changed automatically.</p><label>Polling Interval (Minutes) <input type="number" name="minutes" min="1" value="${data.pollMinutes}" required></label></div><div class="settings-row"><h3>Review Criteria</h3><p>Initial plan: all critical/high and most medium concerns addressed, with remaining medium decisions explicit. After feedback: all critical/high addressed. Code: all critical/high/medium addressed.</p></div><div class="settings-row"><h3>Conversation & Completion</h3><p>Questions live in this workspace. An observed human merge moves work to Completed. The application will post state-change notifications to Teams; this demo sends nothing. Linear label-removal behavior remains undecided.</p></div><div class="settings-row"><h3>Recovery</h3><p>Retain completed work and resume the interrupted step. A real backend must persist progress and reconcile uncertain external writes. This page stores only local demonstration state.</p></div><div class="form-foot"><small>No polling or external integrations run.</small><button class="btn primary" type="submit">Save Settings</button></div></form>`,
+        );
+      }
+      function controls() {
+        const t = ticket();
+        modal(
+          "Prototype Controls",
+          `<p class="caption">These controls simulate external progress. They are separate from the actions you would take in the product.</p>${t ? `<div class="controls"><h3>${t.id} · ${esc(summary(t).action)}</h3><p>Advance one agent step or choose an observed GitHub result.</p>${button("Complete Current Agent Step", "advance", false, !phases[t.phase] || Boolean(t.blocker))}${button("Observe Checks Passing", "checks", false, t.phase !== "github" || Boolean(t.blocker))}${button("Observe Your Merge", "merge", false, t.phase !== "github" || Boolean(t.blocker) || currentPr(t)?.checks !== "passing")}<p class="scenario-label">Interruption Examples</p>${button("Missing Configuration", "block-env", false, !phases[t.phase] || Boolean(t.blocker))}${button("Review Needs Your Direction", "block-review", false, !["plan-review", "code-review"].includes(t.phase) || Boolean(t.blocker))}${button("GitHub Check Failure", "block-checks", false, t.phase !== "github" || Boolean(t.blocker))}</div>` : '<p class="caption">Open a ticket to advance its example. Each ticket keeps its own work record.</p>'}<div class="controls"><h3>Local Workspace</h3><p>Reset this prototype’s saved example progress.</p>${button("Reset Examples", "reset")}</div>`,
+        );
+      }
+      function advance(t) {
+        if (!t || t.blocker || !phases[t.phase]) return;
+        switch (t.phase) {
+          case "drafting": {
+            const v = plan(t, t.versions.length + 1);
+            t.versions.push(v);
+            log(
+              t,
+              `Codex drafted plan v${v.n}${t.feedback ? " from your feedback" : ""}.`,
+            );
+            t.feedback = "";
+            phase(t, "plan-review");
+            break;
+          }
+          case "plan-review": {
+            const v = latest(t);
+            v.reviewed = true;
+            v.reviewer = "Claude";
+            if (v.n === 1) {
+              v.findings = [
+                {
+                  severity: "High",
+                  title: t.real
+                    ? "Cover the home frame as well as the patient frame"
+                    : "Cover the secondary path",
+                  by: "Claude",
+                  state: "Open",
+                  detail:
+                    "The initial plan lacks explicit regression coverage for this path.",
+                },
+              ];
+              log(
+                t,
+                `Claude reviewed plan v${v.n}: 1 high open. Codex is revising.`,
+              );
+              phase(t, "plan-revision");
+            } else {
+              v.findings = clearFindings(t);
+              log(
+                t,
+                `Claude reviewed plan v${v.n}: required concerns addressed. Your approval is next.`,
+              );
+              phase(t, "approval");
+            }
+            break;
+          }
+          case "plan-revision": {
+            const v = plan(t, t.versions.length + 1);
+            t.versions.push(v);
+            log(
+              t,
+              `Codex revised plan v${v.n}: added the missing path and acceptance evidence.`,
+            );
+            phase(t, "plan-review");
+            break;
+          }
+          case "implementing":
+            t.implementation++;
+            t.codePass = false;
+            t.codeRounds.push({
+              agent: "Codex",
+              implementation: t.implementation,
+              note: `Implemented approved plan v${t.approved} and prepared validation.`,
+            });
+            log(
+              t,
+              "Codex completed implementation. Claude is reviewing the diff and evidence.",
+            );
+            phase(t, "code-review");
+            break;
+          case "code-review":
+            if (!t.codeRounds.some((r) => r.agent === "Claude")) {
+              t.codeRounds.push({
+                agent: "Claude",
+                implementation: t.implementation,
+                note: "Found one regression gap in the secondary path.",
+                high: 1,
+              });
+              log(
+                t,
+                "Claude found 1 high code concern. Codex is addressing it.",
+              );
+              phase(t, "code-revision");
+            } else {
+              t.codeRounds.push({
+                agent: "Claude",
+                implementation: t.implementation,
+                note: "Verified fixes and required validation evidence.",
+                high: 0,
+              });
+              t.codePass = true;
+              log(
+                t,
+                "Claude verified the implementation: all required findings addressed.",
+              );
+              phase(t, "publishing");
+            }
+            break;
+          case "code-revision":
+            t.implementation++;
+            t.codePass = false;
+            t.codeRounds.push({
+              agent: "Codex",
+              implementation: t.implementation,
+              note:
+                t.prFeedback ||
+                "Added the missing regression and corrected the affected path.",
+            });
+            log(
+              t,
+              "Codex applied the fixes; Claude is verifying the new implementation.",
+            );
+            t.prFeedback = "";
+            phase(t, "code-review");
+            break;
+          case "publishing": {
+            if (!t.codePass || t.approved !== latest(t).n) return;
+            const existing = t.prs.find((p) => p.state !== "merged"),
+              binding = {
+                version: t.approved,
+                implementation: t.implementation,
+                state: "review",
+                checks: "pending",
+
+              };
+            if (existing) Object.assign(existing, binding);
+            else t.prs.push({ id: t.prs.length + 1, ...binding });
+            log(
+              t,
+              existing
+                ? "Agents updated the existing PR with the reviewed fixes."
+                : "Agents published the reviewed change. Your PR review is next.",
+            );
+            phase(t, "github");
+            break;
+          }
+        }
+        save();
+        render();
+      }
+      document.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b || b.disabled) return;
+        if (b.dataset.ticket) {
+          openTicket(b.dataset.ticket);
+          return;
+        }
+        const a = b.dataset.action,
+          t = ticket();
+        if (!a) return;
+        switch (a) {
+          case "home":
+          case "all-work":
+            data.selected = null;
+            data.allWork = a === "all-work";
+            selectedVersion = null;
+            save();
+            render();
+            window.scrollTo({ top: 0 });
+            break;
+          case "refresh":
+            render();
+            toast("View refreshed from the local work record.");
+            break;
+          case "close":
+            close();
+            break;
+          case "settings":
+            settings();
+            break;
+          case "controls":
+            controls();
+            break;
+          case "focus-question":
+            document.getElementById("answer").focus();
+            document
+              .getElementById("answer")
+              .scrollIntoView({ block: "center", behavior: "smooth" });
+            break;
+          case "focus-blocker": {
+            const el = document.querySelector(
+              ".blocker-form input,.blocker-form textarea",
+            );
+            el?.focus();
+            el?.scrollIntoView({ block: "center", behavior: "smooth" });
+            break;
+          }
+          case "focus-pr":
+            document.getElementById("pr-details").open = true;
+            document
+              .getElementById("pr-details")
+              .scrollIntoView({ block: "center", behavior: "smooth" });
+            break;
+          case "approve":
+            if (
+              !t ||
+              t.blocker ||
+              t.phase !== "approval" ||
+              !latest(t).reviewed
+            )
+              return;
+            t.approved = latest(t).n;
+            selectedVersion = null;
+            log(
+              t,
+              `You approved plan v${t.approved}. Codex is implementing it.`,
+            );
+            phase(t, "implementing");
+            save();
+            render();
+            break;
+          case "advance":
+            close();
+            advance(t);
+            break;
+          case "checks":
+            if (t?.phase !== "github" || t.blocker) return;
+            currentPr(t).checks = "passing";
+            log(t, "GitHub checks are passing. The PR awaits your review.");
+            save();
+            close();
+            render();
+            break;
+          case "merge":
+            if (
+              t?.phase !== "github" ||
+              t.blocker ||
+              currentPr(t)?.checks !== "passing" ||
+              !t.codePass
+            )
+              return;
+            currentPr(t).state = "merged";
+            log(
+              t,
+              `Your merge was observed for plan v${t.approved}, implementation ${t.implementation}.`,
+            );
+            phase(t, "done");
+            save();
+            close();
+            render();
+            break;
+          case "block-env":
+          case "block-review":
+          case "block-checks": {
+            if (!t || t.blocker) return;
+            const kind = a.slice(6);
+            if (
+              (kind === "checks" && t.phase !== "github") ||
+              (kind === "review" &&
+                !["plan-review", "code-review"].includes(t.phase)) ||
+              (kind === "env" && !phases[t.phase])
+            )
+              return;
+            const before = summary(t).now;
+            t.blocker = {
+              kind,
+              before,
+              title:
+                kind === "env"
+                  ? "Missing Configuration"
+                  : kind === "review"
+                    ? "Review Needs Your Direction"
+                    : "A GitHub Check Needs Attention",
+              detail:
+                kind === "env"
+                  ? `TEST_SERVICE_TOKEN is unavailable to the ${t.repo} workspace.`
+                  : kind === "review"
+                    ? "The reviewer needs acceptance evidence that the agents cannot obtain."
+                    : "The required check failed. The PR and reviewed implementation are retained.",
+            };
+            if (kind === "checks") currentPr(t).checks = "failed";
+            log(t, t.blocker.title + " · waiting for your input.");
+            save();
+            close();
+            render();
+            break;
+          }
+          case "reset":
+            close();
+            modal(
+              "Reset Examples?",
+              `<p>This replaces only this prototype’s local sample progress.</p><div class="form-foot">${button("Cancel", "close")}${button("Reset Examples", "confirm-reset", true)}</div>`,
+            );
+            break;
+          case "confirm-reset":
+            data = seed();
+            preserveStorage = false;
+            storageWarning = "";
+            selectedVersion = null;
+            save();
+            close();
+            render();
+            break;
+        }
+      });
+      document.addEventListener("change", (e) => {
+        if (e.target.dataset.setting === "version") {
+          selectedVersion = Number(e.target.value);
+          render();
+        }
+      });
+      document.addEventListener("submit", (e) => {
+        const form = e.target;
+        if (!form.dataset.form) return;
+        e.preventDefault();
+        const f = new FormData(form),
+          t = ticket();
+        switch (form.dataset.form) {
+          case "requirements": {
+            if (t.phase !== "questions" || t.blocker) return;
+            const answer = String(f.get("answer") || "").trim();
+            if (!answer || !f.has("scope")) return;
+            t.answer = answer;
+            t.scopeConfirmed = true;
+            log(
+              t,
+              "You confirmed repository scope and answered the planning question.",
+            );
+            phase(t, "drafting");
+            break;
+          }
+          case "plan-feedback":
+            if (t.phase !== "approval" || t.blocker) return;
+            t.feedback = String(f.get("feedback") || "").trim();
+            if (!t.feedback) return;
+            log(t, "You requested a plan revision: " + t.feedback);
+            t.approved = null;
+            selectedVersion = null;
+            phase(t, "drafting");
+            break;
+          case "pr-feedback":
+            if (
+              t.phase !== "github" ||
+              t.blocker ||
+              currentPr(t)?.state === "merged"
+            )
+              return;
+            t.prFeedback = String(f.get("feedback") || "").trim();
+            if (!t.prFeedback) return;
+            currentPr(t).state = "changes";
+            t.codePass = false;
+            log(t, "You requested changes on the existing PR: " + t.prFeedback);
+            phase(t, "code-revision");
+            break;
+          case "unblock": {
+            if (!t.blocker) return;
+            const answer = String(f.get("answer") || "").trim();
+            if (t.blocker.kind === "env" ? !f.has("ready") : !answer) return;
+            const was = t.blocker.kind;
+            log(
+              t,
+              was === "env"
+                ? "You marked configuration ready; the agent resumes its check."
+                : "You supplied direction: " + answer,
+            );
+            t.blocker = null;
+            t.phaseAt = now();
+            if (was === "checks") {
+              currentPr(t).checks = "pending";
+              log(t, "GitHub checks are pending after your correction.");
+            }
+            break;
+          }
+          case "settings":
+            data.pollMinutes = Number(f.get("minutes"));
+            close();
+            break;
+        }
+        save();
+        render();
+      });
+      save();
+      render();
+    </script>
+  </body>
+</html>
