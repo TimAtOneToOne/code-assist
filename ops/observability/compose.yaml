@@ -1,0 +1,45 @@
+name: code-assist-observability
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:v1.1.1@sha256:dae91bc1f9d4c11db54e924d8d25bac7f6c50e080a8f06fc90d9468eaab81b67
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5080:5080"
+    environment:
+      ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL}
+      ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD}
+      ZO_DATA_DIR: /data
+      ZO_DATA_WAL_DIR: /data/wal
+      ZO_DATA_DB_DIR: /data/db
+      ZO_DATA_STREAM_DIR: /data/stream
+      ZO_TELEMETRY: "false"
+      ZO_COMPACT_DATA_RETENTION_DAYS: "0"
+      ZO_INGEST_ALLOWED_UPTO: "87600"
+    volumes:
+      - type: bind
+        source: ${CODE_ASSIST_OBSERVABILITY_DIR}/openobserve
+        target: /data
+        bind:
+          create_host_path: false
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.163.1@sha256:1175b03003053962012f5a231f5567f66a3e8fdb960c7835c0e48f7aa1555806
+    restart: unless-stopped
+    user: "0:0"
+    command: ["--config=/etc/otelcol/config.yaml"]
+    ports:
+      - "127.0.0.1:4318:4318"
+    environment:
+      OPENOBSERVE_AUTHORIZATION: ${OPENOBSERVE_AUTHORIZATION}
+    volumes:
+      - "./collector.yaml:/etc/otelcol/config.yaml:ro"
+      - type: bind
+        source: ${CODE_ASSIST_LOG_DIR}
+        target: /logs
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${CODE_ASSIST_OBSERVABILITY_DIR}/collector
+        target: /var/lib/otelcol
+        bind:
+          create_host_path: false

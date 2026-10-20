@@ -1,6 +1,6 @@
 # Mac mini deployment
 
-The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, Configuration, Mac mini settings and `/health` routes. The separate pg-boss process in `apps/worker` runs a durable confirmation probe against local PostgreSQL. See [worker operation and limits](worker.md). Linear intake and agent execution are not implemented yet.
+The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, Configuration, Mac mini settings, Logs and `/health` routes. The separate pg-boss process in `apps/worker` runs a durable confirmation probe against local PostgreSQL. See [worker operation and limits](worker.md) and [central logging](logging.md). Linear intake and agent execution are not implemented yet.
 
 The shell uses shadcn-svelte Button, Card and Badge components installed through its CLI. AI Elements and AG-UI preferences are recorded in `AGENTS.md` for future agent/chat features.
 
@@ -29,7 +29,10 @@ The installation is under `~/Library/Application Support/CodeAssist/`:
 | `source.git/` | Bare Git repository used to fetch published `main` |
 | `releases/<commit>/` | Source, locked dependencies and validated production build for an exact commit |
 | `current` | Symlink to the active release |
-| `logs/` | Web, worker and updater stdout/stderr |
+| `logs/` | Process output and structured events |
+| `data/artifacts/` | Complete payloads outside releases |
+| `data/observability/` | OpenObserve data and collector state |
+| `observability.env` | Container credentials/storage settings; mode 600 |
 | `runtime.env` | Operator-managed runtime settings, including `CODE_ASSIST_ADMIN_TAILSCALE_USER` and `CODE_ASSIST_DATABASE_URL`; mode 600, outside Git |
 | `data/mac-mini.json` | Saved Mac mini configuration; preserved across releases |
 
@@ -51,7 +54,7 @@ Provision the local `code_assist` database and `runtime.env` before installation
 | `com.code-assist.worker` | Starts at login; launchd keeps the pg-boss worker running |
 | `com.code-assist.updater` | Runs at login and checks `main` every 60 seconds |
 
-The updater uses Mia's existing SSH GitHub identity. It installs frozen dependencies and runs `make verify` in a separate staging directory while the old web release stays up. Only a successful build becomes a release; activation replaces `current` atomically and restarts the web service. It signals the worker to drain its current step, exit and restart under launchd using the new release. The page header, Configuration page and `/health` report the web commit; worker startup/checkpoint logs report the worker commit. On subsequent passes, the updater checks that `/health` matches the active commit.
+The updater uses Mia's existing SSH GitHub identity. It installs frozen dependencies and runs `make verify` in a separate staging directory while the old web release stays up. The checked-in observability installer applies container configuration before activation. Only a successful build becomes a release; activation replaces `current` atomically and restarts the web service. It signals the worker to drain its current step, exit and restart under launchd using the new release. The page header, Configuration page and `/health` report the web commit; worker startup/checkpoint logs report the worker commit. On subsequent passes, the updater checks that `/health` matches the active commit.
 
 No public webhook or GitHub Actions runner is needed. A local commit must be pushed to `main` to be picked up. If several commits arrive between polls, the updater builds the head observed by its fetch. Failed builds leave the current release running; a later scheduled pass attempts the current head again. Logs record failures. Releases preserve database content, OrbStack data and workspace directories. Worker startup installs pg-boss's schema and the diagnostic tables; future dependency/schema upgrades require compatibility validation before publication.
 
@@ -92,4 +95,4 @@ These are login services. A full reboot with FileVault and unattended recovery b
 - The scheduled updater authenticated to GitHub and completed a check successfully from its own launchd context.
 - An isolated deployment probe activated a successful fixture commit, then verified that a deliberately failing build left that active release unchanged. The probe used disposable local repositories and did not alter production.
 
-Optional optimizations and controls: none. The requested automatic updater uses a documented 60-second polling interval and validates a release before activation.
+Logging configuration choices are listed in [central logging](logging.md#configuration-review--october-20-2026). Original web deployment optional optimizations and controls: none. The requested automatic updater uses a documented 60-second polling interval and validates a release before activation.

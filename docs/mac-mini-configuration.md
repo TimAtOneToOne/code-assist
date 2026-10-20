@@ -31,6 +31,7 @@ The following critical services are configured to start when the operating macOS
 | Tailscale | Enabled through its login helper | macOS records `io.tailscale.ipn.macsys.login-item-helper` as enabled and allowed; Tailscale reports `Running` |
 | Code Assist web | User LaunchAgent `com.code-assist.web` | `RunAtLoad=true`, `KeepAlive=true`; deployed shell and Tailscale listener verified |
 | Code Assist worker | User LaunchAgent `com.code-assist.worker` | `RunAtLoad=true`, `KeepAlive=true`; Node process backed by the `code_assist` database |
+| OpenObserve / Collector | OrbStack containers with `restart: unless-stopped` | Persistent host data; port 5080/4318 host publishing is loopback-only |
 | Code Assist updater | User LaunchAgent `com.code-assist.updater` | `RunAtLoad=true`, `StartInterval=60`; fetches and validates published `main` releases |
 
 OrbStack login startup was enabled at Tim's request on October 19, 2026. PostgreSQL and Tailscale already had their login startup registered. All three services were running after verification. These are login-start settings; unattended recovery before login and an actual logout/login or reboot cycle have not been tested.
@@ -54,7 +55,7 @@ To restore the OrbStack and PostgreSQL registrations if they are later disabled,
 | Docker Buildx | 0.37.2 |
 | Engine name | `orbstack` |
 | Engine resources reported | 10 CPUs and approximately 15.7 GiB memory; this is not measured consumption |
-| Containers after testing | None |
+| Persistent containers | OpenObserve 1.1.1 and OpenTelemetry Collector Contrib 0.163.1 |
 | Start at login | Enabled; macOS login item registration verified |
 | Docker socket | `~/.orbstack/run/docker.sock` |
 | Compatibility socket | `/var/run/docker.sock` points to the OrbStack socket |
@@ -114,6 +115,10 @@ Run these read-only checks on the mini. Some commands require the login-shell en
 /opt/homebrew/opt/postgresql@18/bin/pg_isready -h 127.0.0.1 -p 5432
 df -h /System/Volumes/Data
 ```
+
+## Central logs
+
+[Logging configuration](logging.md) describes the Logs page, evidence paths, local OpenObserve service, storage migration and delivery limits. Agent SDK runtime integration and full reboot recovery are still pending.
 
 ## Remaining setup and validation
 

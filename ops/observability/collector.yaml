@@ -1,0 +1,47 @@
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol
+receivers:
+  filelog/application:
+    include: ["/logs/structured/*.jsonl"]
+    start_at: beginning
+    storage: file_storage
+    include_file_path: true
+    include_file_record_offset: true
+    operators:
+      - type: json_parser
+        parse_to: attributes
+        timestamp:
+          parse_from: attributes.timestamp
+          layout_type: gotime
+          layout: "2006-01-02T15:04:05.999Z07:00"
+      - type: move
+        from: attributes.message
+        to: body
+  filelog/process:
+    include: ["/logs/*.log"]
+    start_at: beginning
+    storage: file_storage
+    include_file_path: true
+    include_file_record_offset: true
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+exporters:
+  otlphttp/openobserve:
+    endpoint: http://openobserve:5080/api/default
+    headers:
+      Authorization: ${env:OPENOBSERVE_AUTHORIZATION}
+      stream-name: code_assist
+    sending_queue:
+      storage: file_storage
+service:
+  extensions: [file_storage]
+  pipelines:
+    logs:
+      receivers: [filelog/application, filelog/process, otlp]
+      exporters: [otlphttp/openobserve]
+    traces:
+      receivers: [otlp]
+      exporters: [otlphttp/openobserve]

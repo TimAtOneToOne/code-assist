@@ -127,9 +127,21 @@ test("durable probe, process restart, transaction rollback and manual retry", as
       await waitFor(
         async () => workerLog,
         (log) =>
-          log.includes(
-            '"event":"worker.draining","signal":"SIGTERM","release":"release-drain"',
-          ),
+          log
+            .split("\n")
+            .slice(0, -1)
+            .some((line) => {
+              try {
+                const event = JSON.parse(line);
+                return (
+                  event.event === "worker.draining" &&
+                  event.signal === "SIGTERM" &&
+                  event.release === "release-drain"
+                );
+              } catch {
+                return false;
+              }
+            }),
       );
       assert.equal(draining.exitCode, null);
     } finally {

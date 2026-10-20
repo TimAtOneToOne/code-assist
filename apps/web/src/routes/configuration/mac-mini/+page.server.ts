@@ -8,6 +8,7 @@ import {
 	writeMacMiniConfig
 } from '#lib/server/mac-mini-config.js';
 import { requireSettingsAccess } from '#lib/server/settings-access.js';
+import { logger } from '#lib/server/logs.js';
 import type { Actions, PageServerLoad } from './$types';
 
 function dataDirectory() {
@@ -30,6 +31,11 @@ export const actions = {
 		const validationError = await validateRepositoryRoot(repositoryRoot);
 		if (validationError) return fail(400, { repositoryRoot, error: validationError });
 		await writeMacMiniConfig(dataDirectory(), { repositoryRoot });
+		logger
+			.child({ request_id: event.locals.requestId })
+			.event('info', 'configuration.saved', 'Repository root updated', {
+				repository_root: repositoryRoot
+			});
 		return { repositoryRoot, saved: true };
 	}
 } satisfies Actions;

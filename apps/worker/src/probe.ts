@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Db, PgBoss } from "pg-boss";
+import { logger } from "./logging.ts";
 
 export const probeQueue = "engine-probe";
 type ProbeJob = { probeId: string; step: "prepare" | "finish" };
@@ -87,20 +88,40 @@ export async function registerProbeWorker(boss: PgBoss, release: string) {
     probeQueue,
     { transactional: true },
     async ([job], db) => {
-      const { probeId, step } = job.data;
-      if (step !== "prepare" && step !== "finish")
-        throw new Error("Unknown probe step");
-      const expected = step === "prepare" ? "queued" : "confirmed";
-      const next = step === "prepare" ? "waiting" : "completed";
-      const { rows } = await db.executeSql(
-        `UPDATE code_assist.engine_probe SET state = $3
+      const log = logger.child({ job_id: job.id, attempt_id: randomUUID() });
+      log.event("info", "job.started", "Probe step started", {
+        step: job.data.step,
+        probe_id: job.data.probeId,
+      });
+      try {
+        const { probeId, step } = job.data;
+        if (step !== "prepare" && step !== "finish")
+          throw new Error("Unknown probe step");
+        const expected = step === "prepare" ? "queued" : "confirmed";
+        const next = step === "prepare" ? "waiting" : "completed";
+        const { rows } = await db.executeSql(
+          `UPDATE code_assist.engine_probe SET state = $3
          WHERE id = $1 AND state = $2 AND job_id = $4 RETURNING id`,
-        [probeId, expected, next, job.id],
-      );
-      if (!rows.length)
-        throw new Error("Probe job does not match current state");
-      await recordEvent(db, probeId, next, release);
-      return { probeId, state: next, release };
+          [probeId, expected, next, job.id],
+        );
+        if (!rows.length)
+          throw new Error("Probe job does not match current state");
+        await recordEvent(db, probeId, next, release);
+        // pg-boss commits after this callback returns; this is not a completion claim.
+        log.event(
+          "info",
+          "job.result_prepared",
+          "Probe result prepared for commit",
+          { state: next, probe_id: probeId },
+        );
+        return { probeId, state: next, release };
+      } catch (error) {
+        log.event("error", "job.failed", "Probe step failed", {
+          error,
+          probe_id: job.data.probeId,
+        });
+        throw error;
+      }
     },
   );
 }

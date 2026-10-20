@@ -1,5 +1,6 @@
 import { connectBoss } from "./database.ts";
 import { initializeProbes, probeQueue, registerProbeWorker } from "./probe.ts";
+import { logger } from "./logging.ts";
 
 const release = process.env.CODE_ASSIST_COMMIT ?? "development";
 const boss = connectBoss(`code-assist-worker:${release}`);
@@ -12,13 +13,11 @@ try {
   await boss.start();
   await initializeProbes(boss);
   await registerProbeWorker(boss, release);
-  console.log(
-    JSON.stringify({ event: "worker.ready", release, pid: process.pid }),
-  );
+  logger.event("info", "worker.ready", "Worker ready");
   const signal = await shutdown;
-  console.log(JSON.stringify({ event: "worker.draining", signal, release }));
+  logger.event("info", "worker.draining", "Worker draining", { signal });
   await boss.offWork(probeQueue);
 } finally {
   await boss.stop();
-  console.log(JSON.stringify({ event: "worker.stopped", release }));
+  logger.event("info", "worker.stopped", "Worker stopped");
 }

@@ -83,6 +83,11 @@ export async function deploy(restart = true) {
     }
   }
 
+  run(
+    process.execPath,
+    [join(release, "ops/install-observability.ts")],
+    release,
+  );
   const next = join(root, "current.next");
   rmSync(next, { force: true });
   symlinkSync(release, next);

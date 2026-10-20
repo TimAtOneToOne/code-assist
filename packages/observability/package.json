@@ -1,0 +1,16 @@
+{
+  "name": "@code-assist/observability",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/logger.ts",
+    "./search": "./src/search.ts",
+    "./artifacts": "./src/artifacts.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "lint": "eslint src tests && prettier --check .",
+    "format": "prettier --write .",
+    "test": "node --test tests/*.test.ts"
+  }
+}
