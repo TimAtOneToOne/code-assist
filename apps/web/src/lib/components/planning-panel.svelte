@@ -193,8 +193,9 @@
 								required
 							/><span
 								>I approve v{version.number} for the confirmed repositories and authorize implementation,
-								branch creation, and PR publication. I will review and merge PRs. Separate GitOps approval
-								requirements still apply.</span
+								branch creation, and PR publication, including GitOps changes covered by this plan. No
+								separate GitOps approval is needed. I will review and merge PRs; Terraform applies remain
+								human-initiated.</span
 							></label
 						>
 						<Button type="submit">Approve plan v{version.number}</Button>

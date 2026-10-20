@@ -12,6 +12,21 @@ Tim authorized direct commits and pushes to `main` in this repository on October
 
 Build the observability application with SvelteKit and serve it from the Mia Mac mini over Tailscale. Changes published to Code Assist's `main` must be picked up and deployed automatically by the mini. Keep deployment releases separate from durable job state and agent workspaces.
 
+## GitOps Approval in Code Assist
+
+Tim clarified on October 20, 2026 that Code Assist's exact-version plan approval
+also satisfies prior review and approval for GitOps work described in that plan.
+For the confirmed repositories and approved scope, it authorizes implementation,
+branch creation, commits, pushes, and PR publication. Do not add a separate GitOps
+approval checkpoint or create workarounds/technical debt solely to avoid GitOps
+changes. This exception overrides generic separate-approval instructions only
+inside the Code Assist workflow; other projects retain their existing rules.
+
+Discovery and planning remain read-only. Scope changes require a revised plan
+and approval, as with any repository. Tim reviews and merges PRs; agents never
+merge, enable auto-merge, run Terraform apply, or initiate infrastructure deployment.
+Human-initiated applies use the established deployment workflow.
+
 ## Temporary testing files
 
 Keep ad hoc test scripts, probes, logs, screenshots, and other temporary testing artifacts in a task-specific directory under the repository's gitignored `.tmp/` folder. Configure temporary tooling to write generated files and caches there as well; do not leave them in the repository root. Keep permanent tests in their established source directories and use the normal Makefile targets for project validation.

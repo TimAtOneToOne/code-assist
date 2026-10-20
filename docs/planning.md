@@ -8,7 +8,9 @@ The ticket page shows the current plan, findings, agent activity, previous versi
 
 Critical/high findings block approval, even if the reviewer incorrectly labels the plan ready. A ready review may retain medium concerns; Tim must explicitly check each one before approving that exact version. The server validates the current version, plan hash, current discovery and repository scope, review disposition and complete set of accepted medium finding IDs. Approval records the authenticated Tailscale owner, input hash, plan hash, version and accepted concerns.
 
-Feedback on a reviewed plan creates the next version and another independent review. A previous approval remains in history but is no longer current. Changes to ticket inputs or repository selection supersede planning with the discovery baseline. Removing Plan hides the ticket and prevents acceptance of pending results or approvals. Existing GitOps-specific approval requirements still apply.
+Feedback on a reviewed plan creates the next version and another independent review. A previous approval remains in history but is no longer current. Changes to ticket inputs or repository selection supersede planning with the discovery baseline. Removing Plan hides the ticket and prevents acceptance of pending results or approvals.
+
+Within Code Assist, Tim's exact-version plan approval also authorizes the described GitOps implementation, branch creation, commits, pushes, and PR publication for confirmed repositories. No separate GitOps approval checkpoint is needed. Plan necessary GitOps work directly rather than creating workarounds to avoid that approval. This exception, clarified October 20, 2026, supersedes generic separate-approval instructions for this workflow only. Discovery/planning stay read-only; work outside approved scope needs a revised plan and approval. Tim reviews and merges PRs, and humans initiate Terraform applies through the established workflow.
 
 This release ends at plan approval. It does not yet implement plans, create branches, publish PRs or merge them. Approval captures authorization for the subsequent implementation phase; it does not claim that phase has run.
 

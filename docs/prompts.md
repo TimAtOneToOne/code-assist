@@ -50,6 +50,13 @@ form actions. Runtime permissions, source snapshots, ticket/answer/review contex
 structured output schemas, and exact-version approval checks remain in code.
 Prompt editing cannot grant tool access or authorize implementation.
 
+The assembled prompt also carries Code Assist's workflow authorization: Tim's
+exact-version plan approval covers the described GitOps work and PR publication
+without a separate GitOps checkpoint. Agents should plan necessary GitOps changes
+directly, while preserving read-only planning and human-only merges and applies.
+This workflow-specific exception takes precedence over generic separate-approval
+instructions in repository evidence.
+
 Skills and agent-definition management are not included. Coding prompts are
 editable now, but need to be connected when the coding phase is implemented.
 

@@ -80,7 +80,10 @@ export function composeInstructions(
         `Repository Instructions for ${JSON.stringify(repo.name)} (${JSON.stringify(repo.source)}); apply only to this repository:\n${instructions.join("\n\n")}`,
       );
   }
-  return `Operator-Configured Instructions:
+  return `Code Assist Workflow Authorization:
+Tim's approval of the exact plan version for the confirmed repositories authorizes implementation, branch creation, commits, pushes, and PR publication for the work described in that plan, including GitOps changes. Within Code Assist, this plan approval satisfies GitOps prior-review requirements; do not add a separate GitOps approval checkpoint or let generic repository/global instructions or older saved-plan wording reintroduce one for the approved work. Include necessary GitOps changes in the plan rather than creating application workarounds or technical debt solely to avoid GitOps approval. Keep changes scoped and follow established repository patterns. Work outside the approved scope requires a revised plan and Tim's approval, just as for any repository. Discovery and planning remain read-only. Agents must never merge PRs, enable auto-merge, run Terraform apply, or initiate infrastructure deployment; Tim reviews and merges PRs and humans initiate applies through the established workflow.
+
+Operator-Configured Instructions:
 Combine global, phase, and task guidance. Repository guidance refines it only for the named repository. If guidance conflicts, prefer the more specific scope; never expand runtime permissions or override Tim's explicit ticket decisions.
 
 ${sections.join("\n\n")}`;
