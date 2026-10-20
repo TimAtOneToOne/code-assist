@@ -99,6 +99,16 @@ For gaps, inspect source files and collector errors. Re-ingest relevant original
 
 `make verify` covers multi-megabyte payload/hash preservation, redaction, path validation, escaping, pagination and partial-result reporting. Worker integration tests remain `make test-worker`.
 
+## Verified on Mia — October 20, 2026
+
+- Release `7962b54` passed `make verify` locally and in the automatic deployment. The PostgreSQL worker integration test passed locally, including failure rollback, retry and active-handler draining.
+- Attempt `d2a94518-d623-44e4-8eb5-7bbe5d19bdfb` intentionally exited 7. Tim's computer retrieved its three-event timeline and full stdout/stderr through the owner-protected API; artifact length and SHA-256 matched.
+- Stopped both logging containers, wrote evidence while the collector was down, then restarted them. Existing indexed history survived; attempt `1e981333-eee9-4d38-8056-9f2706143521` included both the new payload and an eight-hour-old backfill event.
+- Downloaded all 2,200,051 stored bytes of that payload over Tailscale. Beginning/middle/end markers, credential redaction and SHA-256 passed.
+- Live pagination, SQL-literal escaping, invalid-input 400s, missing-artifact 404s and private port 5080 passed. An isolated production web process configured with a mismatched owner rejected page, search and artifact requests with 403, including spoofed forwarded headers. Both actual Macs belong to Tim's Tailscale account.
+- Chrome exercised the filter form and event expansion; no browser warning/error logs were observed. Full reboot, external-drive migration, native MCP and actual SDK instrumentation remain unverified.
+- Initial data footprint was approximately 65 MiB of observability data, 2.1 MiB of test artifacts and 168 KiB of source logs. This excludes container images and is not a forecast of transcript growth.
+
 References: [search API](https://openobserve.ai/docs/reference/api/search/search/), [MCP](https://openobserve.ai/docs/integration/ai/mcp/), [file receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.163.0/receiver/filelogreceiver), [SvelteKit hooks](https://svelte.dev/docs/kit/hooks).
 
 Optional optimizations and controls:
