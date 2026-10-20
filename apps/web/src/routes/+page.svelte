@@ -95,7 +95,7 @@
 	<h2 class="text-xl font-semibold">Tickets</h2>
 	<div class="flex gap-2" aria-label="Status Color Guide">
 		<Badge variant="attention">Needs Your Attention</Badge>
-		<Badge variant="active">Working</Badge>
+		<Badge variant="active">Working or Done</Badge>
 	</div>
 </div>
 {#if !data.issues.length}<Card.Root class="panel"

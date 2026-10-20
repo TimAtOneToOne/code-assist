@@ -27,6 +27,7 @@ export function workflowBadgeVariant(status: WorkflowStatus, current = true) {
 		case 'validate':
 		case 'review':
 		case 'publish':
+		case 'done':
 			return 'active';
 		default:
 			return 'secondary';
