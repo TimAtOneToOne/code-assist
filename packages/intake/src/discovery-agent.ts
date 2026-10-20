@@ -1,4 +1,5 @@
 import { composeInstructions, type PromptSettings } from "./prompt-defaults.ts";
+import { codexModel } from "./agent-models.ts";
 import { execFile, fork } from "node:child_process";
 import { mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -228,6 +229,7 @@ export async function runCodex(
     ],
   });
   const thread = codex.startThread({
+    model: codexModel,
     workingDirectory: input.workspace,
     skipGitRepoCheck: true,
     approvalPolicy: "never",

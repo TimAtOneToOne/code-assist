@@ -23,7 +23,7 @@ Existing notification delivery posts to the saved Teams flow when discovery is r
 
 Each attempt archives the HEAD commit of each selected synced clone into `data/discovery/<attempt>/workspace/<repository>`. It records the source path and commit before Codex starts. Background clone synchronization cannot change that snapshot. Git archives contain tracked exported files; untracked files, Git history, and submodule working trees are absent. The prompt identifies these limits and requires Codex to report missing evidence rather than pretend to have inspected it.
 
-The current native `@openai/codex-sdk` and its CLI are pinned to 0.163.0. The SDK's model and reasoning defaults apply. The saved secret named `OPENAI_API_KEY` supplies the approved OpenAI credential. Repository environment mappings are not needed for read-only inspection. No provider key is copied to a repository or passed into shell-tool environments.
+The current native `@openai/codex-sdk` and its CLI are pinned to 0.163.0. The model is explicitly set to `gpt-6.1-sol` in `packages/intake/src/agent-models.ts`; native reasoning defaults still apply. The saved secret named `OPENAI_API_KEY` supplies the approved OpenAI credential. Repository environment mappings are not needed for read-only inspection. No provider key is copied to a repository or passed into shell-tool environments.
 
 Each attempt has an isolated Codex home. A native permission profile grants read access to its snapshot and minimal OS runtime paths, with no command network access or write grants. Interactive approvals and web search are disabled for this unattended read-only step. Codex's API connection remains available. No operator Codex/MCP configuration, AWS credentials, GitHub authority, controller database URL or Teams webhook is inherited by agent tools.
 
@@ -59,6 +59,7 @@ References: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [native permi
 
 Optional optimizations and controls:
 
+- **Explicit model selection — requested by Tim October 20, 2026.** Discovery and Codex planning use `gpt-6.1-sol`; Claude review uses `claude-opus-5-5`. New runs no longer follow changes to the SDKs' default model selection; model upgrades require an explicit configuration change. These are provider model IDs, not immutable model-weight snapshots.
 - **Owned subprocess cleanup — approved by Tim October 20, 2026.** SDK cancellation left an active shell command orphaned in the real Mia crash test. Discovery runners now freeze and terminate only their descendants before cancelling the SDK. Cancellation ends those commands immediately; it does not give them a graceful exit. This applies only to discovery, including future calls through its runner. No global process matching, workload limit or automatic retry was added.
 
 Snapshot isolation, read-only permissions, credential separation, stale-input checks and human scope confirmation implement the requested discovery boundary.

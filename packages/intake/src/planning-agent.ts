@@ -1,4 +1,5 @@
 import { composeInstructions, type PromptSettings } from "./prompt-defaults.ts";
+import { claudeModel } from "./agent-models.ts";
 import { mkdir, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
@@ -110,6 +111,7 @@ export async function runClaude(
     for await (const event of query({
       prompt: input.prompt,
       options: {
+        model: claudeModel,
         cwd: input.workspace,
         env: {
           PATH: input.aws
