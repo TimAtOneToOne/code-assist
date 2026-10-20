@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import './app.css';
+	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import type { LayoutProps } from './$types';
 
 	let { children, data }: LayoutProps = $props();
@@ -11,6 +12,8 @@
 <svelte:head>
 	<link rel="icon" href="/favicon.svg" />
 </svelte:head>
+
+<Toaster richColors closeButton />
 
 <div class="shell">
 	<aside>

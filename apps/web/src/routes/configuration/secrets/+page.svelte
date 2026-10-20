@@ -1,12 +1,45 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { toast } from 'svelte-sonner';
+	import { secretForm } from '#lib/secret-feedback.js';
 	import { resolve } from '$app/paths';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import SecretEditor from '#lib/components/secret-editor.svelte';
 	import type { PageProps } from './$types';
-	let { data, form }: PageProps = $props();
+	let { data }: PageProps = $props();
+	let search = $state('');
+	const query = $derived(search.trim().toLowerCase());
+	const matchingSecrets = $derived(
+		data.secrets.filter((secret) => {
+			const mappings = data.mappings.filter((mapping) => mapping.secretId === secret.id);
+			return [
+				secret.name,
+				secret.description,
+				...(secret.aliases ?? []).map((alias) => alias.name),
+				...mappings.flatMap((mapping) => [
+					mapping.variable,
+					mapping.repository.split('/').at(-1) ?? ''
+				])
+			].some((text) => text.toLowerCase().includes(query));
+		})
+	);
+	const matchingMappings = $derived(
+		data.mappings.filter((mapping) => {
+			const secret = data.secrets.find((secret) => secret.id === mapping.secretId);
+			return [
+				mapping.variable,
+				mapping.repository.split('/').at(-1) ?? '',
+				secret?.name ?? '',
+				secret?.description ?? '',
+				...(secret?.aliases ?? []).map((alias) => alias.name)
+			].some((text) => text.toLowerCase().includes(query));
+		})
+	);
+	$effect(() => {
+		if (data.repositoryError) toast.error(data.repositoryError);
+	});
 	const selectClass = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm';
 </script>
 
@@ -14,31 +47,35 @@
 <a class="mb-5 inline-block text-sm text-muted-foreground" href={resolve('/configuration')}
 	>← Configuration</a
 >
-<div class="eyebrow">WORKSPACE SETTINGS</div>
-<h1>Secrets & Environment</h1>
-<p class="intro">Save shared keys, then map them to each repository’s environment variables.</p>
-
-<form method="POST" action="?/consolidate" use:enhance class="mb-6 space-y-2">
-	<Button type="submit" variant="outline">Consolidate Duplicate Secrets</Button>
-	<p class="text-sm text-muted-foreground">
-		Combine identical values into one saved secret and keep all mappings. Future rotations apply to
-		every mapping that shares it.
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+	<div>
+		<div class="eyebrow">WORKSPACE SETTINGS</div>
+		<h1>Secrets & Environment</h1>
+	</div>
+	<form method="POST" action="?/consolidate" use:enhance={secretForm} class="ml-auto">
+		<Button type="submit" variant="outline">Consolidate Duplicate Secrets</Button>
+	</form>
+</div>
+<div class="mb-6 space-y-2">
+	<label for="secret-search" class="sr-only">Search Secrets</label>
+	<Input
+		id="secret-search"
+		type="search"
+		bind:value={search}
+		placeholder="Search secrets, variables, or repositories…"
+		autocomplete="off"
+	/>
+	<p class="text-sm text-muted-foreground" role="status">
+		{matchingSecrets.length} of {data.secrets.length} secrets
 	</p>
-</form>
-{#if form?.consolidated}
-	<p role="status" class="mb-5">
-		{form.consolidated.removed === 0
-			? 'No duplicate secrets found.'
-			: `Consolidated ${form.consolidated.removed} duplicate secrets and updated ${form.consolidated.mappingsUpdated} mappings.`}
-	</p>
-{/if}
-
-{#if form?.error}<p role="alert" class="mb-5 text-destructive">{form.error}</p>{/if}
-{#if form?.saved}<p role="status" class="mb-5">Configuration saved.</p>{/if}
+</div>
 
 <h2 class="mb-4 text-xl font-semibold">Saved Secrets</h2>
+{#if query && !matchingSecrets.length}
+	<p class="mb-4 text-muted-foreground">No secrets match your search.</p>
+{/if}
 <div class="grid gap-5 xl:grid-cols-2">
-	{#each data.secrets as secret (secret.id + secret.updatedAt)}
+	{#each matchingSecrets as secret (secret.id + secret.updatedAt)}
 		<SecretEditor {secret} />
 	{/each}
 	<SecretEditor />
@@ -49,15 +86,9 @@
 	Choose which saved key supplies each variable. Saving an existing repository and variable updates
 	its mapping. Rotating a secret updates all mappings that use it.
 </p>
-{#if data.repositoryError}
-	<p role="alert" class="mb-5 text-destructive">
-		{data.repositoryError}
-		<a class="underline" href={resolve('/configuration/mac-mini')}>Mac mini settings</a>
-	</p>
-{/if}
 <Card.Root class="panel">
 	<Card.Title>Map a Saved Secret</Card.Title>
-	<form method="POST" action="?/saveMapping" use:enhance class="space-y-4">
+	<form method="POST" action="?/saveMapping" use:enhance={secretForm} class="space-y-4">
 		<div class="grid gap-4 lg:grid-cols-3">
 			<div class="space-y-2">
 				<label for="mapping-repository">Repository</label>
@@ -101,6 +132,8 @@
 	<p class="my-5 text-muted-foreground">
 		No mappings yet. Keys are only supplied to repositories you map explicitly.
 	</p>
+{:else if !matchingMappings.length}
+	<p class="my-5 text-muted-foreground">No mappings match your search.</p>
 {:else}
 	<div class="overflow-x-auto rounded-lg border">
 		<table class="w-full text-left text-sm">
@@ -112,7 +145,7 @@
 				></thead
 			>
 			<tbody>
-				{#each data.mappings as mapping (JSON.stringify([mapping.repository, mapping.variable]))}
+				{#each matchingMappings as mapping (JSON.stringify([mapping.repository, mapping.variable]))}
 					<tr class="border-t">
 						<td class="p-4"
 							><span class="font-medium">{mapping.repository.split('/').at(-1)}</span>
@@ -121,7 +154,7 @@
 						<td class="p-4 font-mono">{mapping.variable}</td>
 						<td class="p-4">{data.secrets.find((s) => s.id === mapping.secretId)?.name}</td>
 						<td class="p-4">
-							<form method="POST" action="?/deleteMapping" use:enhance>
+							<form method="POST" action="?/deleteMapping" use:enhance={secretForm}>
 								<input type="hidden" name="repository" value={mapping.repository} />
 								<input type="hidden" name="variable" value={mapping.variable} />
 								<Button type="submit" variant="outline">Remove mapping</Button>

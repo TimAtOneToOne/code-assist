@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { toast } from 'svelte-sonner';
+	import { notifySecretAction, secretForm } from '#lib/secret-feedback.js';
 	import { resolve } from '$app/paths';
 	import type { SecretMetadata } from '@code-assist/secrets';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -10,7 +12,6 @@
 	let value = $state('');
 	let revealed = $state(false);
 	let loading = $state(false);
-	let revealError = $state('');
 	const fieldId = $derived(secret?.id ?? 'new-secret');
 
 	async function toggleReveal() {
@@ -20,7 +21,6 @@
 		}
 		if (secret && !value) {
 			loading = true;
-			revealError = '';
 			try {
 				const response = await fetch(
 					resolve('/configuration/secrets/[id]/value', { id: secret.id })
@@ -28,7 +28,7 @@
 				if (!response.ok) throw new Error();
 				value = (await response.json()).value;
 			} catch {
-				revealError = 'Could not reveal this secret. Check your connection and access.';
+				toast.error('Could not reveal this secret. Check your connection and access.');
 				return;
 			} finally {
 				loading = false;
@@ -63,7 +63,8 @@
 						value = '';
 						revealed = false;
 					}
-					await update();
+					notifySecretAction(result);
+					if (result.type !== 'error') await update();
 				}}
 		>
 			<input type="hidden" name="id" value={secret?.id ?? ''} />
@@ -106,12 +107,11 @@
 				{#if secret}<p class="text-sm text-muted-foreground">
 						Leave the value blank to keep the saved key.
 					</p>{/if}
-				{#if revealError}<p role="alert" class="text-sm text-destructive">{revealError}</p>{/if}
 			</div>
 			<Button type="submit">{secret ? 'Save secret' : 'Add secret'}</Button>
 		</form>
 		{#if secret}
-			<form method="POST" action="?/deleteSecret" use:enhance class="mt-3">
+			<form method="POST" action="?/deleteSecret" use:enhance={secretForm} class="mt-3">
 				<input type="hidden" name="id" value={secret.id} />
 				<Button type="submit" variant="outline">Delete secret</Button>
 			</form>

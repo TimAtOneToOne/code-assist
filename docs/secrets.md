@@ -2,6 +2,8 @@
 
 Open [Configuration → Secrets & environment](http://100.91.0.83:3000/configuration/secrets) on Mia.
 
+- **Search:** filter saved secrets and mappings by name, alias, notes, repository name or environment-variable name. Search uses metadata only; it does not reveal or load secret values.
+- **Feedback:** save, consolidation and error messages appear as dismissible toasts. The consolidation button is in the page header.
 - **Saved secrets:** add a name, notes and value. Existing values start masked and are fetched only when you click **Reveal**. **Hide** masks the field again. Save a new value to rotate a key; leave it blank to preserve the current value.
 - **Repository mappings:** choose a clone from the configured Mac mini repository root, enter its environment-variable name and select a saved secret. Save the same repository/variable pair to change its source. Remove a mapping from the table.
 - A secret can supply multiple variables and repositories. Rotation retains its ID, so all mappings resolve the new value on their next read. Remove its mappings before deleting a secret.
