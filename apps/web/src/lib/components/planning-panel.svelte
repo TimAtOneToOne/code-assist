@@ -89,17 +89,21 @@
 						>Codex responses to review findings</summary
 					>
 					<div class="mt-3 space-y-3">
-						{#each version.document.responses as response, index (index)}<p class="text-sm">
-								<strong>{response.findingId}</strong> · {response.response}
-							</p>{/each}
+						{#each version.document.responses as response, index (index)}<div class="text-sm">
+								<strong>{response.findingId}</strong><Markdown
+									html={html[`${run.id}:${version.number}:response:${index}`] ?? ''}
+								/>
+							</div>{/each}
 					</div>
 				</details>{/if}
 			{#if review}
 				<div class="border-t pt-4">
 					<h3 class="font-semibold">Claude’s review · v{version.number}</h3>
-					<p class="mt-2">{review.summary}</p>
+					<Markdown html={html[`${run.id}:${version.number}:summary`] ?? ''} />
 				</div>
-				{#each review.findings as finding (finding.id)}<div class="space-y-2 rounded-lg border p-3">
+				{#each review.findings as finding, index (finding.id)}<div
+						class="space-y-2 rounded-lg border p-3"
+					>
 						<div class="flex flex-wrap items-center gap-2">
 							<Badge
 								variant={['critical', 'high'].includes(finding.severity)
@@ -109,17 +113,19 @@
 								class="text-xs text-muted-foreground">{finding.id}</span
 							>
 						</div>
-						<p class="text-sm whitespace-pre-wrap">{finding.detail}</p>
-						<p class="text-sm whitespace-pre-wrap">
-							<strong>Recommendation:</strong>
-							{finding.recommendation}
-						</p>
+						<Markdown html={html[`${run.id}:${version.number}:finding:${index}:detail`] ?? ''} />
+						<div>
+							<strong class="text-sm">Recommendation:</strong><Markdown
+								html={html[`${run.id}:${version.number}:finding:${index}:recommendation`] ?? ''}
+							/>
+						</div>
 					</div>{/each}
 				{#if !review.findings.length}<p class="text-sm">No unresolved findings.</p>{/if}
-				{#if review.directionQuestion}<p class="rounded-lg border p-3">
-						<strong>Decision needed:</strong>
-						{review.directionQuestion}
-					</p>{/if}
+				{#if review.directionQuestion}<div class="rounded-lg border p-3">
+						<strong>Decision needed:</strong><Markdown
+							html={html[`${run.id}:${version.number}:direction`] ?? ''}
+						/>
+					</div>{/if}
 				{#if current && editable && run.status === 'awaiting_approval'}
 					<form method="POST" use:enhance class="space-y-4 border-t pt-4">
 						<input type="hidden" name="intent" value="plan-approve" /><input

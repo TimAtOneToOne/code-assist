@@ -36,7 +36,22 @@ export const load: PageServerLoad = async (event) => {
 		item,
 		planHtml: Object.fromEntries(
 			item.planning.flatMap((run) =>
-				run.versions.map((v) => [`${run.id}:${v.number}`, renderMarkdown(v.document.markdown)])
+				run.versions.flatMap((v) => {
+					const key = `${run.id}:${v.number}`;
+					return [
+						[key, renderMarkdown(v.document.markdown)],
+						[`${key}:summary`, renderMarkdown(v.review?.summary ?? '')],
+						[`${key}:direction`, renderMarkdown(v.review?.directionQuestion ?? '')],
+						...v.document.responses.map((response, index) => [
+							`${key}:response:${index}`,
+							renderMarkdown(response.response)
+						]),
+						...(v.review?.findings ?? []).flatMap((finding, index) => [
+							[`${key}:finding:${index}:detail`, renderMarkdown(finding.detail)],
+							[`${key}:finding:${index}:recommendation`, renderMarkdown(finding.recommendation)]
+						])
+					];
+				})
 			)
 		),
 		discoverySummaries: Object.fromEntries(
