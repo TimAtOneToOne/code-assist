@@ -54,6 +54,10 @@ test("durable probe, process restart, transaction rollback and manual retry", as
         ...process.env,
         CODE_ASSIST_DATABASE_URL: url.toString(),
         CODE_ASSIST_COMMIT: release,
+        CODE_ASSIST_DATA_DIR: new URL(
+          `../../../.tmp/intake/durability-${database}/`,
+          import.meta.url,
+        ).pathname,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

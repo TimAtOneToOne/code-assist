@@ -79,7 +79,7 @@ The Docker smoke test passed image building, Compose startup and health checks, 
 | Locale and encoding | `en_US.UTF-8`, UTF-8 |
 | Data checksums | Enabled |
 | Authentication | Fresh `initdb` defaults: local connections use `trust` |
-| Application database | `code_assist`, owned by the non-superuser `code_assist` login role; pg-boss and diagnostic state |
+| Application database | `code_assist`, owned by the non-superuser `code_assist` login role; pg-boss, intake, repository selections, attention outbox and diagnostic state |
 
 PostgreSQL 16 was uninstalled. At Tim's direction, PostgreSQL 18 was then reinitialized from scratch: both former Hint Lite databases, migrated roles, old PostgreSQL 16 data, and the upgrade backup were deleted. There is no retained backup of those old databases. Code Assist subsequently received its own database and local application role.
 
@@ -130,6 +130,6 @@ As of October 20, 2026, [Playwright MCP](browser-testing.md) is pinned in Code A
 - Select the first supported repository and prove its unchanged full validation, Docker services, and browser workflows through both SDKs.
 - Prove isolation between two simultaneous workspaces, including databases, container resources, ports, and browser profiles.
 - Web and worker supervision, release locations and pg-boss storage are configured. Define and test backup/restore before real jobs; no ongoing database backup schedule is configured.
-- Mac mini settings require the configured owner's Tailscale identity. Extend required authorization to future private ticket and approval routes as they are introduced.
+- Home, ticket pages and settings require the configured owner's Tailscale identity. Future approval routes must preserve that boundary.
 
 Optional optimizations and controls introduced by this documentation: none.

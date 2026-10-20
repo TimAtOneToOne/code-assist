@@ -2,11 +2,11 @@
 
 Code Assist uses pg-boss 12.38.0 in `apps/worker`, running as a separate native Node process with PostgreSQL 18 on Mia. Tim selected pg-boss on October 19, 2026. SvelteKit remains the UI; HTTP requests will record commands, not execute agents.
 
-This first slice is a diagnostic workflow:
+The worker now runs [Linear intake and attention notifications](intake.md). The original diagnostic workflow remains available:
 
 `queued → waiting for confirmation → confirmed → completed`
 
-It exercises job creation, execution, a human-style wait, explicit continuation and durable history. It does not scan Linear, run models, approve a plan or publish a PR. Probe confirmation is an operator CLI command, not the future authenticated plan-approval API.
+The probe exercises job creation, execution, a human-style wait, explicit continuation and durable history. Probe confirmation is an operator CLI command, separate from ticket repository selection and the future plan-approval API. Neither workflow runs models, approves a plan or publishes a PR.
 
 ## State and transaction boundaries
 
@@ -29,7 +29,7 @@ The diagnostic queue explicitly sets `retryLimit: 0`, matching the brief's visib
 
 These are diagnostic-queue settings, not a global ticket concurrency policy or an agent execution budget. Agent liveness, time bounds, queued-work recovery and retention need their own implementation before adding real agent queues. A killed active job remains active until pg-boss detects expiration; with automatic retries disabled it then fails. Queue durability does not provide exactly-once external effects.
 
-`SIGTERM` and `SIGINT` stop fetching probe jobs, wait for in-flight handlers through native `offWork()`, then close pg-boss. The updater sends `SIGTERM` after activating a release; launchd starts the replacement when the old worker exits. Web and worker may briefly report different releases during draining. The LaunchAgent retains macOS shutdown defaults: machine shutdown or unloading the service may terminate a handler before it finishes, leaving its uncommitted transaction rolled back. Long-running agent descendant management is not yet implemented.
+`SIGTERM` and `SIGINT` stop fetching probe, intake and attention jobs, wait for in-flight handlers through native `offWork()`, then close pg-boss. The updater sends `SIGTERM` after activating a release; launchd starts the replacement when the old worker exits. Web and worker may briefly report different releases during draining. The LaunchAgent retains macOS shutdown defaults: machine shutdown or unloading the service may terminate a handler before it finishes, leaving its uncommitted transaction rolled back. Long-running agent descendant management is not yet implemented.
 
 ## Operations
 
@@ -60,7 +60,7 @@ TEST_DATABASE_URL=postgresql://<local-admin>@127.0.0.1:5432/postgres make test-w
 
 The test creates a uniquely named disposable database and removes only that database afterward. It proves queued work is consumed, waiting survives a killed worker, confirmation survives worker downtime, a new release completes the continuation, duplicate confirmation is rejected, state/event failure rolls back completion, explicit retry succeeds, enqueue rolls back with application state, and SIGTERM waits for an active SQL handler without claiming the next job.
 
-Before real tickets, implement attempt fencing and descendant cleanup, exact-version approvals, GitHub-write reconciliation, compatible application migrations and database backup/restore. No claim is made that an active Codex/Claude process survives deployment or a full machine reboot.
+Before agent execution, implement attempt fencing and descendant cleanup, exact-version approvals, GitHub-write reconciliation, compatible application migrations and database backup/restore. No claim is made that an active Codex/Claude process survives deployment or a full machine reboot.
 
 ### Initial installation evidence — October 19, 2026
 

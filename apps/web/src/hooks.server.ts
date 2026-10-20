@@ -20,7 +20,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 		);
 	response.headers.set('x-request-id', event.locals.requestId);
-	if (event.route.id?.startsWith('/configuration/secrets')) {
+	if (
+		event.route.id === '/' ||
+		event.route.id?.startsWith('/tickets/') ||
+		event.route.id?.startsWith('/configuration/')
+	) {
 		response.headers.set('Cache-Control', 'no-store');
 	}
 	return response;

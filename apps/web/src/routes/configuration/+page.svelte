@@ -12,6 +12,15 @@
 <h1>Configuration</h1>
 <p class="intro">A home for connections and workspace preferences.</p>
 <Card.Root class="panel">
+	<Card.Title>Ticket intake</Card.Title>
+	<Card.Description
+		>Connect Linear, choose the polling interval and configure Teams attention links.</Card.Description
+	>
+	<div>
+		<Button href={resolve('/configuration/intake')} variant="outline">Configure intake →</Button>
+	</div>
+</Card.Root>
+<Card.Root class="panel">
 	<Card.Title>Secrets & environment</Card.Title>
 	<Card.Description
 		>Manage shared keys and map them to repository-specific environment variables.</Card.Description

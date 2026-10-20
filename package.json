@@ -7,12 +7,12 @@
     "node": ">=24.6 <25"
   },
   "scripts": {
-    "test": "pnpm --filter @code-assist/web test && pnpm --filter @code-assist/observability test && pnpm --filter @code-assist/secrets test",
+    "test": "pnpm --filter @code-assist/web test && pnpm --filter @code-assist/observability test && pnpm --filter @code-assist/secrets test && pnpm --filter @code-assist/intake test",
     "dev": "pnpm --filter @code-assist/web dev",
     "build": "pnpm --filter @code-assist/web build",
-    "check": "pnpm --filter @code-assist/web check && pnpm --filter @code-assist/worker check && tsc -p tsconfig.ops.json && pnpm --filter @code-assist/observability check && pnpm --filter @code-assist/browser-mcp check && pnpm --filter @code-assist/secrets check",
-    "lint": "pnpm --filter @code-assist/web lint && pnpm --filter @code-assist/worker lint && eslint ops && prettier --check ops package.json pnpm-workspace.yaml tsconfig.ops.json eslint.config.js && pnpm --filter @code-assist/observability lint && pnpm --filter @code-assist/browser-mcp lint && pnpm --filter @code-assist/secrets lint",
-    "format": "pnpm --filter @code-assist/web format && pnpm --filter @code-assist/worker format && prettier --write ops package.json pnpm-workspace.yaml tsconfig.ops.json eslint.config.js && pnpm --filter @code-assist/observability format && pnpm --filter @code-assist/browser-mcp format && pnpm --filter @code-assist/secrets format"
+    "check": "pnpm --filter @code-assist/web check && pnpm --filter @code-assist/worker check && tsc -p tsconfig.ops.json && pnpm --filter @code-assist/observability check && pnpm --filter @code-assist/browser-mcp check && pnpm --filter @code-assist/secrets check && pnpm --filter @code-assist/intake check",
+    "lint": "pnpm --filter @code-assist/web lint && pnpm --filter @code-assist/worker lint && eslint ops && prettier --check ops package.json pnpm-workspace.yaml tsconfig.ops.json eslint.config.js && pnpm --filter @code-assist/observability lint && pnpm --filter @code-assist/browser-mcp lint && pnpm --filter @code-assist/secrets lint && pnpm --filter @code-assist/intake lint",
+    "format": "pnpm --filter @code-assist/web format && pnpm --filter @code-assist/worker format && prettier --write ops package.json pnpm-workspace.yaml tsconfig.ops.json eslint.config.js && pnpm --filter @code-assist/observability format && pnpm --filter @code-assist/browser-mcp format && pnpm --filter @code-assist/secrets format && pnpm --filter @code-assist/intake format"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

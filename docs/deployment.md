@@ -1,6 +1,6 @@
 # Mac mini deployment
 
-The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, Configuration, Mac mini settings, Logs and `/health` routes. The separate pg-boss process in `apps/worker` runs a durable confirmation probe against local PostgreSQL. See [worker operation and limits](worker.md) and [central logging](logging.md). Linear intake and agent execution are not implemented yet.
+The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, ticket selection, Configuration, Mac mini settings, Secrets, Logs and `/health` routes. The separate pg-boss process in `apps/worker` runs [Linear intake and attention notifications](intake.md), plus the diagnostic confirmation probe against local PostgreSQL. See [worker operation and limits](worker.md) and [central logging](logging.md). Agent execution is not implemented yet.
 
 The shell uses shadcn-svelte Button, Card and Badge components installed through its CLI. AI Elements and AG-UI preferences are recorded in `AGENTS.md` for future agent/chat features.
 
@@ -18,7 +18,7 @@ make verify
 
 ## Deployment and access
 
-Target URL: **http://100.91.0.83:3000**. The server binds directly to Mia's Tailscale IPv4 address. It does not listen on all interfaces. The Home and application overview pages contain no private ticket content and remain visible to devices allowed to reach that address. The editable Mac mini settings page verifies the actual connection's peer using `tailscale whois` and requires an untagged device registered to the configured owner. Forwarded identity headers are not used.
+Target URL: **http://100.91.0.83:3000**. The server binds directly to Mia's Tailscale IPv4 address. It does not listen on all interfaces. Home now contains private ticket content. Home, ticket pages and settings verify the actual connection's peer using `tailscale whois` and require an untagged device registered to the configured owner. Forwarded identity headers are not used.
 
 Runtime: native Node 24.22.0 at `~/.nvm/versions/node/v24.22.0/bin/node`, with pnpm 10.28.0 installed alongside it. Service definitions contain the absolute Node path and an explicit PATH. PostgreSQL and OrbStack are independent of this web deployment.
 
@@ -35,6 +35,7 @@ The installation is under `~/Library/Application Support/CodeAssist/`:
 | `observability.env` | Container credentials/storage settings; mode 600 |
 | `runtime.env` | Operator-managed runtime settings, including `CODE_ASSIST_ADMIN_TAILSCALE_USER` and `CODE_ASSIST_DATABASE_URL`; mode 600, outside Git |
 | `data/mac-mini.json` | Saved Mac mini configuration; preserved across releases |
+| `data/intake.json` | Linear/attention secret references and polling interval |
 | `data/secrets/store.json` | Shared secret values and repository mappings; mode 600 inside a mode 700 directory |
 
 ## Mac mini settings
@@ -87,7 +88,7 @@ launchctl kickstart -k "gui/$(id -u)/com.code-assist.web"
 
 Older releases are retained. There is no automatic rollback or release cleanup. To roll back operationally, first unload the updater, then atomically point `current` to a compatible existing release, restart the web service and signal the worker with `launchctl kill SIGTERM "gui/$(id -u)/com.code-assist.worker"`. Fix `main` before re-enabling automatic updates. Do not roll the worker back to a release without worker code, or reverse database state during code rollback. Runtime health failures are logged; successful compilation alone does not prove that a future release is healthy.
 
-These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. Worker draining currently covers the short SQL-only diagnostic workflow. Add and prove agent-process interruption, ownership and checkpoint recovery before deploying long-running agent work.
+These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. Worker draining covers diagnostic, intake and attention handlers. Add and prove agent-process interruption, ownership and checkpoint recovery before deploying long-running agent work.
 
 ## Initial verification — October 19, 2026
 

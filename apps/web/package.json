@@ -46,7 +46,9 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
+		"@code-assist/intake": "workspace:*",
 		"@code-assist/observability": "workspace:*",
-		"@code-assist/secrets": "workspace:*"
+		"@code-assist/secrets": "workspace:*",
+		"@opentelemetry/api": "1.9.1"
 	}
 }

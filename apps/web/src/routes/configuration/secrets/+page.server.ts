@@ -11,6 +11,7 @@ import { dataDirectory } from '#lib/server/data-directory.js';
 import { requireSettingsAccess } from '#lib/server/settings-access.js';
 import { listRepositories } from '#lib/server/repositories.js';
 import type { Actions, PageServerLoad } from './$types';
+import { readSettings } from '@code-assist/intake/settings';
 
 export const load: PageServerLoad = async (event) => {
 	await requireSettingsAccess(event);
@@ -56,6 +57,19 @@ export const actions = {
 		}),
 	deleteSecret: (event) =>
 		mutate(event, (field) => {
+			const settings = readSettings(dataDirectory());
+			if (
+				settings &&
+				[
+					settings.linearSecretId,
+					settings.teamsWebhookSecretId,
+					settings.teamsConversationSecretId
+				].includes(field('id'))
+			) {
+				throw new SecretInputError(
+					'Choose a different secret in intake settings before deleting this one.'
+				);
+			}
 			deleteSecret(dataDirectory(), field('id'));
 		}),
 	saveMapping: (event) =>

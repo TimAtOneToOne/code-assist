@@ -1,6 +1,7 @@
 import { defineEnvVars } from '@sveltejs/kit/env';
 
 export const variables = defineEnvVars({
+	CODE_ASSIST_DATABASE_URL: { schema: (value) => value ?? null },
 	CODE_ASSIST_LOG_SEARCH_URL: { schema: (value) => value ?? null },
 	CODE_ASSIST_LOG_SEARCH_AUTH: { schema: (value) => value ?? null },
 	CODE_ASSIST_ARTIFACT_DIR: { schema: (value) => value ?? null },
