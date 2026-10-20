@@ -38,10 +38,11 @@ The installation is under `~/Library/Application Support/CodeAssist/`:
 | `data/intake.json` | Linear/attention secret references and polling interval |
 | `data/discovery/<attempt>/` | Captured repository commits, isolated Codex home and native session files |
 | `data/secrets/store.json` | Shared secret values and repository mappings; mode 600 inside a mode 700 directory |
+| `data/workspaces/<uuid>/workspace.json` | Preparation state and approved inputs for an isolated coding workspace; no environment values |
 
 ## Mac mini settings
 
-[Secrets & environment](secrets.md) provides shared secret management and repository-specific environment-variable mappings. Values live outside releases and are revealed only on request to the verified owner. The future agent runner will consume the resolver; no repository `.env` files are rewritten.
+[Secrets & environment](secrets.md) provides shared secret management and repository-specific environment-variable mappings. Values live outside releases and are revealed only on request to the verified owner. The [ICU workspace provisioner](workspaces.md) resolves those mappings into a private environment in each OrbStack machine; no repository `.env` files are rewritten. Automatic coding-worker integration is not yet implemented.
 
 Open **http://100.91.0.83:3000/configuration/mac-mini** to edit the repository root. The initial value is `/Users/miasocci/CODE/repos/OnetoOneHealth`, the parent of the existing synced clones. Save checks that the supplied absolute path is a readable directory on Mia, then atomically replaces `data/mac-mini.json`. This setting locates source clones; it does not reconfigure the existing sync job, clone repositories, or designate those synced clones as mutable agent workspaces.
 

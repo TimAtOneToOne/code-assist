@@ -77,3 +77,7 @@ tested; these mappings include real gateway and SendGrid access. Saving them doe
 not launch an agent or provision services.
 
 Optional optimizations and controls: none.
+
+The [ICU workspace provisioner](workspaces.md) now supplies those attempt-local
+settings and resolves these mappings during preparation. Automatic coding-worker
+integration remains the next step.

@@ -8,7 +8,8 @@
     "check": "tsc --noEmit",
     "test:integration": "node --test tests/*.integration.ts",
     "lint": "eslint src tests && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "workspace": "node src/workspace-cli.ts"
   },
   "dependencies": {
     "pg": "8.23.1",
