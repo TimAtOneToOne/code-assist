@@ -62,6 +62,13 @@ The test creates a uniquely named disposable database and removes only that data
 
 Before real tickets, implement attempt fencing and descendant cleanup, exact-version approvals, GitHub-write reconciliation, compatible application migrations and database backup/restore. No claim is made that an active Codex/Claude process survives deployment or a full machine reboot.
 
+### Initial installation evidence — October 19, 2026
+
+- `make verify` passed locally and in Mia's automatic release build.
+- The PostgreSQL integration test passed against local PostgreSQL 17.11 and Mia's PostgreSQL 18.6, including an active-handler drain.
+- Release `39d6590` started under `com.code-assist.worker`. A live probe reached its saved waiting state; killing that worker with `SIGKILL` caused launchd to start a new worker process.
+- Worker startup logs identify both release and PID. Probe history records the release at each checkpoint, allowing a continuation after deployment to be distinguished from the original execution.
+
 References: [pg-boss workers](https://pgboss.io/api/workers), [queue defaults](https://pgboss.io/api/queues), [transaction API](https://pgboss.io/api/constructor).
 
 Optional optimizations and controls: none. Explicit failure handling, transaction checks and deployment draining implement the requested durability requirements.

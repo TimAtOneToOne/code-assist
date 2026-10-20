@@ -53,7 +53,7 @@ Provision the local `code_assist` database and `runtime.env` before installation
 
 The updater uses Mia's existing SSH GitHub identity. It installs frozen dependencies and runs `make verify` in a separate staging directory while the old web release stays up. Only a successful build becomes a release; activation replaces `current` atomically and restarts the web service. It signals the worker to drain its current step, exit and restart under launchd using the new release. The page header, Configuration page and `/health` report the web commit; worker startup/checkpoint logs report the worker commit. On subsequent passes, the updater checks that `/health` matches the active commit.
 
-No public webhook or GitHub Actions runner is needed. A local commit must be pushed to `main` to be picked up. If several commits arrive between polls, the updater builds the head observed by its fetch. Failed builds leave the current release running; a later scheduled pass attempts the current head again. Logs record failures. The update process does not modify PostgreSQL, OrbStack data or any agent workspace.
+No public webhook or GitHub Actions runner is needed. A local commit must be pushed to `main` to be picked up. If several commits arrive between polls, the updater builds the head observed by its fetch. Failed builds leave the current release running; a later scheduled pass attempts the current head again. Logs record failures. Releases preserve database content, OrbStack data and workspace directories. Worker startup installs pg-boss's schema and the diagnostic tables; future dependency/schema upgrades require compatibility validation before publication.
 
 ## Inspection and recovery
 
