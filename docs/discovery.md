@@ -29,11 +29,13 @@ Each attempt has an isolated Codex home. A native permission profile grants read
 
 The service process uses the SDK's native streaming API, structured-output schema and AbortSignal. Full SDK events and input/failure payloads go through the existing credential-redacting artifact logger, with stable ticket, attempt, job and thread IDs. The ticket page links to the existing Logs view filtered by attempt. Native session files remain in the attempt's isolated home. No new retention policy, output clipping or question limit was added.
 
-## Recovery and current deployment blocker
+## Recovery and subprocess ownership
 
 Native pg-boss defaults apply, including active-job expiration; automatic retries remain disabled. A graceful worker shutdown aborts the investigation and queues a new attempt using the already captured snapshots. An unexpected worker death leaves a visible failed attempt on reconciliation, with an explicit Retry action. Committed findings and answers do not depend on a live worker or browser.
 
-**Pending approval:** a real crash test on Mia showed SDK 0.163.0 terminates the Codex CLI on AbortSignal but leaves an active `/bin/sleep 60` shell subprocess orphaned. The SDK runner's IPC disconnect correctly detects worker death; native subprocess cleanup is incomplete. No custom cleanup workaround has been implemented. Tim's SDK-workaround rule requires approval for cleanup limited to the subprocesses owned by the discovery attempt. Production deployment is pending this decision and a passing cleanup regression.
+A real crash test on Mia showed SDK 0.163.0 terminates the Codex CLI on AbortSignal but leaves an active `/bin/sleep 60` shell subprocess orphaned. Tim approved cleanup of the run's owned subprocesses on October 20, 2026. Before SDK cancellation, the separate runner identifies its descendants by parent relationships, freezes them to stop further spawning, and terminates them. It checks PID/start-time identity before each signal and excludes its own inspection process. This covers commands in separate process sessions; it never kills by a global process name or signals the controller.
+
+Worker IPC disconnect, explicit cancellation and runner SIGTERM invoke this cleanup. Interrupted discovery can restart from its recorded repository snapshots. Cleanup is specific to discovery runners; a direct SIGKILL of the runner itself cannot execute a cleanup handler. The runner must stay alive long enough to handle its worker's disconnect or cancellation.
 
 ## Validation
 
@@ -51,8 +53,12 @@ The official Playwright MCP exercised the built application with a disposable da
 
 A full synthetic worker run on Mia used a disposable database and Git repository, the saved OpenAI key, and the real Codex SDK. It captured the source commit, read the fixture, saved a grounded finding and question, completed the native job, wrote correlated activity artifacts, and recorded one unsent notification intent. The source repository was unchanged; the disposable database and temporary secret entry were removed. No real ticket was investigated or notification sent by that test.
 
-A native permission probe verified that snapshot reads succeed while writes and reads outside the supplied workspace fail. `make verify`, `make test-intake`, and `make test-worker` passed locally. The crash probe described above is a known failure, not a completed durability claim.
+A native permission probe verified that snapshot reads succeed while writes and reads outside the supplied workspace fail. `make verify`, `make test-intake`, and `make test-worker` passed locally. The owned-process regression verifies detached descendants are terminated while an unrelated process stays alive. Real SDK crash and cancellation probes on Mia also passed: the worker, runner, Codex CLI, code-mode host and active shell command were gone, while the unrelated process remained alive.
 
 References: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [native permission profiles](https://learn.chatgpt.com/docs/permissions), [sandboxing](https://learn.chatgpt.com/docs/sandboxing).
 
-Optional optimizations and controls: none. Snapshot isolation, read-only permissions, credential separation, stale-input checks and human scope confirmation implement the requested discovery boundary. Any approved subprocess workaround must be listed here before deployment.
+Optional optimizations and controls:
+
+- **Owned subprocess cleanup — approved by Tim October 20, 2026.** SDK cancellation left an active shell command orphaned in the real Mia crash test. Discovery runners now freeze and terminate only their descendants before cancelling the SDK. Cancellation ends those commands immediately; it does not give them a graceful exit. This applies only to discovery, including future calls through its runner. No global process matching, workload limit or automatic retry was added.
+
+Snapshot isolation, read-only permissions, credential separation, stale-input checks and human scope confirmation implement the requested discovery boundary.

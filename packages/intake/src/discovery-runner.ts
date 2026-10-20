@@ -1,14 +1,19 @@
 import { runCodex, type AgentInput } from "./discovery-agent.ts";
+import { terminateOwnedProcesses } from "./owned-processes.ts";
 const abort = new AbortController();
 let started = false;
-process.on("disconnect", () =>
-  abort.abort(new Error("Owning worker disconnected.")),
-);
-process.on("SIGTERM", () =>
-  abort.abort(new Error("Discovery process interrupted.")),
-);
+function cancel(message: string) {
+  if (abort.signal.aborted) return;
+  try {
+    terminateOwnedProcesses();
+  } finally {
+    abort.abort(new Error(message));
+  }
+}
+process.on("disconnect", () => cancel("Owning worker disconnected."));
+process.on("SIGTERM", () => cancel("Discovery process interrupted."));
 process.on("message", async (message: { type: string; input?: AgentInput }) => {
-  if (message.type === "abort") abort.abort(new Error("Discovery cancelled."));
+  if (message.type === "abort") cancel("Discovery cancelled.");
   if (message.type !== "start" || !message.input || started) return;
   started = true;
   try {

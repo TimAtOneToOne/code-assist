@@ -2,7 +2,7 @@
 
 Code Assist uses pg-boss 12.38.0 in `apps/worker`, running as a separate native Node process with PostgreSQL 18 on Mia. Tim selected pg-boss on October 19, 2026. SvelteKit remains the UI; HTTP requests will record commands, not execute agents.
 
-The deployed worker runs [Linear intake and attention notifications](intake.md). The new [initial Codex discovery](discovery.md) implementation is awaiting a subprocess-cleanup decision before publication. The original diagnostic workflow remains available:
+The worker runs [Linear intake and attention notifications](intake.md) and [initial Codex discovery](discovery.md). The original diagnostic workflow remains available:
 
 `queued → waiting for confirmation → confirmed → completed`
 
@@ -29,7 +29,7 @@ The diagnostic queue explicitly sets `retryLimit: 0`, matching the brief's visib
 
 These are diagnostic-queue settings, not a global ticket concurrency policy or an agent execution budget. Discovery also uses native queue defaults and explicit failure/manual Retry. Its reconciliation detects missing worker PIDs and expired jobs; durable application history retains questions and answers after queue retention. Queue durability does not provide exactly-once external effects.
 
-`SIGTERM` and `SIGINT` abort discovery through the native SDK and checkpoint a replacement attempt with captured repository snapshots. Native `offWork()` waits for discovery, probe, intake and attention handlers before closing pg-boss. The updater sends `SIGTERM` after activating a release; launchd starts the replacement when the old worker exits. Web and worker may briefly report different releases during draining. The LaunchAgent retains macOS shutdown defaults: machine shutdown or unloading the service may terminate a handler before it finishes, leaving its uncommitted transaction rolled back. Complete agent descendant cleanup remains a deployment blocker.
+`SIGTERM` and `SIGINT` terminate the discovery runner's owned subprocesses, abort the native SDK and checkpoint a replacement attempt with captured repository snapshots. Native `offWork()` waits for discovery, probe, intake and attention handlers before closing pg-boss. The updater sends `SIGTERM` after activating a release; launchd starts the replacement when the old worker exits. Web and worker may briefly report different releases during draining. The LaunchAgent retains macOS shutdown defaults: machine shutdown or unloading the service may terminate a handler before it finishes, leaving its uncommitted transaction rolled back. See [discovery recovery](discovery.md#recovery-and-subprocess-ownership) for cleanup scope and limits.
 
 ## Operations
 
@@ -60,7 +60,7 @@ TEST_DATABASE_URL=postgresql://<local-admin>@127.0.0.1:5432/postgres make test-w
 
 The test creates a uniquely named disposable database and removes only that database afterward. It proves queued work is consumed, waiting survives a killed worker, confirmation survives worker downtime, a new release completes the continuation, duplicate confirmation is rejected, state/event failure rolls back completion, explicit retry succeeds, enqueue rolls back with application state, and SIGTERM waits for an active SQL handler without claiming the next job.
 
-Discovery implements attempt fencing, additive migrations and saved human checkpoints. Descendant cleanup remains pending. Full planning/implementation still needs exact-version plan approvals, GitHub-write reconciliation and database backup/restore. No claim is made that an active Codex/Claude process survives deployment or a full machine reboot.
+Discovery implements attempt fencing, additive migrations, owned-process cleanup and saved human checkpoints. Full planning/implementation still needs exact-version plan approvals, GitHub-write reconciliation and database backup/restore. No claim is made that an active Codex/Claude process survives deployment or a full machine reboot.
 
 ### Initial installation evidence — October 19, 2026
 
@@ -71,4 +71,4 @@ Discovery implements attempt fencing, additive migrations and saved human checkp
 
 References: [pg-boss workers](https://pgboss.io/api/workers), [queue defaults](https://pgboss.io/api/queues), [transaction API](https://pgboss.io/api/constructor).
 
-Optional optimizations and controls: none. Explicit failure handling, transaction checks and deployment draining implement the requested durability requirements.
+Optional optimizations and controls: discovery's owned-subprocess cleanup was approved by Tim after the SDK crash probe; [scope and tradeoff](discovery.md#validation). Explicit failure handling, transaction checks and deployment draining implement the requested durability requirements.

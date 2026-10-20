@@ -1,6 +1,6 @@
 # Mac mini deployment
 
-The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, ticket selection, Configuration, Mac mini settings, Secrets, Logs and `/health` routes. The separate pg-boss process in `apps/worker` runs [Linear intake and attention notifications](intake.md), plus the diagnostic confirmation probe against local PostgreSQL. See [worker operation and limits](worker.md) and [central logging](logging.md). [Initial Codex discovery](discovery.md) is implemented locally; publication is pending the documented subprocess-cleanup decision.
+The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, ticket selection, Configuration, Mac mini settings, Secrets, Logs and `/health` routes. The separate pg-boss process in `apps/worker` runs [Linear intake and attention notifications](intake.md), [initial Codex discovery](discovery.md), and the diagnostic confirmation probe against local PostgreSQL. See [worker operation and limits](worker.md) and [central logging](logging.md).
 
 The shell uses shadcn-svelte Button, Card and Badge components installed through its CLI. AI Elements and AG-UI preferences are recorded in `AGENTS.md` for future agent/chat features.
 
@@ -89,7 +89,7 @@ launchctl kickstart -k "gui/$(id -u)/com.code-assist.web"
 
 Older releases are retained. There is no automatic rollback or release cleanup. To roll back operationally, first unload the updater, then atomically point `current` to a compatible existing release, restart the web service and signal the worker with `launchctl kill SIGTERM "gui/$(id -u)/com.code-assist.worker"`. Fix `main` before re-enabling automatic updates. Do not roll the worker back to a release without worker code, or reverse database state during code rollback. Runtime health failures are logged; successful compilation alone does not prove that a future release is healthy.
 
-These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. Worker draining covers diagnostic, intake and attention handlers. The new discovery handler checkpoints on graceful shutdown and rejects stale results; its native SDK still leaves a shell subprocess alive in the crash probe. Resolve and verify that limitation before deploying this release. On its first startup, it will queue discovery for all already-selected eligible tickets, using the saved `OPENAI_API_KEY`.
+These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. Worker draining covers diagnostic, intake and attention handlers. Discovery cleans up its owned subprocesses, checkpoints on graceful shutdown and rejects stale results. On its first startup, it queues discovery for all already-selected eligible tickets, using the saved `OPENAI_API_KEY`. Read [the cleanup scope and validated recovery behavior](discovery.md#recovery-and-subprocess-ownership) before changing the process lifecycle.
 
 ## Initial verification — October 19, 2026
 
