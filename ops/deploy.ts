@@ -83,6 +83,7 @@ export async function deploy(restart = true) {
     }
   }
 
+  run(process.execPath, [join(release, "ops/install-browser.ts")], release);
   run(
     process.execPath,
     [join(release, "ops/install-observability.ts")],

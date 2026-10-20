@@ -120,6 +120,10 @@ df -h /System/Volumes/Data
 
 [Logging configuration](logging.md) describes the Logs page, evidence paths, local OpenObserve service, storage migration and delivery limits. Agent SDK runtime integration and full reboot recovery are still pending.
 
+## Browser tools
+
+As of October 20, 2026, [Playwright MCP](browser-testing.md) is pinned in Code Assist and registered as `playwright` for Mia's Codex CLI and Claude Code. Each client launches its own headless Chromium process on demand with an isolated browser profile. No separate login service is needed. Browser revisions are installed during deployment and retained in `~/Library/Caches/ms-playwright` for compatibility with managed repositories.
+
 ## Remaining setup and validation
 
 - Test the configured login startup and recovery after logout, reboot, and power interruption, including whether manual login is needed before services become available.
