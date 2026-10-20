@@ -37,3 +37,43 @@ Optional optimizations and controls: none. Owner authorization, non-cacheable se
 ## AWS staging planning connection
 
 The AWS staging page selects saved source credentials by ID. The imported names are `STAGING_AGENT_AWS_ACCESS_KEY_ID` and `STAGING_AGENT_AWS_SECRET_ACCESS_KEY`. They are used by the worker to assume the configured read-only role, not injected as repository environment variables. Account, role, region and profile are non-secret connection settings. The original IAM user ARN and source-profile name describe the source installation and are not needed by the worker, which passes the selected keys explicitly to STS. See [planning](planning.md#aws-staging-evidence) for runtime behavior and verification.
+
+## ICU Coding Environment
+
+On October 20, 2026, Tim authorized importing ICU's local development configuration
+from `internal-chat-ui/sveltekit/.env`. Fifteen variables are now mapped to
+`/Users/miasocci/CODE/repos/OnetoOneHealth/internal-chat-ui` on Mia. Each saved entry
+is named `ICU_<variable>`; the repository receives the original variable name.
+Values are stored only in Mia's secret store, not in this document or Git.
+
+| Integration | Mapped Variables |
+| --- | --- |
+| Microsoft OAuth | `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` |
+| Linear OAuth | `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET` |
+| Model gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_MODEL` |
+| Email | `SENDGRID_API_KEY`, `SENDGRID_FROM_ADDRESS` |
+| Roles | `AZURE_AD_ROLE_MAP`, `DEV_ROLE_OVERRIDES` |
+| Local Medusa | `MEDUSA_API_URL`, `MEDUSA_MCP_URL`, `MEDUSA_MCP_API_KEY` |
+
+The active Medusa key matched the local variant. The URLs point to localhost
+port 8000, so Medusa-dependent features require a service inside the attempt.
+The staging/production Medusa variants and the spike-only
+`LINEAR_DEVELOPER_TOKEN_USER` were not imported. ICU uses its configured model
+gateway; Code Assist's agent provider keys are separate.
+
+The runner still needs to supply `DATABASE_URL`, `TEST_DATABASE_URL`, `ORIGIN`,
+a fresh `BETTER_AUTH_SECRET`, and the local storage configuration:
+`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`AWS_ENDPOINT_URL_S3`, and `ICU_CHAT_ATTACHMENTS_BUCKET`. These must describe
+the attempt's own database and LocalStack. The source file's AWS credentials
+were the LocalStack `test` values, not cloud credentials.
+
+Verification used the owner-authenticated web actions, then resolved all fifteen
+mappings and compared values with the source without printing them. Existing
+secrets and other repositories' mappings were preserved. The live settings page
+shows the saved mappings, returns `no-store`, and omits credential values from
+initial HTML. External credentials, OAuth callbacks, and email delivery were not
+tested; these mappings include real gateway and SendGrid access. Saving them does
+not launch an agent or provision services.
+
+Optional optimizations and controls: none.
