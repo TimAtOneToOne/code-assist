@@ -96,9 +96,9 @@
 		{#key `${run.id}:${version.number}`}
 			<p class="text-sm text-muted-foreground">{version.document.changeSummary}</p>
 			{#if showChanges && comparison}<p class="text-sm text-muted-foreground" role="status">
-					{#if comparison.addedCount || comparison.removedCount}Yellow marks added or changed
-						sections since v{comparison.previousVersion}. {comparison.addedCount} added or changed · {comparison.removedCount}
-						removed or replaced.{:else}No content changes since v{comparison.previousVersion}.{/if}
+					{#if comparison.addedCount || comparison.removedCount}Yellow marks added or changed words
+						since v{comparison.previousVersion}. Previous wording is available below.{:else}No
+						content changes since v{comparison.previousVersion}.{/if}
 				</p>{/if}
 			<Markdown
 				html={showChanges && comparison
