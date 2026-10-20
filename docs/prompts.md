@@ -9,6 +9,14 @@ The default global prompt requests Title Case for document titles, section
 headings, and proposed UI titles, including “Adversarial Planning” and “Status and
 Evidence.” Ordinary prose remains sentence case.
 
+The default **Plan Drafting** prompt starts every new or revised plan with
+**A Simple Explanation**, immediately after its title: a plain-language outcome
+and short WHEN / IF / THEN-style pseudocode describing behavior, decisions and
+results. Technical implementation and evidence follow. **Adversarial Review**
+checks that this explanation stays accurate as the plan changes. Both instructions
+are editable in Prompt Management. Existing saved versions and approvals remain
+unchanged; the preference applies when the next draft or revision starts.
+
 ## Scopes
 
 | Scope | Applies To |
