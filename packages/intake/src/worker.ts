@@ -39,6 +39,16 @@ export function attentionMessage(
     timeStyle: "long",
   }).format(date);
   const planningMessages: Record<string, string[]> = {
+    coding_done: [
+      "✅ Complete · Pull request merged",
+      "GitHub confirms the pull request was merged. Code Assist marked the work Done and saved the merge commit. Deployment success is tracked separately in GitHub.",
+      "",
+    ],
+    coding_pr_closed: [
+      "🔎 Ready for review · Pull request closed without merge",
+      "GitHub reports the pull request was closed without merging. The implementation and evidence are preserved.",
+      "Review the closed pull request and decide whether to reopen it or revise the scope.",
+    ],
     coding_failed: [
       "⚠️ Blocked · Coding step failed",
       "Completed coding checkpoints are preserved. The failing step has diagnostic logs.",
@@ -92,7 +102,7 @@ export function attentionMessage(
       : eventType === "discovery_questions"
         ? "Review the findings, answer any questions, and confirm scope."
         : "Confirm the applicable repositories on the ticket page.");
-  return `<p><b>Code Assist · ${html(identifier)}</b><br><b>${heading}</b><br><br><b>Time:</b> ${html(timestamp)}<br><br>${html(title)}<br><br>${outcome}<br><br><b>Action needed:</b> ${action}<br><br><a href="${applicationOrigin}/tickets/${encodeURIComponent(id)}">Review ${html(identifier)}</a></p>`;
+  return `<p><b>Code Assist · ${html(identifier)}</b><br><b>${heading}</b><br><br><b>Time:</b> ${html(timestamp)}<br><br>${html(title)}<br><br>${outcome}${action ? `<br><br><b>Action needed:</b> ${action}` : ""}<br><br><a href="${applicationOrigin}/tickets/${encodeURIComponent(id)}">Review ${html(identifier)}</a></p>`;
 }
 
 export async function reconcileSchedule(boss: PgBoss, directory: string) {

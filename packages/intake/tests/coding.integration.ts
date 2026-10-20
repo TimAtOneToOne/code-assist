@@ -7,6 +7,13 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
 import {
+  recordGitHubObservation,
+  requestGitHubRefresh,
+  refreshGitHub,
+  githubQueue,
+  type PullRequestState,
+} from "../src/github.ts";
+import {
   initializeIntake,
   requestScan,
   recordScan,
@@ -239,7 +246,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       "pr_open",
       undefined,
       undefined,
-      "https://example.invalid/pull/1",
+      "https://github.com/example/icu/pull/1",
     );
     await recordScan(
       boss,
@@ -257,6 +264,110 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
         .coding_status,
       "pr_open",
     );
+    const published = (await readCoding(boss.getDb(), ticket.id))[0];
+    const pr: PullRequestState = {
+      url: published.pr_url!,
+      state: "CLOSED",
+      mergedAt: null,
+      closedAt: "2026-10-20T20:00:00Z",
+      mergeCommit: null,
+    };
+    const at = (n: number) => new Date(Date.now() - 60_000 + n);
+    await recordGitHubObservation(boss, published, at(1), { pr });
+    assert.equal((await dashboard(boss)).issues[0].coding_status, "pr_closed");
+    await recordGitHubObservation(boss, published, at(2), { pr });
+    assert.equal(
+      (
+        await boss
+          .getDb()
+          .executeSql(
+            "SELECT id FROM code_assist.intake_event WHERE type='coding_pr_closed' AND issue_id=$1",
+            [ticket.id],
+          )
+      ).rows.length,
+      1,
+    );
+    await recordGitHubObservation(boss, published, at(3), {
+      pr: { ...pr, state: "OPEN", closedAt: null },
+    });
+    assert.equal(
+      (await readWorkItem(boss.getDb(), ticket.id))!.coding_status,
+      "pr_open",
+    );
+    assert.equal(
+      await recordGitHubObservation(boss, published, new Date(0), { pr }),
+      false,
+    );
+    await assert.rejects(
+      requestGitHubRefresh(boss, randomUUID(), published.id),
+    );
+    await requestGitHubRefresh(boss, ticket.id, published.id);
+    const [refresh] = await boss.fetch<{ runId: string }>(githubQueue);
+    assert.equal(refresh.data.runId, published.id);
+    await assert.rejects(
+      refreshGitHub(
+        boss,
+        refresh.data,
+        new AbortController().signal,
+        refresh.id,
+        async () => {
+          throw new Error("Fixture GitHub unavailable");
+        },
+      ),
+    );
+    const failedRefresh = (await readCoding(boss.getDb(), ticket.id))[0];
+    assert.equal(failedRefresh.status, "pr_open");
+    assert.match(failedRefresh.github_error!, /GitHub refresh failed/);
+    const merged: PullRequestState = {
+      ...pr,
+      state: "MERGED",
+      mergedAt: pr.closedAt,
+      mergeCommit: { oid: "c".repeat(40) },
+    };
+    await recordGitHubObservation(
+      boss,
+      published,
+      new Date(Date.now() + 1_000),
+      { pr: merged },
+    );
+    const done = (await readCoding(boss.getDb(), ticket.id))[0];
+    assert.equal(done.status, "done");
+    assert.equal(done.merge_commit, "c".repeat(40));
+    assert.equal(
+      new Date(done.merged_at!).toISOString(),
+      "2026-10-20T20:00:00.000Z",
+    );
+    assert.equal(done.github_error, null);
+    await recordGitHubObservation(
+      boss,
+      published,
+      new Date(Date.now() + 2_000),
+      { pr: merged },
+    );
+    assert.equal(
+      (
+        await boss
+          .getDb()
+          .executeSql(
+            "SELECT id FROM code_assist.intake_event WHERE type='coding_done' AND issue_id=$1",
+            [ticket.id],
+          )
+      ).rows.length,
+      1,
+    );
+    assert.equal((await dashboard(boss)).issues[0].coding_status, "done");
+    let githubReads = 0;
+    await refreshGitHub(
+      boss,
+      {},
+      new AbortController().signal,
+      randomUUID(),
+      async () => {
+        githubReads++;
+        return merged;
+      },
+    );
+    assert.equal(githubReads, 0);
     await submitPlanFeedback(
       boss,
       ticket.id,

@@ -15,6 +15,7 @@ export function workflowBadgeVariant(status: WorkflowStatus, current = true) {
 		case 'needs_direction':
 		case 'failed':
 		case 'pr_open':
+		case 'pr_closed':
 			return 'attention';
 		case 'queued':
 		case 'running':

@@ -1,4 +1,5 @@
 import { initializeCoding, readCoding, type CodingRun } from "./coding.ts";
+import { initializeGitHub } from "./github.ts";
 import {
   readPlanning,
   reconcilePlanningFailures,
@@ -99,6 +100,7 @@ export async function initializeIntake(boss: PgBoss) {
   await boss.createQueue(notificationQueue, { retryLimit: 0 });
   await initializeDiscovery(boss);
   await initializeCoding(boss);
+  await initializeGitHub(boss);
 }
 
 export async function requestScan(boss: PgBoss) {

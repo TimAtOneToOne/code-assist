@@ -18,6 +18,8 @@
 		failed: 'Coding Needs Attention',
 		needs_direction: 'Coding Needs Direction',
 		pr_open: 'Pull Request Open',
+		pr_closed: 'Closed Without Merge',
+		done: 'Done',
 		superseded: 'Coding Paused'
 	};
 	const planningLabel = {
@@ -49,6 +51,9 @@
 		<Button type="submit" disabled={!data.settings}>Check Linear now</Button>
 	</form>
 	<Button variant="outline" onclick={() => invalidateAll()}>Refresh results</Button>
+	<form method="POST" action="?/github" use:enhance>
+		<Button type="submit" variant="outline">Refresh GitHub</Button>
+	</form>
 	<Button href={resolve('/configuration/intake')} variant="outline">Intake settings</Button>
 </div>
 {#if form?.error}<p role="alert" class="mb-4 text-destructive">{form.error}</p>{/if}

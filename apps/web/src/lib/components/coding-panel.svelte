@@ -18,6 +18,8 @@
 		failed: 'Needs Attention',
 		needs_direction: 'Your Direction Needed',
 		pr_open: 'Pull Request Open',
+		pr_closed: 'Closed Without Merge',
+		done: 'Done',
 		superseded: 'Superseded'
 	};
 	const latest = $derived(run.steps.find((s) => s.id === run.current_step_id));
@@ -38,10 +40,41 @@
 	</p>
 	{#if run.error}<p role="alert">{run.error}</p>{/if}
 	{#if run.pr_url}
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub URL from the publication controller. -->
-		<a class="font-medium underline" href={run.pr_url} target="_blank" rel="noreferrer"
-			>Review Pull Request →</a
-		>{/if}
+		<div class="flex flex-wrap items-center gap-3">
+			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub URL from the publication controller. -->
+			<a class="font-medium underline" href={run.pr_url} target="_blank" rel="noreferrer"
+				>{run.status === 'done'
+					? 'View Merged Pull Request →'
+					: run.status === 'pr_closed'
+						? 'View Closed Pull Request →'
+						: 'Review Pull Request →'}</a
+			>
+			<form method="POST" use:enhance>
+				<input type="hidden" name="intent" value="github-refresh" />
+				<input type="hidden" name="codingId" value={run.id} />
+				<Button type="submit" variant="outline" size="sm">Refresh GitHub</Button>
+			</form>
+		</div>
+		<p class="text-sm text-muted-foreground">
+			{#if run.github_checked_at}GitHub Checked: {new Date(
+					run.github_checked_at
+				).toLocaleString()}.{:else}Waiting for the first GitHub check.{/if}
+			{#if run.status !== 'done'}PR states are checked every five minutes.{/if}
+		</p>
+		{#if run.github_error}<p role="alert">{run.github_error}</p>{/if}
+		{#if run.status === 'done' && run.merged_at && run.merge_commit}
+			<p class="text-sm">
+				Merged {new Date(run.merged_at).toLocaleString()} · Commit {run.merge_commit.slice(0, 7)}.
+				Done records the merge; deployment status is available in GitHub.
+			</p>
+		{:else if run.status === 'pr_closed'}
+			<p class="text-sm">
+				The pull request was closed without merging{run.pr_closed_at
+					? ` on ${new Date(run.pr_closed_at).toLocaleString()}`
+					: ''}. Review it in GitHub to decide what happens next.
+			</p>
+		{/if}
+	{/if}
 	{#if run.status === 'needs_direction'}<p>
 			The agent needs your direction. Read its question below, then use Requested Changes on the
 			approved plan to revise the scope.

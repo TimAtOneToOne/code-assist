@@ -1,4 +1,5 @@
 import { dashboard, requestScan, requeuePendingNotifications } from '@code-assist/intake';
+import { requestGitHubRefresh } from '@code-assist/intake/github';
 import { readSettings } from '@code-assist/intake/settings';
 import { fail } from '@sveltejs/kit';
 import { withController } from '#lib/server/intake.js';
@@ -10,6 +11,11 @@ export const load: PageServerLoad = async (event) => {
 	return { ...(await withController(dashboard)), settings: readSettings(dataDirectory()) };
 };
 export const actions = {
+	github: async (event) => {
+		await requireSettingsAccess(event);
+		await withController((boss) => requestGitHubRefresh(boss));
+		return { message: 'GitHub refresh queued. Refresh results to see the latest PR states.' };
+	},
 	check: async (event) => {
 		await requireSettingsAccess(event);
 		if (!readSettings(dataDirectory()))

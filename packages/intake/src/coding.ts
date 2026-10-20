@@ -26,6 +26,11 @@ export async function initializeCoding(boss: PgBoss) {
  CREATE TABLE IF NOT EXISTS code_assist.coding_step (
  id uuid PRIMARY KEY,run_id uuid NOT NULL REFERENCES code_assist.coding_run(id),job_id uuid NOT NULL,kind text NOT NULL,input_commit text,
  status text NOT NULL,worker_pid integer,result jsonb,error text,created_at timestamptz NOT NULL DEFAULT now(),finished_at timestamptz);
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_checked_at timestamptz;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_error text;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS merged_at timestamptz;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS merge_commit text;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS pr_closed_at timestamptz;
  `);
   await boss.createQueue(codingQueue, { retryLimit: 0 });
 }

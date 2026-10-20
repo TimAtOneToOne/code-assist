@@ -1,4 +1,5 @@
 import { retryCoding, changeCodingBranch, CodingConflict } from '@code-assist/intake/coding';
+import { requestGitHubRefresh } from '@code-assist/intake/github';
 import { reconcileCodingFailures } from '@code-assist/intake/coding-worker';
 import {
 	approvePlan,
@@ -96,6 +97,17 @@ export const actions = {
 		const approver = await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const id = issueId(event.params.id);
+		if (form.get('intent') === 'github-refresh') {
+			try {
+				await withController((boss) =>
+					requestGitHubRefresh(boss, id, issueId(String(form.get('codingId'))))
+				);
+				return { message: 'GitHub refresh queued. Refresh the coding panel to see the result.' };
+			} catch (cause) {
+				if (cause instanceof CodingConflict) return fail(409, { error: cause.message });
+				throw cause;
+			}
+		}
 		if (form.get('intent') === 'coding-retry' || form.get('intent') === 'coding-branch') {
 			try {
 				if (form.get('intent') === 'coding-branch') {

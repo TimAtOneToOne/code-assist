@@ -10,6 +10,7 @@ import type { Ticket } from "./linear.ts";
 
 export const discoveryQueue = "initial-discovery";
 export const currentAttention = `(e.type='repository_needed' OR
+  EXISTS (SELECT 1 FROM code_assist.coding_run c WHERE c.issue_id=i.id AND e.details->>'codingId'=c.id::text AND ((e.type='coding_done' AND c.status='done') OR (e.type='coding_pr_closed' AND c.status='pr_closed'))) OR
   (i.eligible AND EXISTS (SELECT 1 FROM code_assist.coding_run c JOIN code_assist.planning_run cp ON cp.id=c.planning_id WHERE cp.discovery_id=i.current_discovery_id AND cp.status='approved' AND cp.current_version=c.version AND e.details->>'codingId'=c.id::text AND e.details->>'stepId'=c.current_step_id::text AND ((e.type='coding_failed' AND c.status='failed') OR (e.type='coding_direction' AND c.status='needs_direction') OR (e.type='coding_pr_open' AND c.status='pr_open')))) OR
   (e.details->>'runId'=i.current_discovery_id::text AND EXISTS (
     SELECT 1 FROM code_assist.discovery_run d WHERE d.id=i.current_discovery_id

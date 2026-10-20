@@ -12,12 +12,24 @@ export type CodingRun = {
   identifier: string;
   title: string;
   branch: string;
-  status: CodingKind | "failed" | "needs_direction" | "pr_open" | "superseded";
+  status:
+    | CodingKind
+    | "failed"
+    | "needs_direction"
+    | "pr_open"
+    | "pr_closed"
+    | "done"
+    | "superseded";
   current_step_id: string;
   workspace_id: string | null;
   commit: string | null;
   error: string | null;
   pr_url: string | null;
+  github_checked_at: Date | null;
+  github_error: string | null;
+  merged_at: Date | null;
+  merge_commit: string | null;
+  pr_closed_at: Date | null;
   created_at: Date;
 };
 export type CodingStep = {

@@ -28,7 +28,17 @@ Guest agents and validation run in named systemd units with process-group owners
 
 Publication runs from Mia's login-session worker, where the operator's GitHub keychain identity is available. SSH sessions cannot necessarily access that keychain. The controller requires passing validation and code review for the exact commit, inspects all existing PR states and the remote branch, checks compatibility with the current default branch, and records publication intent before writing. A new branch is pushed with an expected-absent ref lease. On an uncertain retry, an existing branch/PR must match the saved intent and exact commit. Unexpected changes, closed/merged branches and merge conflicts require attention. Agents never merge, enable auto-merge or deploy the managed application.
 
-PR feedback handling, automated rebase/revalidation and merge observation are not implemented in this milestone. Workspaces and evidence remain on disk after PR publication; operators can use the workspace CLI for deliberate cleanup.
+## GitHub PR Tracking
+
+The `github-pr-refresh` pg-boss queue checks published, unmerged PRs every five minutes, independently of Linear intake. The worker uses the same login-session GitHub CLI credentials as publication. Home's **Refresh GitHub** queues a check of tracked unmerged PRs; the ticket's button checks that specific PR, including completed work. Use **Refresh** to reload the observed result. No inbound webhook or new token is needed.
+
+GitHub `MERGED` marks the coding run **Done** and stores the merge commit and merge time. `CLOSED` shows **Closed Without Merge** in yellow; a reopened PR returns to **Pull Request Open**. Done is neutral because no agent work is running. State changes are recorded in ticket history and central Logs (`service=github`); merge and closure transitions use the existing Teams notification flow. Repeated observations do not create duplicate transition notifications.
+
+Failed GitHub reads preserve the previous state and show a check error on the ticket. A later scheduled check or manual refresh tries again. Observations are ordered by check start time, so a delayed response cannot overwrite a newer result. Existing exact-version approvals and coding evidence are unchanged. The observer also checks published PRs whose original planning scope is no longer current; observation never reauthorizes coding or changes Linear state.
+
+**Done means merged, not successfully deployed.** Deployment workflow tracking, PR feedback handling and automated rebase/revalidation are not implemented. Workspaces and evidence remain on disk after PR publication; operators can use the workspace CLI for deliberate cleanup.
+
+GitHub fields use the supported [`gh pr view --json` interface](https://cli.github.com/manual/gh_pr_view).
 
 Optional optimizations and controls: none. Approval fencing, commit-bound validation/review, process ownership and expected-head publication are required workflow integrity checks.
 
