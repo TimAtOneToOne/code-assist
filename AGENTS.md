@@ -19,3 +19,10 @@ Keep ad hoc test scripts, probes, logs, screenshots, and other temporary testing
 ## Programming language
 
 TypeScript is the default programming language for new application, service, and automation code in this repository. Any exception that introduces or expands another programming language requires explicit approval from the owners listed in the repository-root `CODEOWNERS` file.
+
+## UI and agent interaction preferences
+
+- Prefer [shadcn-svelte](https://www.shadcn-svelte.com/) components for this SvelteKit application.
+- Consider [Svelte AI Elements](https://svelte-ai-elements.vercel.app/components/context), including its Context component, when an actual agent-facing feature needs them.
+- If building chat interfaces, prefer the [AG-UI protocol](https://docs.ag-ui.com/introduction) for agent/UI interaction.
+- Tim requested these preferences on October 19, 2026. AI Elements and AG-UI are future options, not a requirement to install dependencies or build chat into the initial shell.

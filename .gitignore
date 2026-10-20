@@ -1,5 +1,8 @@
 .env
 .DS_Store
+node_modules/
+.env.*
+!.env.example
 /.pnpm-store/
 .tmp/*
 !.tmp/.gitkeep
