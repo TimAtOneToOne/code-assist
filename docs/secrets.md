@@ -22,9 +22,9 @@ Local development uses the existing gitignored `.tmp/local-web-data/secrets/` di
 
 `@code-assist/secrets` exports `resolveRepositoryEnvironment(dataDirectory, sourceRepositoryPath)`. It returns only that source clone's explicit variable mappings as an environment object, resolving current values on each call. It does not copy the Code Assist service's environment or write `.env` files. Mappings use absolute source-clone paths; changing the clone root does not silently remap them to different repositories.
 
-The future SDK runner must pass the returned values to the attempt's child-process environment, alongside its deliberate toolchain environment. Use the source repository path, not the temporary attempt directory. Never log the resolved object or pass the whole secret store to an agent. Running processes retain the environment they started with.
+An implementation-phase SDK runner must pass the returned values to the attempt's child-process environment, alongside its deliberate toolchain environment. Use the source repository path, not the temporary attempt directory. Never log the resolved object or pass the whole secret store to an agent. Running processes retain the environment they started with.
 
-The UI and resolver are implemented; the agent runner is still pending. Saving a mapping does not currently start an agent or rewrite a managed repository.
+The UI and resolver are implemented. Repository mappings are not injected into discovery/planning runners, which use their explicit provider and AWS connections. Saving a mapping does not start an agent or rewrite a managed repository.
 
 ## Verification
 
