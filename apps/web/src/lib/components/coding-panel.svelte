@@ -46,17 +46,76 @@
 		Plan v{run.version} · {run.branch}{#if run.commit}
 			· {run.commit.slice(0, 7)}{/if}
 	</p>
+	{#if run.repositories}
+		<div class="space-y-2 text-sm">
+			<h3 class="font-medium">Repository Progress</h3>
+			<p class="text-muted-foreground">
+				Repositories run one at a time. Claude reviews the combined implementation before PR
+				publication. Done requires every repository’s main workflow to succeed.
+			</p>
+			{#each run.repositories as repository, index (repository.name)}
+				<div class="space-y-2 rounded-md border p-3">
+					<div class="flex flex-wrap items-center gap-2">
+						<span class="font-medium">{index + 1}. {repository.name}</span>
+						<Badge variant={workflowBadgeVariant(repository.status, editable)}
+							>{index === run.repository_index &&
+							[
+								'prepare',
+								'implement',
+								'validate',
+								'review',
+								'publish',
+								'failed',
+								'needs_direction'
+							].includes(run.status)
+								? titles[run.status]
+								: titles[repository.status]}</Badge
+						>
+						{#if repository.commit}<span class="text-muted-foreground"
+								>{repository.commit.slice(0, 7)}</span
+							>{/if}
+						{#if repository.pr_url}
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Published GitHub URL. -->
+							<a class="underline" href={repository.pr_url} target="_blank" rel="noreferrer"
+								>{repository.merged_at ? 'View Merged PR' : 'Review PR'} →</a
+							>
+						{/if}
+					</div>
+					{#if repository.github_error}<p role="alert">{repository.github_error}</p>{/if}
+					{#each repository.main_workflows?.runs ?? [] as workflow (workflow.id)}
+						<div>
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Validated GitHub workflow URL. -->
+							<a class="underline" href={workflow.html_url} target="_blank" rel="noreferrer"
+								>{workflow.name}</a
+							>
+							· {workflowLabel(
+								workflow.status === 'completed' ? workflow.conclusion : workflow.status
+							)} · Attempt {workflow.run_attempt}
+						</div>
+					{/each}
+					{#if repository.main_workflows?.failureArtifact}<a
+							class="underline"
+							href={resolve('/api/artifacts/[id]', {
+								id: repository.main_workflows.failureArtifact
+							})}>Failure Evidence →</a
+						>{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
 	{#if run.error}<p role="alert">{run.error}</p>{/if}
 	{#if run.pr_url}
 		<div class="flex flex-wrap items-center gap-3">
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub URL from the publication controller. -->
-			<a class="font-medium underline" href={run.pr_url} target="_blank" rel="noreferrer"
-				>{run.merged_at
-					? 'View Merged Pull Request →'
-					: run.status === 'pr_closed'
-						? 'View Closed Pull Request →'
-						: 'Review Pull Request →'}</a
-			>
+			{#if !run.repositories}
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub URL from the publication controller. -->
+				<a class="font-medium underline" href={run.pr_url} target="_blank" rel="noreferrer"
+					>{run.merged_at
+						? 'View Merged Pull Request →'
+						: run.status === 'pr_closed'
+							? 'View Closed Pull Request →'
+							: 'Review Pull Request →'}</a
+				>
+			{/if}
 			<form method="POST" use:enhance>
 				<input type="hidden" name="intent" value="github-refresh" />
 				<input type="hidden" name="codingId" value={run.id} />
@@ -164,7 +223,9 @@
 		{#each run.steps as step (step.id)}
 			<details open={step.id === run.current_step_id} class="rounded-md border p-3">
 				<summary class="cursor-pointer text-sm font-medium"
-					>{titles[step.kind]} · {step.status} · {new Date(
+					>{titles[step.kind]}{run.repositories
+						? ` · ${run.repositories[step.repository_index ?? 0].name}`
+						: ''} · {workflowLabel(step.status)} · {new Date(
 						step.created_at
 					).toLocaleString()}</summary
 				>

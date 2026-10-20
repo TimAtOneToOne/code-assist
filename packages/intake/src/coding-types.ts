@@ -3,7 +3,22 @@ import type { WorkspaceInput } from "./workspace.ts";
 import type { PlanDocument, PlanReview } from "./planning-types.ts";
 export type CodingKind =
   "prepare" | "implement" | "validate" | "review" | "publish";
+export type CodingRepository = {
+  name: string;
+  commit: string | null;
+  baseCommit?: string;
+  pr_url: string | null;
+  status: CodingRun["status"];
+  github_checked_at?: Date | string | null;
+  github_error?: string | null;
+  merged_at?: Date | string | null;
+  merge_commit?: string | null;
+  pr_closed_at?: Date | string | null;
+  main_workflows?: MainWorkflows | null;
+};
 export type CodingRun = {
+  repositories?: CodingRepository[] | null;
+  repository_index?: number;
   id: string;
   issue_id: string;
   planning_id: string;
@@ -37,10 +52,16 @@ export type CodingRun = {
   main_workflows: MainWorkflows | null;
   parent_run_id: string | null;
   repair_key: string | null;
-  repair: { baseCommit: string; workflows: MainWorkflows } | null;
+  repair: {
+    baseCommit: string;
+    workflows: MainWorkflows;
+    repository?: string;
+  } | null;
   created_at: Date;
 };
 export type CodingStep = {
+  repository_index?: number;
+  input_commits?: Record<string, string | null> | null;
   id: string;
   run_id: string;
   job_id: string;

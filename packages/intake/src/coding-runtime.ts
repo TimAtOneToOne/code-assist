@@ -9,7 +9,14 @@ import type { CodingRun, CodingStep } from "./coding-types.ts";
 import { composeInstructions } from "./prompt-defaults.ts";
 import { readPromptSettings } from "./prompt-settings.ts";
 import type { createLogger } from "@code-assist/observability";
-export const repo = "/work/internal-chat-ui";
+import {
+  activeSnapshot,
+  snapshots,
+  repositories,
+  repositoryDirectory,
+} from "./coding-repositories.ts";
+import { environmentLauncher } from "./workspace-bootstrap.ts";
+import { repositoryProfile } from "./repository-profiles.ts";
 export function codingDirectory(directory: string, id: string) {
   if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error("Invalid coding ID");
   return join(directory, "coding", id);
@@ -104,7 +111,9 @@ export function guestCommands(
   workspace: Workspace,
   signal: AbortSignal,
   log: Log,
+  name = workspace.input.snapshot.name,
 ) {
+  const repo = `/work/${name}`;
   const guest = (
     args: string[],
     input?: string | Readable,
@@ -133,7 +142,13 @@ export function guestCommands(
     guest,
     root,
     git,
-    run: (args: string[]) => guest(["node", "/work/run.mjs", ...args]),
+    run: (args: string[]) =>
+      guest([
+        "node",
+        "/work/run.mjs",
+        ...(workspace.environments ? ["--repo", name] : []),
+        ...args,
+      ]),
   };
 }
 export async function stopCodingUnit(
@@ -169,19 +184,27 @@ export async function prepareCodingSource(
   signal: AbortSignal,
   log: Log,
 ) {
-  const bare = join(codingDirectory(directory, run.id), "repository.git");
-  await mkdir(codingDirectory(directory, run.id), {
+  const bare = join(repositoryDirectory(directory, run), "repository.git");
+  await mkdir(repositoryDirectory(directory, run), {
     recursive: true,
     mode: 0o700,
   });
   const git = (args: string[]) =>
     executeCoding("/usr/bin/git", args, signal, log);
   await git(["init", "--bare", bare]);
-  const commit = run.repair?.baseCommit ?? run.input.snapshot.commit;
-  if (run.repair) {
+  const targetRepair =
+    run.repair &&
+    (!run.repair.repository ||
+      run.repair.repository === activeSnapshot(run).name);
+  const commit = targetRepair
+    ? run.repair!.baseCommit
+    : run.repair
+      ? run.commit!
+      : activeSnapshot(run).commit;
+  if (targetRepair) {
     const remote = await git([
       "-C",
-      run.input.snapshot.source,
+      activeSnapshot(run).source,
       "remote",
       "get-url",
       "origin",
@@ -207,11 +230,16 @@ export async function prepareCodingSource(
       "--git-dir",
       bare,
       "fetch",
-      run.input.snapshot.source,
+      run.repair && run.parent_run_id
+        ? join(
+            repositoryDirectory(directory, { ...run, id: run.parent_run_id }),
+            "repository.git",
+          )
+        : activeSnapshot(run).source,
       `${commit}:refs/heads/base`,
     ]);
   }
-  return { ...run.input.snapshot, source: bare, commit };
+  return { ...activeSnapshot(run), source: bare, commit };
 }
 export async function setupCodingRuntime(
   directory: string,
@@ -220,9 +248,14 @@ export async function setupCodingRuntime(
   signal: AbortSignal,
   log: Log,
 ) {
-  const local = codingDirectory(directory, run.id);
+  const local = repositoryDirectory(directory, run);
   await mkdir(local, { recursive: true, mode: 0o700 });
-  const { guest, git } = guestCommands(workspace, signal, log),
+  const { guest, git } = guestCommands(
+      workspace,
+      signal,
+      log,
+      activeSnapshot(run).name,
+    ),
     bare = join(local, "repository.git");
   const cmd = (args: string[]) =>
     executeCoding("/usr/bin/git", args, signal, log);
@@ -241,7 +274,7 @@ export async function setupCodingRuntime(
   await guest(["rm", "/work/source.bundle"]);
   await rm(bundle);
   await ensureCodingRuntime(directory, run, workspace, signal, log);
-  return run.repair?.baseCommit ?? run.input.snapshot.commit;
+  return await git("rev-parse", "HEAD");
 }
 export async function ensureCodingRuntime(
   directory: string,
@@ -250,7 +283,27 @@ export async function ensureCodingRuntime(
   signal: AbortSignal,
   log: Log,
 ) {
-  const { root, guest } = guestCommands(workspace, signal, log);
+  const { root, guest } = guestCommands(
+    workspace,
+    signal,
+    log,
+    activeSnapshot(run).name,
+  );
+  if (!workspace.environments) {
+    const name = workspace.input.snapshot.name;
+    await root(["mkdir", "-p", "/work/environments"]);
+    await root([
+      "cp",
+      "/work/environment.json",
+      "/work/environments/" + name + ".json",
+    ]);
+    await root(
+      ["bash", "-c", "cat > /work/repositories.json"],
+      JSON.stringify({ [name]: repositoryProfile(name).cwd }),
+    );
+    await root(["bash", "-c", "cat > /work/run.mjs"], environmentLauncher);
+    await root(["chown", "-R", "workspace:workspace", "/work/environments"]);
+  }
   const release = process.env.CODE_ASSIST_COMMIT ?? "development";
   const installed = await root([
     "bash",
@@ -311,7 +364,12 @@ export async function checkpoint(
   signal: AbortSignal,
   log: Log,
 ) {
-  const { guest, git } = guestCommands(workspace, signal, log);
+  const { guest, git } = guestCommands(
+    workspace,
+    signal,
+    log,
+    activeSnapshot(run).name,
+  );
   await git("add", "-A");
   await git(
     "commit",
@@ -327,7 +385,7 @@ export async function checkpoint(
     "/usr/bin/git",
     [
       "--git-dir",
-      join(codingDirectory(directory, run.id), "repository.git"),
+      join(repositoryDirectory(directory, run), "repository.git"),
       "fetch",
       bundle,
       `HEAD:refs/checkpoints/${step.id}`,
@@ -346,7 +404,12 @@ export async function preserveEvidence(
   signal: AbortSignal,
   log: Log,
 ) {
-  const { guest } = guestCommands(workspace, signal, log);
+  const { guest } = guestCommands(
+    workspace,
+    signal,
+    log,
+    activeSnapshot(run).name,
+  );
   const path = join(
     codingDirectory(directory, run.id),
     `${step.id}-evidence.tar.gz`,
@@ -367,13 +430,18 @@ export async function codingPrompt(
 ) {
   return `You are ${step.kind === "review" ? "Claude independently reviewing" : "Codex implementing"} Code Assist ticket ${run.identifier}: ${run.title}.
 Tim approved the exact plan below. Implement only that scope. Follow repository AGENTS.md and existing patterns. Do not upgrade Drizzle, add unrelated optimizations, change Linear, access production, push Git, open/merge PRs, or deploy infrastructure. The controller owns commits and publication. Do not create commits or change branches. If a material product decision, missing credential/service, or changed scope blocks progress, return needs_direction with the exact question. Do not invent success or silently skip acceptance criteria.
-Repository: ${repo}. Approved base: ${run.input.snapshot.commit}. Diff base: ${run.repair?.baseCommit ?? run.input.snapshot.commit}. Current checkpoint: ${step.input_commit ?? run.repair?.baseCommit ?? run.input.snapshot.commit}.
+Repository: /work/${activeSnapshot(run).name}. Approved base: ${activeSnapshot(run).commit}. Diff base: ${run.repair?.baseCommit ?? activeSnapshot(run).commit}. Current checkpoint: ${step.input_commit ?? run.repair?.baseCommit ?? activeSnapshot(run).commit}.
 ${run.repair ? `This is a corrective run after the approved feature merged. Read the COMPLETE main workflow failure evidence in /work/evidence/main-workflow-failure.json. The base is the failed merge commit, with the feature already implemented. Diagnose the cause, reproduce it where feasible, and fix only defects within the approved feature and this repository. Do not reimplement the feature or change shared CI, credentials, IAM, Terraform deployment controls, or unrelated scope to make a pipeline pass. Environmental/transient failures with no justified repository fix require needs_direction with a concrete diagnosis. Do not rerun GitHub workflows or deploy. Validate that the fix addresses the failure and preserves the feature. Review the corrective diff against the Diff base, not the original pre-feature approved base. The controller will publish a fresh corrective PR for Tim to merge. Failed runs: ${JSON.stringify(run.repair.workflows.runs)}.` : ""}
-This is an isolated OrbStack Linux guest with a private Docker Engine, PostgreSQL on localhost:5435 and LocalStack on localhost:4566. All commands for the app must use node /work/run.mjs <command> [args]; this loads mapped repository variables and runs in sveltekit/. No host/controller/GitHub credentials are available. Do not inspect or print /work/environment.json or provider secrets. Local fixture credentials are allowed. Use .tmp/ for ad hoc scripts; do not commit temporary evidence, credentials, or patient data.
-Playwright MCP is registered as playwright in this guest. Start the app with node /work/run.mjs pnpm dev --host 127.0.0.1 --port 5173 --strictPort. Use the real local credential sign-in flow with a synthetic user in the attempt database, not a bypass of application authorization. Exercise the approved UI behavior with MCP, inspect desktop and mobile rendering and browser errors. Save screenshots and complete evidence to /work/evidence. The controller runs lint, check, test and build after every implementation; also add/run meaningful regression tests for the plan. Explain unavailable external integration tests honestly.
+This is an isolated OrbStack Linux guest with a private container engine. Repository commands must use node /work/run.mjs --repo <repository-name> <command> [args]; this loads that repository's mapped variables and selects its working directory. No host/controller/GitHub credentials are available. Do not inspect or print environment JSON files or provider secrets. Local fixture credentials are allowed. Use .tmp/ for ad hoc scripts; do not commit temporary evidence, credentials, or patient data.
+Candidate checkouts and exact checkpoints: ${JSON.stringify(snapshots(run.input).map((s, i) => ({ repository: s.name, path: "/work/" + s.name, approvedBase: s.commit, diffBase: repositories(run)[i].baseCommit ?? s.commit, checkpoint: repositories(run)[i].commit })))}.
+${step.kind === "review" ? "Review ALL candidate repositories together, including integration between them. Every candidate must remain unchanged during review." : "Implement ONLY " + activeSnapshot(run).name + ". Other candidate checkouts are available for reading and paired tests; do not edit them. The controller works through repositories sequentially, then reviews the whole set. Intermediate repositories may defer paired browser acceptance until the final repository is implemented; report what remains honestly. On revision, fix findings affecting this repository; leave already-correct work intact."}
+${snapshots(run.input)
+  .map((s) => s.name + ": " + repositoryProfile(s.name).instructions)
+  .join("\n")}
+Playwright MCP is registered as playwright in this guest. Exercise the approved UI behavior using real local/synthetic fixtures, inspect rendering and browser errors. Save screenshots and full evidence to /work/evidence. The final implementation must include browser evidence for the combined feature. Controller validation runs each repository's established checks; also implement and run all acceptance tests required by the plan, including paired tests. Explain unavailable external integration tests honestly.
 Central logging: every SDK event and tool result is captured. Your workspace's redacted log mirror is /work/logs/structured/coding.jsonl with full JSON payloads in /work/logs/artifacts; use normal read/search tools to investigate previous failures. The same events are indexed in the main Logs UI under this coding step. Test/app output may be saved under /work/evidence for diagnosis.
-${step.kind === "review" ? "Review the actual git diff from the Diff base and the saved validation/browser evidence. Do not edit source or commit. Re-run targeted checks where useful. Return only unresolved findings, with file evidence and actionable recommendations. Any critical/high/medium finding requires revise; low findings may remain. Use needs_direction for a real unresolved human decision. Verify prior fixes independently." : "Implement or revise the approved feature. Read prior code reviews and failures below. Return implemented only after the approved behavior and browser checks are complete. Return browserEvidence as the paths to evidence you actually saved."}
-${composeInstructions(readPromptSettings(directory), "coding", null, [run.input.snapshot])}
+${step.kind === "review" ? "Review the actual git diff from the Diff base and the saved validation/browser evidence. Do not edit source or commit. Re-run targeted checks where useful. Return only unresolved findings, with file evidence and actionable recommendations. Any critical/high/medium finding requires revise; low findings may remain. Use needs_direction for a real unresolved human decision. Verify prior fixes independently." : "Implement or revise the approved feature. Read prior code reviews and failures below. Return implemented after this repository’s approved work and its available checks are complete; the final repository must complete combined acceptance. Return browserEvidence as the paths to evidence you actually saved."}
+${composeInstructions(readPromptSettings(directory), "coding", null, snapshots(run.input))}
 Approved Plan v${run.version} (${run.input.planHash}):
 ${run.plan.markdown}
 Previous Coding Steps (complete results):
@@ -456,7 +524,12 @@ export async function validation(
   signal: AbortSignal,
   log: Log,
 ) {
-  const command = guestCommands(workspace, signal, log);
+  const command = guestCommands(
+    workspace,
+    signal,
+    log,
+    activeSnapshot(run).name,
+  );
   await command.root([
     "systemd-run",
     "--quiet",
@@ -469,6 +542,8 @@ export async function validation(
     "/usr/local/bin/node",
     "/opt/code-assist/packages/intake/src/coding-validation.ts",
     step.id,
+    activeSnapshot(run).name,
+    ...(workspace.environments ? ["--environments"] : []),
   ]);
   const results = JSON.parse(
     await command.guest(["cat", `/work/evidence/${step.id}-validation.json`]),

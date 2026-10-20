@@ -37,7 +37,11 @@ export function workspaceLogEnvironment(
   environment: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv {
   const result = { ...environment };
-  for (const key of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"])
-    if (result[key] === "test") delete result[key];
+  for (const key of Object.keys(result))
+    if (
+      /(^|_)AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)$/.test(key) &&
+      result[key] === "test"
+    )
+      delete result[key];
   return result;
 }

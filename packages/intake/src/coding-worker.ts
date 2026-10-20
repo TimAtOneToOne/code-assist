@@ -1,3 +1,12 @@
+import {
+  snapshots,
+  repositories,
+  repositoryIndex,
+  repositoryRun,
+  activeSnapshot,
+  codingIndexes,
+  publicationReady,
+} from "./coding-repositories.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { readFile } from "node:fs/promises";
 import type { PgBoss } from "pg-boss";
@@ -106,7 +115,7 @@ export async function registerCodingWorker(
       stage = step.kind as string;
     const mapped = resolveRepositoryEnvironment(
       directory,
-      run.input.snapshot.source,
+      activeSnapshot(run).source,
     );
     let log = createLogger(
       "coding",
@@ -128,8 +137,15 @@ export async function registerCodingWorker(
     try {
       await assertCurrent();
       if (step.kind === "prepare") {
-        await checkCodingBranch(run, signal, log);
-        const source = await prepareCodingSource(directory, run, signal, log);
+        const sources = [];
+        for (const index of snapshots(run.input).keys()) {
+          const current = repositoryRun(run, index);
+          if (codingIndexes(run).includes(index))
+            await checkCodingBranch(current, signal, log);
+          sources.push(
+            await prepareCodingSource(directory, current, signal, log),
+          );
+        }
         await assertCurrent();
         workspace = await prepareWorkspace(
           directory,
@@ -151,16 +167,20 @@ export async function registerCodingWorker(
                 [run.id, w.id, step.id],
               );
           },
-          source,
+          sources,
         );
         stage = "installing coding runtime";
-        const commit = await setupCodingRuntime(
-          directory,
-          run,
-          workspace,
-          signal,
-          log,
-        );
+        const states = repositories(run).map((r) => ({ ...r }));
+        for (const index of snapshots(run.input).keys()) {
+          states[index].commit = await setupCodingRuntime(
+            directory,
+            repositoryRun(run, index),
+            workspace,
+            signal,
+            log,
+          );
+        }
+        const commit = states[repositoryIndex(run)].commit!;
         if (run.repair) {
           const artifacts = process.env.CODE_ASSIST_ARTIFACT_DIR;
           if (!artifacts || !run.repair.workflows.failureArtifact)
@@ -186,22 +206,69 @@ export async function registerCodingWorker(
           "implement",
           commit,
           workspace.id,
+          undefined,
+          run.repositories
+            ? { repositories: states, index: repositoryIndex(run) }
+            : undefined,
         );
         return;
       }
       if (!run.workspace_id) throw new Error("Coding workspace is missing.");
       workspace = await readWorkspace(directory, run.workspace_id);
       await ensureCodingRuntime(directory, run, workspace, signal, log);
-      const commands = guestCommands(workspace, signal, log);
-      let environmentText = "";
-      await commands.guest(
-        ["cat", "/work/environment.json"],
-        undefined,
-        (line) => {
-          environmentText += line;
-        },
+      const commands = guestCommands(
+        workspace,
+        signal,
+        log,
+        activeSnapshot(run).name,
       );
-      const environment = JSON.parse(environmentText) as Record<string, string>;
+      const environment: Record<string, string> = {};
+      for (const snapshot of snapshots(run.input)) {
+        let environmentText = "";
+        await commands.guest(
+          [
+            "cat",
+            workspace.environments
+              ? "/work/environments/" + snapshot.name + ".json"
+              : "/work/environment.json",
+          ],
+          undefined,
+          (line) => {
+            environmentText += line;
+          },
+        );
+        for (const [key, value] of Object.entries(JSON.parse(environmentText)))
+          environment[snapshot.name + "_" + key] = String(value);
+      }
+      const unchanged = async (except?: number) => {
+        for (const [index, state] of repositories(run).entries()) {
+          if (index === except) continue;
+          const git = guestCommands(workspace!, signal, log, state.name).git;
+          if (
+            (await git("rev-parse", "HEAD")) !== state.commit ||
+            (await git("status", "--porcelain"))
+          )
+            throw new Error(
+              "Unexpected changes in " +
+                state.name +
+                "; validation and review must use the saved candidate commits.",
+            );
+        }
+      };
+      const progress = (
+        index = repositoryIndex(run),
+        commit?: string,
+        status?: typeof run.status,
+        url?: string,
+      ) => {
+        if (!run.repositories) return undefined;
+        const states = repositories(run).map((r) => ({ ...r }));
+        const active = states[repositoryIndex(run)];
+        if (commit) active.commit = commit;
+        if (status) active.status = status;
+        if (url) active.pr_url = url;
+        return { repositories: states, index };
+      };
       log = createLogger(
         "coding",
         {
@@ -265,6 +332,9 @@ export async function registerCodingWorker(
           step,
           {
             id: step.id,
+            repository: activeSnapshot(run).name,
+            repositories: snapshots(run.input).map((s) => s.name),
+            environments: workspace.environments,
             provider,
             apiKey,
             model,
@@ -320,11 +390,12 @@ export async function registerCodingWorker(
             return;
           }
           if (
-            !result.browserEvidence.length ||
-            !browserCalls.some(
-              (tool) =>
-                tool === "browser_navigate" || tool === "browser_run_code",
-            )
+            repositoryIndex(run) === codingIndexes(run).at(-1) &&
+            (!result.browserEvidence.length ||
+              !browserCalls.some(
+                (tool) =>
+                  tool === "browser_navigate" || tool === "browser_run_code",
+              ))
           )
             throw new Error(
               "The implementation did not supply browser evidence.",
@@ -339,6 +410,7 @@ export async function registerCodingWorker(
               );
             await commands.guest(["test", "-f", path]);
           }
+          await unchanged(repositoryIndex(run));
           const commit = await checkpoint(
             directory,
             run,
@@ -354,16 +426,13 @@ export async function registerCodingWorker(
             { ...result, evidence, commit, browserCalls },
             "validate",
             commit,
+            undefined,
+            undefined,
+            progress(repositoryIndex(run), commit, "validate"),
           );
         } else {
           const result = parseReview(safe);
-          if (
-            (await commands.git("rev-parse", "HEAD")) !== run.commit ||
-            (await commands.git("status", "--porcelain"))
-          )
-            throw new Error(
-              "Review changed the code; validation and review must be repeated.",
-            );
+          await unchanged();
           await finishCoding(
             boss,
             run,
@@ -374,6 +443,10 @@ export async function registerCodingWorker(
               : codeReviewReady(result)
                 ? "publish"
                 : "implement",
+            undefined,
+            undefined,
+            undefined,
+            progress(codingIndexes(run)[0]),
           );
         }
       } else if (step.kind === "validate") {
@@ -386,32 +459,45 @@ export async function registerCodingWorker(
           log,
         );
         await assertCurrent();
+        await unchanged();
+        const indexes = codingIndexes(run);
+        const following = indexes[indexes.indexOf(repositoryIndex(run)) + 1];
         await finishCoding(
           boss,
           run,
           step,
           result,
-          result.passed ? "review" : "implement",
+          result.passed
+            ? following === undefined
+              ? "review"
+              : "implement"
+            : "implement",
+          undefined,
+          undefined,
+          undefined,
+          progress(
+            result.passed
+              ? (following ?? repositoryIndex(run))
+              : repositoryIndex(run),
+            undefined,
+            result.passed ? "review" : "implement",
+          ),
         );
       } else {
         const history = (await readCoding(boss.getDb(), run.issue_id)).find(
           (r) => r.id === run.id,
         )!.steps;
         const review = history.findLast(
-            (s) => s.kind === "review" && s.status === "completed",
-          ),
-          validated = history.findLast(
-            (s) => s.kind === "validate" && s.status === "completed",
-          );
+          (s) => s.kind === "review" && s.status === "completed",
+        );
         if (
-          review?.input_commit !== run.commit ||
-          validated?.input_commit !== run.commit ||
-          !validated.result?.passed ||
+          !publicationReady(run, history) ||
           !codeReviewReady(parseReview(review?.result))
         )
           throw new Error(
             "Publication requires passing validation and review of this exact commit.",
           );
+        await unchanged();
         const url = await publishCoding(
           directory,
           run,
@@ -419,6 +505,8 @@ export async function registerCodingWorker(
           log,
           assertCurrent,
         );
+        const indexes = codingIndexes(run);
+        const following = indexes[indexes.indexOf(repositoryIndex(run)) + 1];
         await finishCoding(
           boss,
           run,
@@ -428,10 +516,16 @@ export async function registerCodingWorker(
             url,
             commit: run.commit,
           },
-          "pr_open",
+          following === undefined ? "pr_open" : "publish",
           undefined,
           undefined,
-          url,
+          run.pr_url ?? url,
+          progress(
+            following ?? repositoryIndex(run),
+            undefined,
+            "pr_open",
+            url,
+          ),
         );
       }
     } catch (error) {

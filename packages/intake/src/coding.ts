@@ -1,3 +1,10 @@
+import {
+  snapshots,
+  repositories,
+  repositoryIndex,
+  commitSet,
+  repositoryDirectory,
+} from "./coding-repositories.ts";
 import { mainFailureKey } from "./github-workflows.ts";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -27,6 +34,10 @@ export async function initializeCoding(boss: PgBoss) {
  CREATE TABLE IF NOT EXISTS code_assist.coding_step (
  id uuid PRIMARY KEY,run_id uuid NOT NULL REFERENCES code_assist.coding_run(id),job_id uuid NOT NULL,kind text NOT NULL,input_commit text,
  status text NOT NULL,worker_pid integer,result jsonb,error text,created_at timestamptz NOT NULL DEFAULT now(),finished_at timestamptz);
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repositories jsonb;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repository_index integer NOT NULL DEFAULT 0;
+ ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS repository_index integer NOT NULL DEFAULT 0;
+ ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS input_commits jsonb;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_checked_at timestamptz;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_error text;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS merged_at timestamptz;
@@ -88,10 +99,13 @@ export async function currentCoding(
     return false;
   if (run.parent_run_id && !run.pr_url) {
     const parent = await codingRun(db, run.parent_run_id);
+    const state = run.repair?.repository
+      ? repositories(parent).find((r) => r.name === run.repair!.repository)!
+      : parent;
     if (
-      parent.status !== "main_failed" ||
-      !parent.main_workflows ||
-      mainFailureKey(parent.main_workflows) !== run.repair_key
+      state.status !== "main_failed" ||
+      !state.main_workflows ||
+      mainFailureKey(state.main_workflows) !== run.repair_key
     )
       return false;
   }
@@ -109,8 +123,16 @@ async function enqueue(boss: PgBoss, db: Db, run: CodingRun, kind: CodingKind) {
     job = await boss.send(codingQueue, { stepId: id }, { db });
   if (!job) throw new Error("Could not queue coding.");
   await db.executeSql(
-    "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status) VALUES($1,$2,$3,$4,$5,'queued')",
-    [id, run.id, job, kind, run.commit],
+    "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status,repository_index,input_commits) VALUES($1,$2,$3,$4,$5,'queued',$6,$7)",
+    [
+      id,
+      run.id,
+      job,
+      kind,
+      run.commit,
+      repositoryIndex(run),
+      run.repositories ? JSON.stringify(commitSet(run)) : null,
+    ],
   );
   await db.executeSql(
     "UPDATE code_assist.coding_run SET current_step_id=$2,status=$3,error=NULL WHERE id=$1",
@@ -156,9 +178,25 @@ export async function syncCoding(boss: PgBoss, db: Db, issueId: string) {
       `feature/${identifier.toLowerCase()}`,
     ],
   );
+  if (input.snapshots)
+    await db.executeSql(
+      "UPDATE code_assist.coding_run SET repositories=$2 WHERE id=$1",
+      [
+        id,
+        JSON.stringify(
+          snapshots(input).map((s) => ({
+            name: s.name,
+            commit: null,
+            pr_url: null,
+            status: "prepare",
+          })),
+        ),
+      ],
+    );
   await enqueue(boss, db, await codingRun(db, id), "prepare");
 }
 export async function queueMainRepair(boss: PgBoss, db: Db, run: CodingRun) {
+  if (run.repositories) return queueRepositoryRepair(boss, db, run);
   if (
     !run.main_workflows?.failureArtifact ||
     !run.merge_commit ||
@@ -200,7 +238,7 @@ export async function syncApprovedCoding(boss: PgBoss) {
   const { rows } = await boss
     .getDb()
     .executeSql(
-      `SELECT p.issue_id FROM code_assist.planning_run p JOIN code_assist.intake_issue i ON i.current_discovery_id=p.discovery_id JOIN code_assist.discovery_run d ON d.id=p.discovery_id WHERE p.status='approved' AND i.eligible AND i.removed_at IS NULL AND jsonb_array_length(d.snapshots)=1 AND d.snapshots->0->>'name'='internal-chat-ui'`,
+      `SELECT p.issue_id FROM code_assist.planning_run p JOIN code_assist.intake_issue i ON i.current_discovery_id=p.discovery_id JOIN code_assist.discovery_run d ON d.id=p.discovery_id WHERE p.status='approved' AND i.eligible AND i.removed_at IS NULL`,
     );
   for (const row of rows)
     await codingTransaction(boss, (db) => syncCoding(boss, db, row.issue_id));
@@ -244,6 +282,10 @@ export async function finishCoding(
   commit?: string,
   workspaceId?: string,
   prUrl?: string,
+  progress?: {
+    repositories: NonNullable<CodingRun["repositories"]>;
+    index: number;
+  },
 ) {
   return codingTransaction(boss, async (db) => {
     if (!(await currentCoding(db, run, step, true))) return false;
@@ -268,6 +310,17 @@ export async function finishCoding(
       "UPDATE code_assist.coding_run SET commit=COALESCE($2,commit),workspace_id=COALESCE($3,workspace_id),pr_url=COALESCE($4,pr_url),status=$5 WHERE id=$1",
       [run.id, commit ?? null, workspaceId ?? null, prUrl ?? null, next],
     );
+    if (progress) {
+      await db.executeSql(
+        "UPDATE code_assist.coding_run SET repositories=$2,repository_index=$3,commit=$4 WHERE id=$1",
+        [
+          run.id,
+          JSON.stringify(progress.repositories),
+          progress.index,
+          progress.repositories[progress.index].commit,
+        ],
+      );
+    }
     await recordIntakeEvent(boss, db, run.issue_id, "coding_completed", {
       codingId: run.id,
       stepId: step.id,
@@ -382,7 +435,26 @@ export async function changeCodingBranch(
     throw new CodingConflict("Enter a valid Git branch name.");
   }
   try {
-    await access(join(directory, "coding", runId, "publication.json"));
+    const run = await codingRun(boss.getDb(), runId);
+    for (const index of repositories(run).keys()) {
+      try {
+        await access(
+          join(
+            repositoryDirectory(directory, { ...run, repository_index: index }),
+            "publication.json",
+          ),
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
+      }
+      throw new CodingConflict(
+        "Reconcile the previous publication attempt before changing branches.",
+      );
+    }
+    const missing = new Error("No publication intent") as NodeJS.ErrnoException;
+    missing.code = "ENOENT";
+    throw missing;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     return codingTransaction(boss, async (db) => {
@@ -416,4 +488,70 @@ export async function changeCodingBranch(
   throw new CodingConflict(
     "Reconcile the previous publication attempt before changing branches.",
   );
+}
+
+async function queueRepositoryRepair(boss: PgBoss, db: Db, run: CodingRun) {
+  if (!(await currentCoding(db, run))) return;
+  const latest = await db.executeSql(
+    "SELECT id FROM code_assist.coding_run WHERE planning_id=$1 AND version=$2 AND status<>'superseded' ORDER BY created_at DESC LIMIT 1",
+    [run.planning_id, run.version],
+  );
+  if (latest.rows[0]?.id !== run.id) return;
+  const index = repositories(run).findIndex(
+    (r) =>
+      r.status === "main_failed" &&
+      r.main_workflows?.failureArtifact &&
+      r.merge_commit,
+  );
+  if (index < 0) return;
+  const failed = repositories(run)[index];
+  const key = mainFailureKey(failed.main_workflows!);
+  if (!key) return;
+  const existing = await db.executeSql(
+    "SELECT id FROM code_assist.coding_run WHERE parent_run_id=$1 AND repair_key=$2",
+    [run.id, key],
+  );
+  if (existing.rows.length) return;
+  const id = randomUUID();
+  const states = repositories(run).map((r, i) =>
+    i === index
+      ? {
+          ...r,
+          baseCommit: r.merge_commit!,
+          commit: null,
+          pr_url: null,
+          status: "prepare",
+          main_workflows: null,
+          merged_at: null,
+          merge_commit: null,
+          github_checked_at: null,
+          github_error: null,
+          pr_closed_at: null,
+        }
+      : { ...r },
+  );
+  await db.executeSql(
+    "INSERT INTO code_assist.coding_run(id,issue_id,planning_id,version,input,plan,identifier,title,branch,status,parent_run_id,repair_key,repair,repositories,repository_index) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'prepare',$10,$11,$12,$13,$14)",
+    [
+      id,
+      run.issue_id,
+      run.planning_id,
+      run.version,
+      JSON.stringify(run.input),
+      JSON.stringify(run.plan),
+      run.identifier,
+      run.title,
+      `feature/${run.identifier.toLowerCase()}-main-fix-${id}`,
+      run.id,
+      key,
+      JSON.stringify({
+        repository: failed.name,
+        baseCommit: failed.merge_commit,
+        workflows: failed.main_workflows,
+      }),
+      JSON.stringify(states),
+      index,
+    ],
+  );
+  await enqueue(boss, db, await codingRun(db, id), "prepare");
 }

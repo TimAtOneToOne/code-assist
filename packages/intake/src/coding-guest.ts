@@ -12,6 +12,9 @@ const chunks: Buffer[] = [];
 for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
 const input = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
   id: string;
+  repository?: string;
+  repositories?: string[];
+  environments?: boolean;
   provider: "codex" | "claude";
   apiKey: string;
   model: string;
@@ -19,8 +22,16 @@ const input = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
   schema: Record<string, unknown>;
   anthropicWorkspaceId?: string;
 };
+const repository = input.repository ?? "internal-chat-ui";
+if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(repository))
+  throw new Error("Invalid repository");
 const environment = JSON.parse(
-  readFileSync("/work/environment.json", "utf8"),
+  readFileSync(
+    input.environments
+      ? `/work/environments/${repository}.json`
+      : "/work/environment.json",
+    "utf8",
+  ),
 ) as Record<string, string>;
 const home = "/home/workspace",
   temp = "/work/tmp",
@@ -35,7 +46,24 @@ const log = createLogger(
     logDirectory: "/work/logs",
     artifactDirectory: artifacts,
     environment: workspaceLogEnvironment({
-      ...environment,
+      ...Object.fromEntries(
+        (input.repositories ?? [repository]).flatMap((name) => {
+          if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(name))
+            throw new Error("Invalid repository");
+          const env = JSON.parse(
+            readFileSync(
+              input.environments
+                ? "/work/environments/" + name + ".json"
+                : "/work/environment.json",
+              "utf8",
+            ),
+          );
+          return Object.entries(env).map(([key, value]) => [
+            name + "_" + key,
+            String(value),
+          ]);
+        }),
+      ),
       API_KEY: input.apiKey,
     }),
   },
@@ -93,7 +121,7 @@ try {
     });
     const thread = sdk.startThread({
       model: input.model,
-      workingDirectory: "/work/internal-chat-ui",
+      workingDirectory: `/work/${repository}`,
       approvalPolicy: "never",
       sandboxMode: "danger-full-access",
       webSearchMode: "disabled",
@@ -123,7 +151,7 @@ try {
       prompt: input.prompt,
       options: {
         model: input.model,
-        cwd: "/work/internal-chat-ui",
+        cwd: `/work/${repository}`,
         env: {
           ...shell,
           ANTHROPIC_API_KEY: input.apiKey,

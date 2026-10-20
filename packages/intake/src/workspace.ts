@@ -8,11 +8,14 @@ import type { Db } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
 import { resolveRepositoryEnvironment } from "@code-assist/secrets";
 import type { RepositorySnapshot } from "./discovery.ts";
-import {
-  icuEnvironment,
-  workspaceLogEnvironment,
-} from "./workspace-environment.ts";
+import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { bootstrap, environmentLauncher } from "./workspace-bootstrap.ts";
+
+import { snapshots } from "./coding-repositories.ts";
+import {
+  repositoryProfile,
+  repositoryEnvironment,
+} from "./repository-profiles.ts";
 
 export class WorkspaceApprovalError extends Error {}
 export type WorkspaceInput = {
@@ -22,12 +25,15 @@ export type WorkspaceInput = {
   planHash: string;
   inputHash: string;
   snapshot: RepositorySnapshot;
+  snapshots?: RepositorySnapshot[];
 };
 export type Workspace = {
   id: string;
   machine: string;
   input: WorkspaceInput;
   source?: RepositorySnapshot;
+  sources?: RepositorySnapshot[];
+  environments?: boolean;
   state: "preparing" | "ready" | "failed" | "destroyed";
   stage: string;
   createdAt: string;
@@ -86,12 +92,19 @@ export async function approvedWorkspaceInput(
       "A current, approved plan is required to prepare a coding workspace.",
     );
   const snapshots: RepositorySnapshot[] = row.snapshots;
-  if (snapshots?.length !== 1 || snapshots[0].name !== "internal-chat-ui")
+  if (
+    !snapshots?.length ||
+    new Set(snapshots.map((s) => s.name)).size !== snapshots.length
+  )
     throw new WorkspaceApprovalError(
-      "Workspace provisioning currently supports ICU only; this plan needs another repository setup.",
+      "Approved repositories must be present and unique.",
     );
-  if (!/^[a-f0-9]{40,64}$/.test(snapshots[0].commit))
-    throw new Error("Invalid approved source commit.");
+  for (const snapshot of snapshots)
+    if (
+      !/^[a-f0-9]{40,64}$/.test(snapshot.commit) ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(snapshot.name)
+    )
+      throw new Error("Invalid approved repository or source commit.");
   return {
     issueId,
     planningId: row.planning_id,
@@ -99,6 +112,7 @@ export async function approvedWorkspaceInput(
     planHash: row.plan_hash,
     inputHash: row.input_hash,
     snapshot: snapshots[0],
+    ...(snapshots.length > 1 ? { snapshots } : {}),
   };
 }
 
@@ -157,12 +171,28 @@ export async function prepareWorkspace(
   issueId: string,
   signal: AbortSignal,
   onCreated?: (workspace: Workspace) => Promise<void>,
-  sourceOverride?: RepositorySnapshot,
+  sourceOverride?: RepositorySnapshot | RepositorySnapshot[],
 ) {
   const input = await approvedWorkspaceInput(db, issueId);
-  const source = sourceOverride ?? input.snapshot;
-  const environment = icuEnvironment(
-    resolveRepositoryEnvironment(directory, input.snapshot.source),
+  const sources = sourceOverride
+    ? Array.isArray(sourceOverride)
+      ? sourceOverride
+      : [sourceOverride]
+    : snapshots(input);
+  const source = sources[0];
+  const environments = Object.fromEntries(
+    snapshots(input).map((s) => [
+      s.name,
+      repositoryEnvironment(
+        s.name,
+        resolveRepositoryEnvironment(directory, s.source),
+      ),
+    ]),
+  );
+  const environment = Object.fromEntries(
+    Object.entries(environments).flatMap(([name, env]) =>
+      Object.entries(env).map(([key, value]) => [name + "_" + key, value]),
+    ),
   );
   const id = randomUUID();
   const workspace: Workspace = {
@@ -170,6 +200,8 @@ export async function prepareWorkspace(
     machine: `ca-${id}`,
     input,
     source,
+    sources,
+    environments: true,
     state: "preparing",
     stage: "creating machine",
     createdAt: new Date().toISOString(),
@@ -217,84 +249,91 @@ export async function prepareWorkspace(
     await stage("installing toolchain and private container engine");
     await guest(["bash", "-c", bootstrap]);
     await stage("copying approved source");
-    await command(
-      "/usr/bin/git",
-      [
-        "-C",
-        source.source,
-        "archive",
-        "--format=tar",
-        `--output=${archive}`,
-        source.commit,
-      ],
-      signal,
-      output,
-    );
-    await guest(["mkdir", "-p", "/work/internal-chat-ui"]);
-    await guest(
-      ["tar", "-xf", "-", "-C", "/work/internal-chat-ui"],
-      createReadStream(archive),
-    );
-    await rm(archive);
+    for (const source of sources) {
+      await command(
+        "/usr/bin/git",
+        [
+          "-C",
+          source.source,
+          "archive",
+          "--format=tar",
+          `--output=${archive}`,
+          source.commit,
+        ],
+        signal,
+        output,
+      );
+      await guest(["mkdir", "-p", `/work/${source.name}`]);
+      await guest(
+        ["tar", "-xf", "-", "-C", `/work/${source.name}`],
+        createReadStream(archive),
+      );
+      await rm(archive);
+    }
     await stage("configuring attempt environment");
+    await guest(["mkdir", "-p", "/work/environments"]);
+    for (const [name, env] of Object.entries(environments)) {
+      await guest(
+        [
+          "bash",
+          "-c",
+          'umask 077; cat > "$1"',
+          "bash",
+          "/work/environments/" + name + ".json",
+        ],
+        JSON.stringify(env),
+      );
+    }
     await guest(
       ["bash", "-c", "umask 077; cat > /work/environment.json"],
-      JSON.stringify(environment),
+      JSON.stringify(environments[source.name]),
+    );
+    await guest(
+      ["bash", "-c", "cat > /work/repositories.json"],
+      JSON.stringify(
+        Object.fromEntries(
+          snapshots(input).map((s) => [s.name, repositoryProfile(s.name).cwd]),
+        ),
+      ),
     );
     await guest(
       ["bash", "-c", "umask 077; cat > /work/run.mjs"],
       environmentLauncher,
     );
     await guest(["chown", "-R", "workspace:workspace", "/work"]);
-    const run = (args: string[]) =>
-      orb([
-        "-m",
-        workspace.machine,
-        "-u",
-        "workspace",
-        "node",
-        "/work/run.mjs",
-        ...args,
-      ]);
-    await stage("starting repository services");
-    await run([
-      "docker",
-      "compose",
-      "--profile",
-      "localstack",
-      "up",
-      "-d",
-      "--wait",
-    ]);
-    await run([
-      "docker",
-      "compose",
-      "exec",
-      "-T",
-      "db",
-      "createdb",
-      "-U",
-      "root",
-      "icu_test",
-    ]);
-    await stage("installing repository dependencies");
-    await run(["pnpm", "install", "--frozen-lockfile"]);
-    await stage("migrating local database");
-    await run(["pnpm", "db:migrate"]);
-    await stage("installing repository browser");
-    // The guest operator installs system dependencies; repository commands run as workspace.
-    await guest([
-      "bash",
-      "-c",
-      "cd /work/internal-chat-ui/sveltekit && pnpm exec playwright install-deps chromium",
-    ]);
-    await run(["pnpm", "exec", "playwright", "install", "chromium"]);
+    for (const source of sources) {
+      const profile = repositoryProfile(source.name);
+      const run = (args: string[]) =>
+        orb([
+          "-m",
+          workspace.machine,
+          "-u",
+          "workspace",
+          "node",
+          "/work/run.mjs",
+          "--repo",
+          source.name,
+          ...args,
+        ]);
+      await stage("preparing " + source.name);
+      for (const args of profile.setup) await run(args);
+      if (profile.browserDirectory) {
+        await guest([
+          "bash",
+          "-c",
+          'cd "$1" && pnpm exec playwright install-deps chromium',
+          "bash",
+          profile.browserDirectory,
+        ]);
+        await run(profile.browserInstall);
+      }
+    }
     const current = await approvedWorkspaceInput(db, issueId);
     if (JSON.stringify(current) !== JSON.stringify(input))
       throw new Error("Approved inputs changed during workspace preparation.");
     workspace.state = "ready";
     await stage("ready");
-    log.event("info", "workspace.ready", "ICU workspace ready", {
+    log.event("info", "workspace.ready", "Coding workspace ready", {
       machine: workspace.machine,
     });
     return workspace;

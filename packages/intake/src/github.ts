@@ -1,3 +1,5 @@
+import { repositories } from "./coding-repositories.ts";
+import { recordRepositoryObservation } from "./github-repositories.ts";
 import {
   failedMainWorkflows,
   mainFailureKey,
@@ -111,6 +113,15 @@ export async function recordGitHubObservation(
       [run.id],
     );
     const current = rows[0] as CodingRun | undefined;
+    if (current?.repositories)
+      return recordRepositoryObservation(
+        boss,
+        db,
+        current,
+        run,
+        checkedAt,
+        observation,
+      );
     if (
       !current ||
       current.pr_url !== run.pr_url ||
@@ -318,37 +329,67 @@ export async function refreshGitHub(
       request.runId ? [request.runId] : [],
     );
   let failures = 0;
-  for (const run of rows as CodingRun[]) {
-    signal.throwIfAborted();
-    const log = createLogger("github").child({
-      job_id: jobId,
-      attempt_id: jobId,
-      ticket_id: run.identifier,
-    });
-    const checkedAt = new Date();
-    let pr: PullRequestState;
-    let main: MainWorkflows | undefined;
-    try {
-      pr = await read(run, signal, log);
-      if (pr.state === "MERGED" && pr.baseRefName === "main")
-        main = await readWorkflows(run, pr, signal, log);
-    } catch {
-      signal.throwIfAborted();
-      const error =
-        "GitHub refresh failed. The previous PR/workflow state is preserved. Check the GitHub logs and retry.";
-      await recordGitHubObservation(boss, run, checkedAt, { error });
-      log.event("error", "github.refresh_failed", error, { coding_id: run.id });
-      failures++;
+  for (const parent of rows as CodingRun[]) {
+    if (
+      parent.repositories &&
+      ![
+        "pr_open",
+        "pr_closed",
+        "awaiting_main",
+        "main_running",
+        "main_failed",
+        "done",
+      ].includes(parent.status)
+    )
       continue;
+    for (const [index, state] of repositories(parent).entries()) {
+      if (!state.pr_url) continue;
+      const run: CodingRun = {
+        ...parent,
+        ...state,
+        github_checked_at: state.github_checked_at
+          ? new Date(state.github_checked_at)
+          : null,
+        merged_at: state.merged_at ? new Date(state.merged_at) : null,
+        pr_closed_at: state.pr_closed_at ? new Date(state.pr_closed_at) : null,
+        main_workflows: state.main_workflows ?? null,
+        github_error: state.github_error ?? null,
+        merge_commit: state.merge_commit ?? null,
+        repository_index: index,
+      };
+      signal.throwIfAborted();
+      const log = createLogger("github").child({
+        job_id: jobId,
+        attempt_id: jobId,
+        ticket_id: run.identifier,
+      });
+      const checkedAt = new Date();
+      let pr: PullRequestState;
+      let main: MainWorkflows | undefined;
+      try {
+        pr = await read(run, signal, log);
+        if (pr.state === "MERGED" && pr.baseRefName === "main")
+          main = await readWorkflows(run, pr, signal, log);
+      } catch {
+        signal.throwIfAborted();
+        const error =
+          "GitHub refresh failed. The previous PR/workflow state is preserved. Check the GitHub logs and retry.";
+        await recordGitHubObservation(boss, run, checkedAt, { error });
+        log.event("error", "github.refresh_failed", error, {
+          coding_id: run.id,
+        });
+        failures++;
+        continue;
+      }
+      await recordGitHubObservation(boss, run, checkedAt, { pr, main });
+      log.event("info", "github.refreshed", "Pull request state checked", {
+        coding_id: run.id,
+        pr_state: pr.state,
+        pr_url: pr.url,
+        main_status: main ? mainWorkflowStatus(main) : null,
+        workflow_count: main?.runs.length ?? 0,
+      });
     }
-    await recordGitHubObservation(boss, run, checkedAt, { pr, main });
-    log.event("info", "github.refreshed", "Pull request state checked", {
-      coding_id: run.id,
-      pr_state: pr.state,
-      pr_url: pr.url,
-      main_status: main ? mainWorkflowStatus(main) : null,
-      workflow_count: main?.runs.length ?? 0,
-    });
   }
   if (failures)
     throw new Error(`${failures} GitHub pull request check(s) failed.`);

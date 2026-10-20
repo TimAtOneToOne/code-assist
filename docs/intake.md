@@ -26,7 +26,7 @@ The searchable multi-select is prefilled with suggestions until Tim saves a sele
 
 Descriptions and comments render sanitized Markdown, including headings, links, lists, code, tables, task lists and images. Raw ticket text remains intact in the database.
 
-The additive database migration retains the legacy single-repository field. Unconverted choices read as a one-element array; new selections are stored in `selected_repositories`. Both web startup and worker startup ensure the schema exists before using it. Existing history remains readable. An old application release cannot display new multi-repository selections; rollback must use a release that understands the new field. Initial discovery reads all selected repositories; coordinated implementation and PRs remain future work.
+The additive database migration retains the legacy single-repository field. Unconverted choices read as a one-element array; new selections are stored in `selected_repositories`. Both web startup and worker startup ensure the schema exists before using it. Existing history remains readable. An old application release cannot display new multi-repository selections; rollback must use a release that understands the new field. Initial discovery reads all selected repositories; coding now implements selected repositories sequentially and reviews them together before publishing separate PRs.
 
 ## Durability and attention delivery
 

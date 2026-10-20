@@ -2,7 +2,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { createLogger } from "@code-assist/observability";
 import type { CodingRun } from "./coding-types.ts";
-import { codingDirectory, executeCoding } from "./coding-runtime.ts";
+import {
+  activeSnapshot,
+  repositoryDirectory,
+  commitSet,
+} from "./coding-repositories.ts";
+import { executeCoding } from "./coding-runtime.ts";
 export class CodingBranchConflict extends Error {}
 export async function checkCodingBranch(
   run: CodingRun,
@@ -11,7 +16,7 @@ export async function checkCodingBranch(
 ) {
   const remote = await executeCoding(
     "/usr/bin/git",
-    ["-C", run.input.snapshot.source, "remote", "get-url", "origin"],
+    ["-C", activeSnapshot(run).source, "remote", "get-url", "origin"],
     signal,
     log,
   );
@@ -61,14 +66,14 @@ export async function publishCoding(
 ) {
   if (!run.commit || !/^[a-f0-9]{40}$/.test(run.commit))
     throw new Error("No validated commit to publish.");
-  const local = codingDirectory(directory, run.id),
+  const local = repositoryDirectory(directory, run),
     bare = join(local, "repository.git");
   const git = (args: string[]) =>
     executeCoding("/usr/bin/git", ["--git-dir", bare, ...args], signal, log);
   const remote = (
     await executeCoding(
       "/usr/bin/git",
-      ["-C", run.input.snapshot.source, "remote", "get-url", "origin"],
+      ["-C", activeSnapshot(run).source, "remote", "get-url", "origin"],
       signal,
       log,
     )
@@ -148,7 +153,7 @@ export async function publishCoding(
   await git([
     "merge-base",
     "--is-ancestor",
-    run.repair?.baseCommit ?? run.input.snapshot.commit,
+    run.repair?.baseCommit ?? activeSnapshot(run).commit,
     "FETCH_HEAD",
   ]);
   // A merge-tree conflict is a concrete reason to revise, never a license to overwrite main.
@@ -183,7 +188,13 @@ export async function publishCoding(
             .map((r) => `[${r.name}, attempt ${r.run_attempt}](${r.html_url})`)
             .join(", ")}. Corrective base: ${run.repair.baseCommit}.`
         : ""
-    }\n\nValidation: repository lint, type checks, tests and production build passed; workspace browser evidence and Claude's adversarial review are recorded for commit ${run.commit}.\n\n**Optional optimizations and controls:** none.\n\n[Code Assist plan, validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\n${marker}\n`,
+    }\n\nValidation: the repository’s configured checks passed; browser evidence and Claude’s combined adversarial review are recorded for the candidate commits below.\n\n${Object.entries(
+      commitSet(run),
+    )
+      .map(([name, commit]) => `- ${name}: ${commit}`)
+      .join(
+        "\n",
+      )}\n\n**Optional optimizations and controls:** none.\n\n[Code Assist plan, validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\n${marker}\n`,
     { mode: 0o600 },
   );
   return (

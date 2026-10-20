@@ -48,7 +48,7 @@ test("adversarial planning preserves versions, checkpoints, exact approvals and 
   boss.on("error", () => {});
   const ticket = {
     id: randomUUID(),
-    identifier: "ONE-FIXTURE",
+    identifier: "ONE-999998",
     title: "Soft deletion",
     description: "Delete only owned threads",
     url: "https://example.invalid",

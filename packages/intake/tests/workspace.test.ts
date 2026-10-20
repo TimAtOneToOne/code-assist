@@ -41,7 +41,7 @@ test("attempt services replace mapped shared destinations while preserving integ
   assert.equal("CODE_ASSIST_DATABASE_URL" in a, false);
 });
 
-test("workspace setup requires a matching current approval and supports only the implemented repo setup", async () => {
+test("workspace approval preserves ordered repositories and rejects duplicate identities", async () => {
   const row = {
     planning_id: "planning",
     current_version: 3,
@@ -67,9 +67,20 @@ test("workspace setup requires a matching current approval and supports only the
       db([{ ...row, snapshots: [...row.snapshots, ...row.snapshots] }]),
       "ticket",
     ),
-    /ICU only/,
+    /unique/,
   );
   const input = await approvedWorkspaceInput(db([row]), "ticket");
+  const second = {
+    ...row.snapshots[0],
+    name: "workplace-agents",
+    source: "/repos/workplace-agents",
+  };
+  const multi = await approvedWorkspaceInput(
+    db([{ ...row, snapshots: [...row.snapshots, second] }]),
+    "ticket",
+  );
+  assert.deepEqual(multi.snapshots, [...row.snapshots, second]);
+  assert.equal(input.snapshots, undefined);
   assert.equal(input.version, 3);
   assert.equal(input.snapshot.commit, "a".repeat(40));
 });
@@ -92,4 +103,25 @@ test("LocalStack fixture keys do not redact test commands or filenames, while re
       .AWS_SECRET_ACCESS_KEY,
     "real-aws-secret",
   );
+});
+
+test("repository profiles keep Workplace Agents on its private database and use established root commands", async () => {
+  const { repositoryEnvironment, repositoryProfile } =
+    await import("../src/repository-profiles.ts");
+  const env = repositoryEnvironment("workplace-agents", {
+    DATABASE_URL: "postgres://shared/production",
+    TEST_DATABASE_URL: "postgres://shared/test",
+    TOKEN: "mapped-provider",
+  });
+  assert.equal(new URL(env.DATABASE_URL).hostname, "127.0.0.1");
+  assert.equal(new URL(env.DATABASE_URL).port, "65432");
+  assert.equal(env.TOKEN, "mapped-provider");
+  assert.equal(env.ORIGIN, "http://localhost:6001");
+  assert.deepEqual(repositoryProfile("workplace-agents").validation, [
+    ["make", "validate"],
+  ]);
+  assert.deepEqual(repositoryProfile("elation_companion").validation, [
+    ["bash", "./build.sh"],
+  ]);
+  assert.throws(() => repositoryProfile("unknown"), /not configured/);
 });

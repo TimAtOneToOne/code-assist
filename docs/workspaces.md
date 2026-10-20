@@ -1,10 +1,10 @@
 # Coding Workspaces
 
-ICU workspace provisioning is implemented as a callable TypeScript module and an
+Repository workspace provisioning is implemented as a callable TypeScript module and an
 operator CLI. The [coding worker](coding.md) uses this module to prepare an isolated
 environment before implementation, validation and adversarial code review.
 
-## Preparing an ICU Workspace
+## Preparing a Workspace
 
 Run from the deployed release on Mia with the service's operator-managed runtime
 environment loaded, including `CODE_ASSIST_DATABASE_URL`, `CODE_ASSIST_DATA_DIR`,
@@ -18,9 +18,9 @@ pnpm --filter @code-assist/worker workspace destroy <workspace-uuid>
 
 Preparation requires the ticket's current, eligible, approved plan. It verifies
 that the approval matches the current plan version, plan hash and input hash.
-Only the implemented single-repository ICU setup is accepted. Multi-repository
-intake and planning still work; provisioning those plans needs their repository
-setups before coding can begin.
+Profiles currently support ICU, Companion, and Workplace Agents. All selected
+repositories share a ticket-local guest for paired tests, while separate tickets
+retain separate guests. Unknown repository profiles fail visibly.
 
 Each invocation creates a new `ca-<workspace-uuid>` OrbStack Ubuntu 24.04 machine
 with `--isolated --isolate-network`, a private Docker Engine from Docker's official
@@ -31,14 +31,14 @@ an explicit all-interface publish can override them, as accepted by Tim.
 
 The provisioner archives the exact Git commit recorded during approved planning.
 It leaves Mia's synced repository unchanged and installs the archive at
-`/work/internal-chat-ui`. Source is currently an archive, not a branch or Git
+`/work/<repository>`. Source is initially an archive, not a branch or Git
 worktree. Branch creation and change publication belong to the next coding stage.
 Node 24.22.0 and pnpm 10.28.0 are installed in each machine. The repository's locked
 dependencies and Playwright Chromium are installed using its own tooling.
 
 ## Environment and Services
 
-The provisioner resolves only ICU's saved [repository mappings](secrets.md#icu-coding-environment).
+The provisioner resolves each repository’s own saved [repository mappings](secrets.md#icu-coding-environment). ICU uses the settings below.
 It then supplies the following attempt-owned settings, replacing any mappings for
 these names so a shared database or storage destination cannot accidentally win:
 
@@ -62,14 +62,20 @@ The unchanged Compose file starts PostgreSQL and LocalStack. Preparation creates
 the test database and runs ICU's migrations against the local application database.
 LocalStack's repository-owned initialization creates the attachments bucket.
 
-Values are delivered over stdin into `/work/environment.json`, mode `0600`, in
+Workplace Agents uses its checked-in Compose PostgreSQL on loopback port 65432,
+portal origin `http://localhost:6001`, and a fresh local Better Auth secret. Setup
+uses root Makefile install/database/browser targets. Companion requires no
+application services; its package build uses the guest’s zip utility. No Workplace
+Agents cloud/provider credentials are imported automatically.
+
+Values are delivered over stdin into `/work/environments/<repository>.json`, mode `0600`, in
 the guest's private `/work` directory. No `.env` is added to the source tree and no
 values are placed in the workspace manifest. `/work/run.mjs` loads that JSON and
 launches a command with the mapped/generated environment and explicit guest
 PATH/HOME. It does not inherit the Code Assist controller's environment. For example:
 
 ```sh
-orb -m ca-<workspace-uuid> -u workspace node /work/run.mjs pnpm test
+orb -m ca-<workspace-uuid> -u workspace node /work/run.mjs --repo internal-chat-ui pnpm test
 orb -m ca-<workspace-uuid> -u workspace node /work/run.mjs pnpm dev --host 127.0.0.1 --port 5173 --strictPort
 ```
 

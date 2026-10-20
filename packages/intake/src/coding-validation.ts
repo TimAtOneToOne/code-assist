@@ -1,3 +1,4 @@
+import { repositoryProfile } from "./repository-profiles.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -6,8 +7,14 @@ import { artifactPath } from "@code-assist/observability/artifacts";
 const id = process.argv[2];
 if (!/^[a-f0-9-]{36}$/.test(id))
   throw new Error("A coding step ID is required.");
+const repository = process.argv[3] ?? "internal-chat-ui";
+const profile = repositoryProfile(repository);
+const scoped = process.argv.includes("--environments");
 const environment = JSON.parse(
-  readFileSync("/work/environment.json", "utf8"),
+  readFileSync(
+    scoped ? `/work/environments/${repository}.json` : "/work/environment.json",
+    "utf8",
+  ),
 ) as Record<string, string>;
 const artifacts = "/work/logs/artifacts";
 const log = createLogger(
@@ -20,11 +27,12 @@ const log = createLogger(
   { attempt_id: id },
 );
 const results: Record<string, number> = {};
-for (const task of ["lint", "check", "test", "build"]) {
+for (const args of profile.validation) {
+  const task = args.join(" ");
   results[task] = await new Promise<number>((resolve, reject) => {
     const child = spawn(
       "/usr/local/bin/node",
-      ["/work/run.mjs", "pnpm", task],
+      ["/work/run.mjs", ...(scoped ? ["--repo", repository] : []), ...args],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
     for (const stream of [child.stdout, child.stderr]) {
