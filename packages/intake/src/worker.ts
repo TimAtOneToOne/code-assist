@@ -1,3 +1,5 @@
+import { reconcileCodingFailures } from "./coding-worker.ts";
+import { syncApprovedCoding } from "./coding.ts";
 import { reconcilePlanningFailures } from "./planning.ts";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
@@ -37,6 +39,21 @@ export function attentionMessage(
     timeStyle: "long",
   }).format(date);
   const planningMessages: Record<string, string[]> = {
+    coding_failed: [
+      "⚠️ Blocked · Coding step failed",
+      "Completed coding checkpoints are preserved. The failing step has diagnostic logs.",
+      "Review the failure and retry the coding step.",
+    ],
+    coding_direction: [
+      "⏳ Approval needed · Coding needs your direction",
+      "The coding agent identified a decision that blocks implementation.",
+      "Review the question and request a plan revision with your direction.",
+    ],
+    coding_pr_open: [
+      "🔎 Ready for review · Pull request opened",
+      "Implementation, repository validation, browser checks and adversarial review are saved for the published commit.",
+      "Review the pull request linked from the ticket. You perform the merge.",
+    ],
     plan_ready: [
       "🔎 Ready for review · Plan ready",
       "Codex drafted the plan and Claude completed its adversarial review. Versions and findings are saved.",
@@ -215,6 +232,8 @@ export async function registerIntakeWorker(boss: PgBoss, directory: string) {
     } finally {
       await reconcileDiscoveryFailures(boss);
       await reconcilePlanningFailures(boss);
+      await reconcileCodingFailures(boss);
+      await syncApprovedCoding(boss);
       await requeuePendingNotifications(boss);
     }
   });

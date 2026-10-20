@@ -250,7 +250,9 @@
 			</details>
 		{/key}
 	{/if}
-	{#if run.status === 'approved'}<p>Plan approved. Implementation has not started.</p>{/if}
+	{#if run.status === 'approved'}<p>
+			Plan approved for implementation. See the Coding section for progress.
+		</p>{/if}
 	{#if run.feedback.length}<details>
 			<summary class="cursor-pointer text-sm font-medium">Your Feedback History</summary
 			>{#each run.feedback as feedback, index (index)}<p class="mt-3 text-sm whitespace-pre-wrap">

@@ -1,8 +1,8 @@
 # Coding Workspaces
 
 ICU workspace provisioning is implemented as a callable TypeScript module and an
-operator CLI. It prepares the environment for the future coding worker; it does
-not yet enqueue coding, run an agent, edit implementation files, or publish a PR.
+operator CLI. The [coding worker](coding.md) uses this module to prepare an isolated
+environment before implementation, validation and adversarial code review.
 
 ## Preparing an ICU Workspace
 

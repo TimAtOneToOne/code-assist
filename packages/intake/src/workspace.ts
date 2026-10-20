@@ -11,6 +11,7 @@ import type { RepositorySnapshot } from "./discovery.ts";
 import { icuEnvironment } from "./workspace-environment.ts";
 import { bootstrap, environmentLauncher } from "./workspace-bootstrap.ts";
 
+export class WorkspaceApprovalError extends Error {}
 export type WorkspaceInput = {
   issueId: string;
   planningId: string;
@@ -77,12 +78,12 @@ export async function approvedWorkspaceInput(
   );
   const row = rows[0];
   if (!row)
-    throw new Error(
+    throw new WorkspaceApprovalError(
       "A current, approved plan is required to prepare a coding workspace.",
     );
   const snapshots: RepositorySnapshot[] = row.snapshots;
   if (snapshots?.length !== 1 || snapshots[0].name !== "internal-chat-ui")
-    throw new Error(
+    throw new WorkspaceApprovalError(
       "Workspace provisioning currently supports ICU only; this plan needs another repository setup.",
     );
   if (!/^[a-f0-9]{40,64}$/.test(snapshots[0].commit))
@@ -151,6 +152,7 @@ export async function prepareWorkspace(
   db: Db,
   issueId: string,
   signal: AbortSignal,
+  onCreated?: (workspace: Workspace) => Promise<void>,
 ) {
   const input = await approvedWorkspaceInput(db, issueId);
   const environment = icuEnvironment(
@@ -168,6 +170,7 @@ export async function prepareWorkspace(
     variables: Object.keys(environment).sort(),
   };
   await save(directory, workspace);
+  await onCreated?.(workspace);
   const log = createLogger(
     "workspace",
     { environment: { ...process.env, ...environment } },

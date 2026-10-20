@@ -7,6 +7,7 @@
 	import RepositoryPicker from '#lib/components/repository-picker.svelte';
 	import Markdown from '#lib/components/markdown.svelte';
 	import PageJump from '#lib/components/page-jump.svelte';
+	import CodingPanel from '#lib/components/coding-panel.svelte';
 	import PlanningPanel from '#lib/components/planning-panel.svelte';
 	import DiscoveryPanel from '#lib/components/discovery-panel.svelte';
 	import type { PageProps } from './$types';
@@ -81,6 +82,14 @@
 {:else if !data.item.eligible}<p class="mb-4">
 		This ticket no longer matches Plan without Code. Agent work is paused.
 	</p>{/if}
+{#each data.item.coding as run (run.id)}<CodingPanel
+		{run}
+		editable={data.item.eligible &&
+			!data.item.removed_at &&
+			run.planning_id === planning?.id &&
+			run.version === planning?.current_version &&
+			planning?.status === 'approved'}
+	/>{/each}
 {#if planning && !data.item.removed_at}<PlanningPanel
 		run={planning}
 		html={data.planHtml}

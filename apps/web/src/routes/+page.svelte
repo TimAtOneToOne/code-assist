@@ -8,6 +8,17 @@
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	const date = (value: string | Date) => new Date(value).toLocaleString();
+	const codingLabel = {
+		prepare: 'Preparing Workspace',
+		implement: 'Codex Implementing',
+		validate: 'Running Validation',
+		review: 'Claude Reviewing',
+		publish: 'Publishing PR',
+		failed: 'Coding Needs Attention',
+		needs_direction: 'Coding Needs Direction',
+		pr_open: 'Pull Request Open',
+		superseded: 'Coding Paused'
+	};
 	const planningLabel = {
 		drafting: 'Codex drafting',
 		reviewing: 'Claude reviewing',
@@ -89,13 +100,15 @@
 			>
 			<div class="flex flex-wrap items-center gap-2">
 				<Badge variant={item.selected_repositories.length ? 'secondary' : 'default'}
-					>{item.planning_status
-						? planningLabel[item.planning_status]
-						: item.discovery_status
-							? discoveryLabel[item.discovery_status]
-							: item.selected_repositories.length
-								? 'Repositories selected'
-								: 'Needs repositories'}</Badge
+					>{item.coding_status
+						? codingLabel[item.coding_status]
+						: item.planning_status
+							? planningLabel[item.planning_status]
+							: item.discovery_status
+								? discoveryLabel[item.discovery_status]
+								: item.selected_repositories.length
+									? 'Repositories selected'
+									: 'Needs repositories'}</Badge
 				>
 				<p class="text-sm">
 					{#if item.selected_repositories.length}Selected: {item.selected_repositories

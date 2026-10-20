@@ -1,3 +1,4 @@
+import { initializeCoding, readCoding, type CodingRun } from "./coding.ts";
 import {
   readPlanning,
   reconcilePlanningFailures,
@@ -33,13 +34,14 @@ export type WorkItem = {
   current_discovery_id: string | null;
   discovery_status: DiscoveryRun["status"] | null;
   planning_status: PlanningRun["status"] | null;
+  coding_status: CodingRun["status"] | null;
   created_at: Date;
   observed_at: Date;
 };
 
 // Read existing single-repository choices until the user saves a new selection.
 const issueColumns =
-  "*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories, (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status, (SELECT status FROM code_assist.planning_run WHERE discovery_id=current_discovery_id) AS planning_status";
+  "*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories, (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status, (SELECT status FROM code_assist.planning_run WHERE discovery_id=current_discovery_id) AS planning_status, (SELECT c.status FROM code_assist.coding_run c JOIN code_assist.planning_run p ON p.id=c.planning_id WHERE p.discovery_id=current_discovery_id AND p.current_version=c.version AND p.status='approved') AS coding_status";
 
 export async function withIntake<T>(
   connectionString: string,
@@ -96,6 +98,7 @@ export async function initializeIntake(boss: PgBoss) {
   await boss.createQueue(intakeQueue, { retryLimit: 0 });
   await boss.createQueue(notificationQueue, { retryLimit: 0 });
   await initializeDiscovery(boss);
+  await initializeCoding(boss);
 }
 
 export async function requestScan(boss: PgBoss) {
@@ -250,6 +253,7 @@ export async function readWorkItem(db: Db, id: string) {
     events,
     discoveries: discoveries as DiscoveryRun[],
     planning: await readPlanning(db, id),
+    coding: await readCoding(db, id),
   };
 }
 

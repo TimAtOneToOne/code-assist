@@ -17,7 +17,9 @@
     "./prompt-defaults": "./src/prompt-defaults.ts",
     "./aws-settings": "./src/aws-settings.ts",
     "./planning-aws": "./src/planning-aws.ts",
-    "./workspace": "./src/workspace.ts"
+    "./workspace": "./src/workspace.ts",
+    "./coding": "./src/coding.ts",
+    "./coding-worker": "./src/coding-worker.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",

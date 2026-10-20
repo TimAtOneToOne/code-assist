@@ -12,8 +12,7 @@ export const promptDefinitions = {
   },
   coding: {
     title: "Coding",
-    description:
-      "Saved for the future coding phase; no coding runner exists yet.",
+    description: "Shared by implementation and adversarial code review.",
     text: "",
   },
   discovery: {

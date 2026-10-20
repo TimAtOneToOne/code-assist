@@ -55,8 +55,7 @@
 					descriptionId="codex-description"
 				/>
 				<p id="codex-description" class="text-sm text-muted-foreground">
-					Used for initial discovery and plan drafting and revision. This selection will also be
-					used by the coding runner when it is added.
+					Used for initial discovery, plan drafting and revision, and implementation.
 				</p>
 			</div>
 			<div class="space-y-2">
@@ -69,7 +68,7 @@
 					descriptionId="claude-description"
 				/>
 				<p id="claude-description" class="text-sm text-muted-foreground">
-					Used for adversarial plan review.
+					Used for adversarial plan and code review.
 				</p>
 			</div>
 			<Button type="submit">Save Models</Button>

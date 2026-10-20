@@ -1,3 +1,5 @@
+import { codingQueue } from "@code-assist/intake/coding";
+import { registerCodingWorker } from "@code-assist/intake/coding-worker";
 import { connectBoss } from "./database.ts";
 import { initializeProbes, probeQueue, registerProbeWorker } from "./probe.ts";
 import { logger } from "./logging.ts";
@@ -37,9 +39,11 @@ try {
   await registerIntakeWorker(boss, dataDirectory);
   await registerDiscoveryWorker(boss, dataDirectory, stopping.signal);
   await registerPlanningWorker(boss, dataDirectory, stopping.signal);
+  await registerCodingWorker(boss, dataDirectory, stopping.signal);
   logger.event("info", "worker.ready", "Worker ready");
   const signal = await shutdown;
   logger.event("info", "worker.draining", "Worker draining", { signal });
+  await boss.offWork(codingQueue);
   await boss.offWork(planningQueue);
   await boss.offWork(discoveryQueue);
   await boss.offWork(probeQueue);

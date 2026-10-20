@@ -8,9 +8,8 @@ Suggestions are not a live provider catalog. Saving validates the fields without
 making a model request; an unavailable model fails its agent step normally.
 
 The initial selections are `gpt-6.1-sol` and `claude-opus-5-5`, as requested by Tim.
-Codex discovery and planning drafts/revisions read the Codex selection. Claude
-adversarial reviews read the Claude selection. The future coding runner must use
-this same configuration. Reasoning and effort retain provider defaults.
+Codex discovery, planning drafts/revisions and implementation read the Codex selection.
+Claude adversarial plan and code reviews read the Claude selection. Reasoning and effort retain provider defaults.
 
 Each worker reads settings when an agent step starts, including retries. A running
 step retains the model already passed to its SDK. The selected ID is recorded in

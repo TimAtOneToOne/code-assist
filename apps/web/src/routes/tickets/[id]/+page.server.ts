@@ -1,3 +1,5 @@
+import { retryCoding, CodingConflict } from '@code-assist/intake/coding';
+import { reconcileCodingFailures } from '@code-assist/intake/coding-worker';
 import {
 	approvePlan,
 	submitPlanFeedback,
@@ -30,6 +32,7 @@ export const load: PageServerLoad = async (event) => {
 	const item = await withController(async (boss) => {
 		await reconcileDiscoveryFailures(boss);
 		await reconcilePlanningFailures(boss);
+		await reconcileCodingFailures(boss);
 		return readWorkItem(boss.getDb(), issueId(event.params.id));
 	});
 	if (!item) error(404, 'Ticket not found.');
@@ -93,6 +96,22 @@ export const actions = {
 		const approver = await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const id = issueId(event.params.id);
+		if (form.get('intent') === 'coding-retry') {
+			try {
+				await withController((boss) =>
+					retryCoding(
+						boss,
+						id,
+						issueId(String(form.get('codingId'))),
+						issueId(String(form.get('stepId')))
+					)
+				);
+				return { message: 'Coding step queued again.' };
+			} catch (cause) {
+				if (cause instanceof CodingConflict) return fail(409, { error: cause.message });
+				throw cause;
+			}
+		}
 		if (String(form.get('intent')).startsWith('plan-')) {
 			const runId = String(form.get('planningId') ?? '');
 			issueId(runId);
@@ -117,7 +136,7 @@ export const actions = {
 						approvePlan(boss, id, runId, version, hash, accepted as string[], approver)
 					);
 					return {
-						message: 'Plan approved. Implementation is the next phase and is not running yet.'
+						message: 'Plan approved. Supported repositories enter the coding workflow.'
 					};
 				}
 				if (intent !== 'plan-feedback') return fail(400, { error: 'Unknown planning action.' });

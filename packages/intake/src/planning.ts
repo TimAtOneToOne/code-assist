@@ -1,3 +1,4 @@
+import { syncCoding } from "./coding.ts";
 import { createHash, randomUUID } from "node:crypto";
 import type { Db, PgBoss } from "pg-boss";
 import type { DiscoveryRun } from "./discovery.ts";
@@ -558,6 +559,9 @@ export async function approvePlan(
       hash,
       approver,
     });
+    const snapshots = (await inputFor(db, run)).discovery.snapshots;
+    if (snapshots?.length === 1 && snapshots[0].name === "internal-chat-ui")
+      await syncCoding(boss, db, issueId);
   });
 }
 export async function reconcilePlanningFailures(boss: PgBoss) {
