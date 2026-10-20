@@ -6,6 +6,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { workflowBadgeVariant } from '#lib/workflow-status.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	let { run, editable }: { run: CodingDetail; editable: boolean } = $props();
 	const titles = {
@@ -26,7 +27,8 @@
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<Card.Title>Coding</Card.Title>
 		<div class="flex items-center gap-2">
-			<Badge variant="secondary">{editable ? titles[run.status] : 'Previous Approved Scope'}</Badge
+			<Badge variant={workflowBadgeVariant(run.status, editable)}
+				>{editable ? titles[run.status] : 'Previous Approved Scope'}</Badge
 			><Button variant="outline" size="sm" onclick={() => invalidateAll()}>Refresh</Button>
 		</div>
 	</div>

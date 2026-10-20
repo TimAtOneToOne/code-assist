@@ -6,6 +6,7 @@
 	import type { PlanningDetail } from '@code-assist/intake/planning';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { workflowBadgeVariant } from '#lib/workflow-status.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import Markdown from './markdown.svelte';
 	let {
@@ -27,14 +28,14 @@
 	let review = $derived(version?.review);
 	let approval = $derived(run.approvals.find((a) => a.version === version?.number));
 	const label = {
-		drafting: 'Codex is drafting',
-		reviewing: 'Claude is reviewing',
-		revising: 'Codex is revising',
-		awaiting_approval: 'Ready for your approval',
-		needs_direction: 'Your direction is needed',
-		approved: 'Plan approved',
-		failed: 'Planning needs attention',
-		superseded: 'Earlier planning run'
+		drafting: 'Codex Drafting',
+		reviewing: 'Claude Reviewing',
+		revising: 'Codex Revising',
+		awaiting_approval: 'Ready for Your Approval',
+		needs_direction: 'Your Direction Is Needed',
+		approved: 'Plan Approved',
+		failed: 'Planning Needs Attention',
+		superseded: 'Earlier Planning Run'
 	};
 </script>
 
@@ -42,7 +43,7 @@
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<Card.Title>Adversarial Planning</Card.Title>
 		<div class="flex items-center gap-2">
-			<Badge variant="secondary">{label[run.status]}</Badge><Button
+			<Badge variant={workflowBadgeVariant(run.status, editable)}>{label[run.status]}</Badge><Button
 				variant="outline"
 				size="sm"
 				onclick={() => invalidateAll()}>Refresh</Button

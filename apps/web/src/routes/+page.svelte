@@ -4,6 +4,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { workflowBadgeVariant } from '#lib/workflow-status.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
@@ -20,22 +21,22 @@
 		superseded: 'Coding Paused'
 	};
 	const planningLabel = {
-		drafting: 'Codex drafting',
-		reviewing: 'Claude reviewing',
-		revising: 'Codex revising',
-		awaiting_approval: 'Review plan',
-		needs_direction: 'Planning needs direction',
-		approved: 'Plan approved',
-		failed: 'Planning failed',
-		superseded: 'Planning paused'
+		drafting: 'Codex Drafting',
+		reviewing: 'Claude Reviewing',
+		revising: 'Codex Revising',
+		awaiting_approval: 'Review Plan',
+		needs_direction: 'Planning Needs Direction',
+		approved: 'Plan Approved',
+		failed: 'Planning Failed',
+		superseded: 'Planning Paused'
 	};
 	const discoveryLabel = {
-		queued: 'Discovery queued',
-		running: 'Codex investigating',
-		questions: 'Review discovery',
-		ready: 'Ready for planning',
-		failed: 'Discovery failed',
-		superseded: 'Discovery paused'
+		queued: 'Discovery Queued',
+		running: 'Codex Investigating',
+		questions: 'Review Discovery',
+		ready: 'Ready for Planning',
+		failed: 'Discovery Failed',
+		superseded: 'Discovery Paused'
 	};
 </script>
 
@@ -85,7 +86,13 @@
 		</form></Card.Root
 	>
 {/if}
-<h2 class="mb-4 text-xl font-semibold">Tickets</h2>
+<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+	<h2 class="text-xl font-semibold">Tickets</h2>
+	<div class="flex gap-2" aria-label="Status Color Guide">
+		<Badge variant="attention">Needs Your Attention</Badge>
+		<Badge variant="active">Working</Badge>
+	</div>
+</div>
 {#if !data.issues.length}<Card.Root class="panel"
 		><Card.Title>No active tickets.</Card.Title>
 		<p>Run a Linear check to bring in tickets labeled Plan.</p></Card.Root
@@ -99,7 +106,14 @@
 				></Card.Title
 			>
 			<div class="flex flex-wrap items-center gap-2">
-				<Badge variant={item.selected_repositories.length ? 'secondary' : 'default'}
+				<Badge
+					variant={workflowBadgeVariant(
+						item.coding_status ??
+							item.planning_status ??
+							item.discovery_status ??
+							(item.selected_repositories.length ? null : 'needs_repositories'),
+						item.eligible
+					)}
 					>{item.coding_status
 						? codingLabel[item.coding_status]
 						: item.planning_status
@@ -107,8 +121,8 @@
 							: item.discovery_status
 								? discoveryLabel[item.discovery_status]
 								: item.selected_repositories.length
-									? 'Repositories selected'
-									: 'Needs repositories'}</Badge
+									? 'Repositories Selected'
+									: 'Needs Repositories'}</Badge
 				>
 				<p class="text-sm">
 					{#if item.selected_repositories.length}Selected: {item.selected_repositories
@@ -118,7 +132,7 @@
 							.join(', ')}{:else}No explicit repository reference found. Choose from Mia’s
 						repositories.{/if}
 				</p>
-				{#if !item.eligible}<Badge variant="outline">Plan trigger no longer present</Badge>{/if}
+				{#if !item.eligible}<Badge variant="outline">Plan Trigger No Longer Present</Badge>{/if}
 			</div>
 		</div>
 		<div class="shrink-0">

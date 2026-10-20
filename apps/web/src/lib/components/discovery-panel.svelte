@@ -3,6 +3,8 @@
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { workflowBadgeVariant } from '#lib/workflow-status.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import Markdown from '#lib/components/markdown.svelte';
@@ -15,13 +17,14 @@
 	let answers = $derived(
 		run.answers ? [...run.answers] : (run.result?.questions.map(() => '') ?? [])
 	);
+	const badgeVariant = $derived(workflowBadgeVariant(run.status, editable));
 </script>
 
 <Card.Root class="panel">
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<div>
 			<div class="mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-				Codex · Initial discovery
+				Codex · Initial Discovery
 			</div>
 			<Card.Title
 				>{run.status === 'queued'
@@ -35,6 +38,15 @@
 								: 'Confirm Scope and Answer Open Questions'}</Card.Title
 			>
 		</div>
+		<Badge variant={badgeVariant}
+			>{badgeVariant === 'attention'
+				? 'Needs Your Attention'
+				: badgeVariant === 'active'
+					? 'Working'
+					: run.status === 'ready'
+						? 'Answers Saved'
+						: 'Previous Discovery'}</Badge
+		>
 		{#if ['queued', 'running'].includes(run.status)}<Button
 				type="button"
 				variant="outline"
