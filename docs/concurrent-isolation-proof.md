@@ -6,6 +6,11 @@ validation and authenticated browser checks. **The network-isolation check
 failed:** either machine could reach the other machine, including its database.
 This is evidence for collision avoidance, not a completed agent security boundary.
 
+The subsequent [local-only port binding proof](loopback-isolation-proof.md)
+closed the demonstrated default database exposure without changing ICU. It also
+confirmed that explicit bindings can override the default and that host web
+access remains possible.
+
 ## Configuration
 
 | Item               | Tested Value                                                                                           |
