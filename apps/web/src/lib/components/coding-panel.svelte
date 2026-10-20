@@ -49,7 +49,9 @@
 				type="hidden"
 				name="codingId"
 				value={run.id}
-			/><input type="hidden" name="stepId" value={latest.id} /><Button>Retry Coding Step</Button>
+			/><input type="hidden" name="stepId" value={latest.id} /><Button type="submit"
+				>Retry Coding Step</Button
+			>
 		</form>{/if}
 	{#if run.status === 'failed' && editable && latest && !run.pr_url}
 		<details>
@@ -72,7 +74,7 @@
 					Authorize this run to use the new branch and retry from its saved checkpoint. Existing
 					branches are preserved.
 				</p>
-				<Button variant="outline">Use Branch and Retry</Button>
+				<Button type="submit" variant="outline">Use Branch and Retry</Button>
 			</form>
 		</details>
 	{/if}
