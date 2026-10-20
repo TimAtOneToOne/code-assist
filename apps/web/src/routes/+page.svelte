@@ -64,18 +64,18 @@
 {#each data.issues as item (item.id)}
 	<Card.Root class="mb-2 gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
 		<div class="min-w-0 space-y-1">
+			<Card.Title
+				><a href={resolve('/tickets/[id]', { id: item.id })}>{item.ticket.title}</a></Card.Title
+			>
 			<div class="flex flex-wrap items-center gap-2">
 				<Badge variant={item.selected_repositories.length ? 'secondary' : 'default'}
 					>{item.selected_repositories.length
 						? 'Repositories selected'
 						: 'Needs repositories'}</Badge
 				>
-				{#if !item.eligible}<Badge variant="outline">Plan trigger no longer present</Badge
-					>{/if}<span class="text-sm text-muted-foreground">{item.ticket.identifier}</span>
+				<span class="text-sm text-muted-foreground">{item.ticket.identifier}</span>
+				{#if !item.eligible}<Badge variant="outline">Plan trigger no longer present</Badge>{/if}
 			</div>
-			<Card.Title
-				><a href={resolve('/tickets/[id]', { id: item.id })}>{item.ticket.title}</a></Card.Title
-			>
 			<p class="text-sm">
 				{#if item.selected_repositories.length}Selected: {item.selected_repositories
 						.map((path) => path.split('/').at(-1))
