@@ -11,6 +11,8 @@ import {
   requestScan,
   recordScan,
   selectRepositories,
+  dashboard,
+  readWorkItem,
 } from "../src/store.ts";
 import {
   discoveryQueue,
@@ -221,6 +223,40 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       ),
     );
     const review = await next();
+    await finishCoding(
+      boss,
+      review.run,
+      review.step,
+      { ready: true },
+      "publish",
+    );
+    const publish = await next();
+    await finishCoding(
+      boss,
+      publish.run,
+      publish.step,
+      { summary: "PR opened" },
+      "pr_open",
+      undefined,
+      undefined,
+      "https://example.invalid/pull/1",
+    );
+    await recordScan(
+      boss,
+      await requestScan(boss),
+      [{ ...ticket, updatedAt: "2026-10-20T18:31:29.238Z" }],
+      [source],
+    );
+    const item = (await readWorkItem(boss.getDb(), ticket.id))!;
+    assert.equal(item.current_discovery_id, d.id);
+    assert.equal(item.discoveries.length, 1);
+    assert.equal(item.planning_status, "approved");
+    assert.equal(item.coding_status, "pr_open");
+    assert.equal(
+      (await dashboard(boss)).issues.find((i) => i.id === ticket.id)!
+        .coding_status,
+      "pr_open",
+    );
     await submitPlanFeedback(
       boss,
       ticket.id,
@@ -250,7 +286,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     assert.equal(completed.commit, "b".repeat(40));
     assert.equal(
       completed.steps.filter((s) => s.status === "completed").length,
-      3,
+      5,
     );
   } finally {
     await boss.stop();

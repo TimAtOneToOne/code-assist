@@ -70,8 +70,14 @@ export async function initializeDiscovery(boss: PgBoss) {
 }
 
 export function discoveryHash(ticket: Ticket, repositories: string[]) {
+  const { id, identifier, title, url, description, labels, comments } = ticket;
   return createHash("sha256")
-    .update(JSON.stringify({ ticket, repositories: [...repositories].sort() }))
+    .update(
+      JSON.stringify({
+        ticket: { id, identifier, title, url, description, labels, comments },
+        repositories: [...repositories].sort(),
+      }),
+    )
     .digest("hex");
 }
 
@@ -98,7 +104,8 @@ export async function syncDiscovery(
   if (
     current &&
     eligible &&
-    current.input_hash === hash &&
+    // Recompute from saved inputs so older timestamp-inclusive hashes remain valid.
+    discoveryHash(current.ticket, current.repositories) === hash &&
     current.status !== "superseded"
   ) {
     if (!force || ["queued", "running"].includes(current.status))
