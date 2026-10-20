@@ -7,6 +7,7 @@ test("PR observations require the expected GitHub URL and complete merge evidenc
   const pr = {
     url,
     state: "MERGED",
+    baseRefName: "main",
     mergedAt: "2026-10-20T20:24:17Z",
     closedAt: "2026-10-20T20:24:17Z",
     mergeCommit: { oid: "a".repeat(40) },
@@ -27,5 +28,72 @@ test("PR observations require the expected GitHub URL and complete merge evidenc
       { ...pr, url: "https://example.invalid/pull/125" },
       "https://example.invalid/pull/125",
     ),
+  );
+});
+
+import {
+  parseMainWorkflows,
+  mainWorkflowStatus,
+  mainFailureKey,
+} from "../src/github-workflows.ts";
+
+const workflow = {
+  id: 42,
+  run_attempt: 1,
+  name: "Deploy",
+  html_url: "https://github.com/example/repo/actions/runs/42",
+  head_sha: "a".repeat(40),
+  head_branch: "main",
+  event: "push",
+  status: "completed",
+  conclusion: "success",
+};
+test("Done requires successful main runs for the exact merge, not PR checks or prod promotion", () => {
+  const parse = (run: unknown) =>
+    parseMainWorkflows(
+      [{ workflow_runs: [run] }],
+      "example/repo",
+      workflow.head_sha,
+    );
+  assert.equal(parse(workflow).length, 1);
+  for (const invalid of [
+    { ...workflow, head_sha: "b".repeat(40) },
+    { ...workflow, head_branch: "prod" },
+    { ...workflow, event: "pull_request" },
+    { ...workflow, event: "workflow_dispatch" },
+    { ...workflow, html_url: "https://github.com/other/repo/actions/runs/42" },
+    { ...workflow, conclusion: null },
+    { ...workflow, run_attempt: 0 },
+  ])
+    assert.throws(() => parse(invalid));
+  assert.equal(mainWorkflowStatus({ runs: [] }), "awaiting_main");
+  assert.equal(
+    mainWorkflowStatus({
+      runs: [
+        workflow,
+        { ...workflow, id: 43, status: "in_progress", conclusion: null },
+      ],
+    }),
+    "main_running",
+  );
+  assert.equal(mainWorkflowStatus({ runs: [workflow] }), "done");
+  for (const conclusion of [
+    "failure",
+    "timed_out",
+    "cancelled",
+    "action_required",
+    "neutral",
+    "skipped",
+    "startup_failure",
+  ])
+    assert.equal(
+      mainWorkflowStatus({ runs: [{ ...workflow, conclusion }] }),
+      "main_failed",
+    );
+  assert.equal(mainFailureKey({ runs: [workflow] }), null);
+  const failed = { ...workflow, conclusion: "failure" };
+  assert.notEqual(
+    mainFailureKey({ runs: [failed] }),
+    mainFailureKey({ runs: [{ ...failed, run_attempt: 2 }] }),
   );
 });

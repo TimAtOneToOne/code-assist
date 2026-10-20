@@ -19,15 +19,23 @@
 		needs_direction: 'Your Direction Needed',
 		pr_open: 'Pull Request Open',
 		pr_closed: 'Closed Without Merge',
+		awaiting_main: 'Waiting for Main Workflow',
+		main_running: 'Main Workflows Running',
+		main_failed: 'Main Workflow Failed',
 		done: 'Done',
 		superseded: 'Superseded'
 	};
+	const workflowLabel = (value: string | null) =>
+		(value ?? 'Unknown')
+			.split('_')
+			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(' ');
 	const latest = $derived(run.steps.find((s) => s.id === run.current_step_id));
 </script>
 
 <Card.Root class="panel">
 	<div class="flex flex-wrap items-center justify-between gap-3">
-		<Card.Title>Coding</Card.Title>
+		<Card.Title>{run.repair ? 'Main Workflow Repair' : 'Coding'}</Card.Title>
 		<div class="flex items-center gap-2">
 			<Badge variant={workflowBadgeVariant(run.status, editable)}
 				>{editable ? titles[run.status] : 'Previous Approved Scope'}</Badge
@@ -43,7 +51,7 @@
 		<div class="flex flex-wrap items-center gap-3">
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub URL from the publication controller. -->
 			<a class="font-medium underline" href={run.pr_url} target="_blank" rel="noreferrer"
-				>{run.status === 'done'
+				>{run.merged_at
 					? 'View Merged Pull Request →'
 					: run.status === 'pr_closed'
 						? 'View Closed Pull Request →'
@@ -59,13 +67,15 @@
 			{#if run.github_checked_at}GitHub Checked: {new Date(
 					run.github_checked_at
 				).toLocaleString()}.{:else}Waiting for the first GitHub check.{/if}
-			{#if run.status !== 'done'}PR states are checked every five minutes.{/if}
+			{#if run.status !== 'done'}PRs and main workflows are checked every five minutes.{/if}
 		</p>
 		{#if run.github_error}<p role="alert">{run.github_error}</p>{/if}
-		{#if run.status === 'done' && run.merged_at && run.merge_commit}
+		{#if run.merged_at && run.merge_commit}
 			<p class="text-sm">
 				Merged {new Date(run.merged_at).toLocaleString()} · Commit {run.merge_commit.slice(0, 7)}.
-				Done records the merge; deployment status is available in GitHub.
+				{#if run.status === 'done'}All observed push-to-main workflows for this merge commit
+					succeeded.{:else}Done waits for successful push-to-main workflows for this exact merge
+					commit.{/if}
 			</p>
 		{:else if run.status === 'pr_closed'}
 			<p class="text-sm">
@@ -75,6 +85,43 @@
 			</p>
 		{/if}
 	{/if}
+	{#if run.main_workflows}
+		<div class="space-y-2 text-sm">
+			<h3 class="font-medium">Main Workflows</h3>
+			{#if !run.main_workflows.runs.length}<p>
+					No matching push-to-main workflow has been reported yet.
+				</p>{/if}
+			{#each run.main_workflows.runs as workflow (workflow.id)}
+				<div class="flex flex-wrap items-center gap-2">
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Validated GitHub workflow URL. -->
+					<a class="underline" href={workflow.html_url} target="_blank" rel="noreferrer"
+						>{workflow.name}</a
+					>
+					<Badge
+						variant={workflow.status !== 'completed' || workflow.conclusion === 'success'
+							? 'active'
+							: 'attention'}
+						>{workflowLabel(
+							workflow.status === 'completed' ? workflow.conclusion : workflow.status
+						)}</Badge
+					>
+					<span class="text-muted-foreground">Attempt {workflow.run_attempt}</span>
+				</div>
+			{/each}
+			{#if run.main_workflows.failureArtifact}
+				<a
+					class="underline"
+					href={resolve('/api/artifacts/[id]', { id: run.main_workflows.failureArtifact })}
+					>Failure Evidence →</a
+				>
+			{/if}
+		</div>
+	{/if}
+	{#if run.repair}<p class="text-sm text-muted-foreground">
+			Corrective run from merged commit {run.repair.baseCommit.slice(0, 7)}. The original PR and
+			workflow evidence are preserved. Any code fix goes through validation, Claude review, and a
+			new PR.
+		</p>{/if}
 	{#if run.status === 'needs_direction'}<p>
 			The agent needs your direction. Read its question below, then use Requested Changes on the
 			approved plan to revise the scope.

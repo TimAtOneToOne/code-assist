@@ -19,6 +19,9 @@
 		needs_direction: 'Coding Needs Direction',
 		pr_open: 'Pull Request Open',
 		pr_closed: 'Closed Without Merge',
+		awaiting_main: 'Waiting for Main Workflow',
+		main_running: 'Main Workflows Running',
+		main_failed: 'Main Workflow Failed',
 		done: 'Done',
 		superseded: 'Coding Paused'
 	};

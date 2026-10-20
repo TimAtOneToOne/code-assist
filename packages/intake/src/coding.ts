@@ -1,3 +1,4 @@
+import { mainFailureKey } from "./github-workflows.ts";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access } from "node:fs/promises";
@@ -31,6 +32,14 @@ export async function initializeCoding(boss: PgBoss) {
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS merged_at timestamptz;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS merge_commit text;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS pr_closed_at timestamptz;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS main_workflows jsonb;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS parent_run_id uuid REFERENCES code_assist.coding_run(id);
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repair_key text;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repair jsonb;
+ ALTER TABLE code_assist.coding_run DROP CONSTRAINT IF EXISTS coding_run_planning_id_version_key;
+ CREATE UNIQUE INDEX IF NOT EXISTS coding_original_plan ON code_assist.coding_run(planning_id,version) WHERE parent_run_id IS NULL;
+ CREATE UNIQUE INDEX IF NOT EXISTS coding_repair_failure ON code_assist.coding_run(parent_run_id,repair_key);
+ UPDATE code_assist.coding_run SET status='awaiting_main' WHERE status='done' AND main_workflows IS NULL;
  `);
   await boss.createQueue(codingQueue, { retryLimit: 0 });
 }
@@ -77,6 +86,15 @@ export async function currentCoding(
   const current = await codingRun(db, run.id);
   if (!isDeepStrictEqual(input, run.input) || current.status === "superseded")
     return false;
+  if (run.parent_run_id && !run.pr_url) {
+    const parent = await codingRun(db, run.parent_run_id);
+    if (
+      parent.status !== "main_failed" ||
+      !parent.main_workflows ||
+      mainFailureKey(parent.main_workflows) !== run.repair_key
+    )
+      return false;
+  }
   if (step) {
     const { rows } = await db.executeSql(
       "SELECT 1 FROM code_assist.coding_step WHERE id=$1 AND job_id=$2 AND status IN ('queued','running')",
@@ -112,7 +130,7 @@ export async function syncCoding(boss: PgBoss, db: Db, issueId: string) {
   );
   const input = await approvedWorkspaceInput(db, issueId);
   const existing = await db.executeSql(
-    "SELECT id FROM code_assist.coding_run WHERE planning_id=$1 AND version=$2",
+    "SELECT id FROM code_assist.coding_run WHERE planning_id=$1 AND version=$2 AND parent_run_id IS NULL",
     [input.planningId, input.version],
   );
   if (existing.rows.length) return;
@@ -136,6 +154,44 @@ export async function syncCoding(boss: PgBoss, db: Db, issueId: string) {
       identifier,
       rows[0].ticket.title,
       `feature/${identifier.toLowerCase()}`,
+    ],
+  );
+  await enqueue(boss, db, await codingRun(db, id), "prepare");
+}
+export async function queueMainRepair(boss: PgBoss, db: Db, run: CodingRun) {
+  if (
+    !run.main_workflows?.failureArtifact ||
+    !run.merge_commit ||
+    run.status !== "main_failed"
+  )
+    return;
+  if (!(await currentCoding(db, run))) return;
+  const key = mainFailureKey(run.main_workflows);
+  if (!key) return;
+  const existing = await db.executeSql(
+    "SELECT id FROM code_assist.coding_run WHERE parent_run_id=$1 AND repair_key=$2",
+    [run.id, key],
+  );
+  if (existing.rows.length) return;
+  const id = randomUUID();
+  await db.executeSql(
+    "INSERT INTO code_assist.coding_run(id,issue_id,planning_id,version,input,plan,identifier,title,branch,status,parent_run_id,repair_key,repair) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'prepare',$10,$11,$12)",
+    [
+      id,
+      run.issue_id,
+      run.planning_id,
+      run.version,
+      JSON.stringify(run.input),
+      JSON.stringify(run.plan),
+      run.identifier,
+      run.title,
+      `feature/${run.identifier.toLowerCase()}-main-fix-${id}`,
+      run.id,
+      key,
+      JSON.stringify({
+        baseCommit: run.merge_commit,
+        workflows: run.main_workflows,
+      }),
     ],
   );
   await enqueue(boss, db, await codingRun(db, id), "prepare");

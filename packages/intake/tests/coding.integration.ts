@@ -37,6 +37,7 @@ import {
 } from "../src/planning.ts";
 import {
   codingQueue,
+  initializeCoding,
   readCoding,
   startCoding,
   finishCoding,
@@ -268,6 +269,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     const pr: PullRequestState = {
       url: published.pr_url!,
       state: "CLOSED",
+      baseRefName: "main",
       mergedAt: null,
       closedAt: "2026-10-20T20:00:00Z",
       mergeCommit: null,
@@ -321,16 +323,90 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     const merged: PullRequestState = {
       ...pr,
       state: "MERGED",
+      baseRefName: "main",
       mergedAt: pr.closedAt,
       mergeCommit: { oid: "c".repeat(40) },
     };
-    await recordGitHubObservation(
-      boss,
-      published,
-      new Date(Date.now() + 1_000),
-      { pr: merged },
+    let tick = Date.now() + 1000;
+    const observe = (
+      main?: import("../src/github-workflows.ts").MainWorkflows,
+    ) =>
+      recordGitHubObservation(boss, published, new Date(++tick), {
+        pr: merged,
+        main,
+      });
+    const original = async () => (await readCoding(boss.getDb(), ticket.id))[0];
+    await observe();
+    assert.equal((await original()).status, "awaiting_main");
+    await observe({ runs: [] });
+    assert.equal((await original()).status, "awaiting_main");
+    const workflow = {
+      id: 42,
+      run_attempt: 1,
+      name: "Main Build",
+      html_url: "https://github.com/example/icu/actions/runs/42",
+      head_sha: "c".repeat(40),
+      head_branch: "main",
+      event: "push",
+      status: "in_progress",
+      conclusion: null as string | null,
+    };
+    await observe({ runs: [workflow] });
+    assert.equal((await original()).status, "main_running");
+    const failure = {
+      runs: [{ ...workflow, status: "completed", conclusion: "failure" }],
+      failureArtifact: randomUUID(),
+    };
+    await observe({
+      ...failure,
+      failureArtifact: undefined,
+      evidenceError: "Logs not available",
+    });
+    assert.equal((await original()).status, "main_failed");
+    assert.equal((await original()).github_error, "Logs not available");
+    assert.equal((await readCoding(boss.getDb(), ticket.id)).length, 1);
+    await observe(failure);
+    assert.equal((await original()).status, "main_failed");
+    let all = await readCoding(boss.getDb(), ticket.id);
+    assert.equal(all.length, 2);
+    const repair = all[1];
+    assert.equal(repair.parent_run_id, published.id);
+    assert.equal(repair.repair!.baseCommit, merged.mergeCommit!.oid);
+    assert.deepEqual(repair.input, published.input);
+    assert.notEqual(repair.branch, published.branch);
+    assert.match(repair.branch, /^feature\/one-999999-main-fix-/);
+    assert.equal(repair.status, "prepare");
+    assert.equal((await dashboard(boss)).issues[0].coding_status, "prepare");
+    await observe(failure);
+    await syncApprovedCoding(boss);
+    assert.equal((await readCoding(boss.getDb(), ticket.id)).length, 2);
+    const preparing = await next();
+    assert.equal(preparing.run.id, repair.id);
+    // A recovered rerun fences already-running corrective work, preserving original history.
+    const passed = {
+      runs: [
+        {
+          ...workflow,
+          run_attempt: 2,
+          status: "completed",
+          conclusion: "success",
+        },
+      ],
+    };
+    await observe(passed);
+    assert.equal(
+      await currentCoding(boss.getDb(), preparing.run, preparing.step),
+      false,
     );
-    const done = (await readCoding(boss.getDb(), ticket.id))[0];
+    assert.equal(
+      await finishCoding(boss, preparing.run, preparing.step, {}, "implement"),
+      false,
+    );
+    assert.equal(
+      (await readCoding(boss.getDb(), ticket.id))[1].status,
+      "superseded",
+    );
+    const done = await original();
     assert.equal(done.status, "done");
     assert.equal(done.merge_commit, "c".repeat(40));
     assert.equal(
@@ -338,12 +414,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       "2026-10-20T20:00:00.000Z",
     );
     assert.equal(done.github_error, null);
-    await recordGitHubObservation(
-      boss,
-      published,
-      new Date(Date.now() + 2_000),
-      { pr: merged },
-    );
+    await observe(passed);
     assert.equal(
       (
         await boss
@@ -368,6 +439,130 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       },
     );
     assert.equal(githubReads, 0);
+    // New failed attempt creates a distinct repair; its validation/review/publication loop is unchanged.
+    const again = {
+      runs: [
+        {
+          ...workflow,
+          run_attempt: 3,
+          status: "completed",
+          conclusion: "failure",
+        },
+      ],
+      failureArtifact: randomUUID(),
+    };
+    await observe(again);
+    const rp = await next();
+    assert.notEqual(rp.run.id, repair.id);
+    await finishCoding(
+      boss,
+      rp.run,
+      rp.step,
+      { ready: true },
+      "implement",
+      "c".repeat(40),
+      randomUUID(),
+    );
+    const ri = await next();
+    await finishCoding(
+      boss,
+      ri.run,
+      ri.step,
+      { summary: "Repair" },
+      "validate",
+      "d".repeat(40),
+    );
+    const rv = await next();
+    await finishCoding(boss, rv.run, rv.step, { passed: true }, "review");
+    const rr = await next();
+    await finishCoding(
+      boss,
+      rr.run,
+      rr.step,
+      { disposition: "revise", findings: [{ severity: "high" }] },
+      "implement",
+    );
+    const revision = await next();
+    await finishCoding(
+      boss,
+      revision.run,
+      revision.step,
+      { summary: "Addressed review" },
+      "validate",
+      "e".repeat(40),
+    );
+    const revalidate = await next();
+    await finishCoding(
+      boss,
+      revalidate.run,
+      revalidate.step,
+      { passed: true },
+      "review",
+    );
+    const rereview = await next();
+    await finishCoding(
+      boss,
+      rereview.run,
+      rereview.step,
+      { ready: true },
+      "publish",
+    );
+    const republish = await next();
+    await finishCoding(
+      boss,
+      republish.run,
+      republish.step,
+      { summary: "Corrective PR" },
+      "pr_open",
+      undefined,
+      undefined,
+      "https://github.com/example/icu/pull/2",
+    );
+    all = await readCoding(boss.getDb(), ticket.id);
+    const correction = all[2];
+    assert.equal(correction.pr_url, "https://github.com/example/icu/pull/2");
+    assert.equal(all[0].pr_url, published.pr_url);
+    const correctedMerge = {
+      ...merged,
+      url: correction.pr_url!,
+      mergeCommit: { oid: "f".repeat(40) },
+    };
+    await recordGitHubObservation(boss, correction, new Date(++tick), {
+      pr: correctedMerge,
+      main: { runs: [] },
+    });
+    assert.equal(
+      (await dashboard(boss)).issues[0].coding_status,
+      "awaiting_main",
+    );
+    await recordGitHubObservation(boss, correction, new Date(++tick), {
+      pr: correctedMerge,
+      main: {
+        runs: [
+          {
+            ...workflow,
+            id: 43,
+            html_url: "https://github.com/example/icu/actions/runs/43",
+            head_sha: "f".repeat(40),
+            status: "completed",
+            conclusion: "success",
+          },
+        ],
+      },
+    });
+    assert.equal((await dashboard(boss)).issues[0].coding_status, "done");
+    // Delayed or failed reads cannot replace success with earlier failure evidence.
+    assert.equal(
+      await recordGitHubObservation(boss, correction, new Date(0), {
+        pr: correctedMerge,
+        main: { runs: [] },
+      }),
+      false,
+    );
+    await recordGitHubObservation(boss, correction, new Date(++tick), {
+      error: "GitHub unavailable",
+    });
+    assert.equal((await dashboard(boss)).issues[0].coding_status, "done");
     await submitPlanFeedback(
       boss,
       ticket.id,
@@ -392,6 +587,34 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     );
     await assert.rejects(
       retryCoding(boss, ticket.id, review.run.id, review.step.id),
+    );
+    await observe({
+      runs: [
+        {
+          ...workflow,
+          run_attempt: 4,
+          status: "completed",
+          conclusion: "failure",
+        },
+      ],
+      failureArtifact: randomUUID(),
+    });
+    assert.equal(
+      (await readCoding(boss.getDb(), ticket.id)).length,
+      3,
+      "Superseded approval must not authorize another repair",
+    );
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.coding_run SET status='done',main_workflows=NULL WHERE id=$1",
+        [published.id],
+      );
+    await initializeCoding(boss);
+    assert.equal(
+      (await original()).status,
+      "awaiting_main",
+      "Legacy merge-only Done must be rechecked",
     );
     const completed = (await readCoding(boss.getDb(), ticket.id))[0];
     assert.equal(completed.commit, "b".repeat(40));

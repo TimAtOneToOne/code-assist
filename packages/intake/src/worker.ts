@@ -40,9 +40,14 @@ export function attentionMessage(
   }).format(date);
   const planningMessages: Record<string, string[]> = {
     coding_done: [
-      "✅ Complete · Pull request merged",
-      "GitHub confirms the pull request was merged. Code Assist marked the work Done and saved the merge commit. Deployment success is tracked separately in GitHub.",
+      "✅ Complete · Main workflows succeeded",
+      "The pull request merged into main and all observed push-to-main workflows for its exact merge commit succeeded. Code Assist marked the work Done. Separate production promotions do not affect this status.",
       "",
+    ],
+    coding_main_failed: [
+      "⚠️ Blocked · Main workflow failed",
+      "A workflow for the merged commit did not succeed. Failure evidence is saved; when the original approved scope is still current, Codex investigates in a separate corrective run with validation and Claude review before a new PR.",
+      "Review the main workflow and any repair progress on the ticket page.",
     ],
     coding_pr_closed: [
       "🔎 Ready for review · Pull request closed without merge",

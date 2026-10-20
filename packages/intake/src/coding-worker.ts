@@ -31,6 +31,7 @@ import {
 } from "./coding.ts";
 import {
   setupCodingRuntime,
+  prepareCodingSource,
   ensureCodingRuntime,
   guestCommands,
   checkpoint,
@@ -128,6 +129,8 @@ export async function registerCodingWorker(
       await assertCurrent();
       if (step.kind === "prepare") {
         await checkCodingBranch(run, signal, log);
+        const source = await prepareCodingSource(directory, run, signal, log);
+        await assertCurrent();
         workspace = await prepareWorkspace(
           directory,
           boss.getDb(),
@@ -148,6 +151,7 @@ export async function registerCodingWorker(
                 [run.id, w.id, step.id],
               );
           },
+          source,
         );
         stage = "installing coding runtime";
         const commit = await setupCodingRuntime(
@@ -157,6 +161,19 @@ export async function registerCodingWorker(
           signal,
           log,
         );
+        if (run.repair) {
+          const artifacts = process.env.CODE_ASSIST_ARTIFACT_DIR;
+          if (!artifacts || !run.repair.workflows.failureArtifact)
+            throw new Error("Main failure evidence is missing.");
+          const evidence = await readFile(
+            artifactPath(artifacts, run.repair.workflows.failureArtifact),
+            "utf8",
+          );
+          await guestCommands(workspace, signal, log).guest(
+            ["bash", "-c", "cat > /work/evidence/main-workflow-failure.json"],
+            evidence,
+          );
+        }
         await finishCoding(
           boss,
           run,

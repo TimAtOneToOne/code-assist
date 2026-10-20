@@ -148,7 +148,7 @@ export async function publishCoding(
   await git([
     "merge-base",
     "--is-ancestor",
-    run.input.snapshot.commit,
+    run.repair?.baseCommit ?? run.input.snapshot.commit,
     "FETCH_HEAD",
   ]);
   // A merge-tree conflict is a concrete reason to revise, never a license to overwrite main.
@@ -176,7 +176,14 @@ export async function publishCoding(
   const body = join(local, "pull-request.md");
   await writeFile(
     body,
-    `## Summary\n\nImplements ${run.identifier}: ${run.title}, following approved plan v${run.version}.\n\nValidation: repository lint, type checks, tests and production build passed; workspace browser evidence and Claude's adversarial review are recorded for commit ${run.commit}.\n\n**Optional optimizations and controls:** none.\n\n[Code Assist plan, validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\n${marker}\n`,
+    `## Summary\n\n${run.repair ? "Repairs a failed main workflow for" : "Implements"} ${run.identifier}: ${run.title}, following approved plan v${run.version}.${
+      run.repair
+        ? `\n\nFailure evidence: ${run.repair.workflows.runs
+            .filter((r) => r.conclusion && r.conclusion !== "success")
+            .map((r) => `[${r.name}, attempt ${r.run_attempt}](${r.html_url})`)
+            .join(", ")}. Corrective base: ${run.repair.baseCommit}.`
+        : ""
+    }\n\nValidation: repository lint, type checks, tests and production build passed; workspace browser evidence and Claude's adversarial review are recorded for commit ${run.commit}.\n\n**Optional optimizations and controls:** none.\n\n[Code Assist plan, validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\n${marker}\n`,
     { mode: 0o600 },
   );
   return (
@@ -190,7 +197,7 @@ export async function publishCoding(
       "--head",
       run.branch,
       "--title",
-      `feat: ${run.title}`,
+      `${run.repair ? "fix" : "feat"}: ${run.title}`,
       "--body-file",
       body,
     ])

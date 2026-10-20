@@ -1,3 +1,4 @@
+import type { MainWorkflows } from "./github-workflows.ts";
 import type { WorkspaceInput } from "./workspace.ts";
 import type { PlanDocument, PlanReview } from "./planning-types.ts";
 export type CodingKind =
@@ -18,6 +19,9 @@ export type CodingRun = {
     | "needs_direction"
     | "pr_open"
     | "pr_closed"
+    | "awaiting_main"
+    | "main_running"
+    | "main_failed"
     | "done"
     | "superseded";
   current_step_id: string;
@@ -30,6 +34,10 @@ export type CodingRun = {
   merged_at: Date | null;
   merge_commit: string | null;
   pr_closed_at: Date | null;
+  main_workflows: MainWorkflows | null;
+  parent_run_id: string | null;
+  repair_key: string | null;
+  repair: { baseCommit: string; workflows: MainWorkflows } | null;
   created_at: Date;
 };
 export type CodingStep = {

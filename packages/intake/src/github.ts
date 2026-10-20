@@ -1,6 +1,19 @@
+import {
+  failedMainWorkflows,
+  mainFailureKey,
+  mainWorkflowStatus,
+  parseMainWorkflows,
+  type MainWorkflows,
+} from "./github-workflows.ts";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
-import { codingTransaction, CodingConflict, type CodingRun } from "./coding.ts";
+import {
+  codingTransaction,
+  CodingConflict,
+  codingRun,
+  queueMainRepair,
+  type CodingRun,
+} from "./coding.ts";
 import { executeCoding } from "./coding-runtime.ts";
 import { recordIntakeEvent } from "./intake-events.ts";
 
@@ -8,6 +21,7 @@ export const githubQueue = "github-pr-refresh";
 type RefreshRequest = { runId?: string };
 export type PullRequestState = {
   url: string;
+  baseRefName: string;
   state: "OPEN" | "CLOSED" | "MERGED";
   mergedAt: string | null;
   closedAt: string | null;
@@ -27,6 +41,8 @@ export function parsePullRequest(
     ) ||
     !pr ||
     pr.url !== expectedUrl ||
+    typeof pr.baseRefName !== "string" ||
+    !pr.baseRefName ||
     !["OPEN", "CLOSED", "MERGED"].includes(pr.state) ||
     (pr.state === "MERGED" &&
       (!validDate(pr.mergedAt) ||
@@ -67,9 +83,24 @@ export async function recordGitHubObservation(
   boss: PgBoss,
   run: CodingRun,
   checkedAt: Date,
-  observation: { pr: PullRequestState } | { error: string },
+  observation:
+    { pr: PullRequestState; main?: MainWorkflows } | { error: string },
 ) {
-  if ("pr" in observation) parsePullRequest(observation.pr, run.pr_url!);
+  if ("pr" in observation) {
+    parsePullRequest(observation.pr, run.pr_url!);
+    if (observation.main) {
+      if (
+        observation.pr.state !== "MERGED" ||
+        observation.pr.baseRefName !== "main"
+      )
+        throw new Error("Main workflows require a merge into main.");
+      parseMainWorkflows(
+        [{ workflow_runs: observation.main.runs }],
+        new URL(run.pr_url!).pathname.split("/").slice(1, 3).join("/"),
+        observation.pr.mergeCommit!.oid,
+      );
+    }
+  }
   return codingTransaction(boss, async (db) => {
     await db.executeSql(
       "SELECT id FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE",
@@ -96,15 +127,17 @@ export async function recordGitHubObservation(
     }
     const pr = observation.pr;
     // A merged PR cannot be reopened; delayed observations must not undo completion.
-    if (current.status === "done" && pr.state !== "MERGED") return false;
+    if (current.merged_at && pr.state !== "MERGED") return false;
     const status =
       pr.state === "MERGED"
-        ? "done"
+        ? observation.main
+          ? mainWorkflowStatus(observation.main)
+          : "awaiting_main"
         : pr.state === "CLOSED"
           ? "pr_closed"
           : "pr_open";
     await db.executeSql(
-      "UPDATE code_assist.coding_run SET status=$2,github_checked_at=$3,github_error=NULL,merged_at=$4,merge_commit=$5,pr_closed_at=$6 WHERE id=$1",
+      "UPDATE code_assist.coding_run SET status=$2,github_checked_at=$3,github_error=$8,merged_at=$4,merge_commit=$5,pr_closed_at=$6,main_workflows=$7 WHERE id=$1",
       [
         run.id,
         status,
@@ -112,6 +145,11 @@ export async function recordGitHubObservation(
         pr.state === "MERGED" ? pr.mergedAt : null,
         pr.state === "MERGED" ? pr.mergeCommit!.oid : null,
         pr.state === "OPEN" ? null : pr.closedAt,
+        observation.main ? JSON.stringify(observation.main) : null,
+        observation.main?.evidenceError ??
+          (pr.state === "MERGED" && pr.baseRefName !== "main"
+            ? `This PR merged into ${pr.baseRefName}, not main. A main merge and successful main workflows are required for Done.`
+            : null),
       ],
     );
     if (status !== current.status)
@@ -121,18 +159,29 @@ export async function recordGitHubObservation(
         run.issue_id,
         status === "done"
           ? "coding_done"
-          : status === "pr_closed"
-            ? "coding_pr_closed"
-            : "coding_pr_reopened",
+          : status === "main_failed"
+            ? "coding_main_failed"
+            : status === "awaiting_main" || status === "main_running"
+              ? "coding_main_waiting"
+              : status === "pr_closed"
+                ? "coding_pr_closed"
+                : "coding_pr_reopened",
         {
           codingId: run.id,
           prUrl: pr.url,
           mergeCommit: pr.mergeCommit?.oid ?? null,
           mergedAt: pr.mergedAt,
           closedAt: pr.closedAt,
+          mainWorkflows: observation.main ?? null,
         },
-        status !== "pr_open",
+        ["done", "pr_closed", "main_failed"].includes(status),
       );
+    // A rerun or recovery invalidates unpublished repairs of the previous failure.
+    await db.executeSql(
+      "UPDATE code_assist.coding_run SET status='superseded' WHERE parent_run_id=$1 AND pr_url IS NULL AND status<>'superseded' AND ($2::text IS NULL OR repair_key<>$2)",
+      [run.id, observation.main ? mainFailureKey(observation.main) : null],
+    );
+    await queueMainRepair(boss, db, await codingRun(db, run.id));
     return true;
   });
 }
@@ -159,7 +208,7 @@ const readGitHub: Reader = async (run, signal, log) => {
           "view",
           url,
           "--json",
-          "url,state,mergedAt,mergeCommit,closedAt",
+          "url,baseRefName,state,mergedAt,mergeCommit,closedAt",
         ],
         signal,
         log,
@@ -169,12 +218,96 @@ const readGitHub: Reader = async (run, signal, log) => {
   );
 };
 
+type MainReader = (
+  run: CodingRun,
+  pr: PullRequestState,
+  signal: AbortSignal,
+  log: ReturnType<typeof createLogger>,
+) => Promise<MainWorkflows>;
+const readMain: MainReader = async (run, pr, signal, log) => {
+  const repository = new URL(pr.url).pathname.split("/").slice(1, 3).join("/");
+  const commit = pr.mergeCommit!.oid;
+  const gh = (args: string[]) =>
+    executeCoding("/opt/homebrew/bin/gh", args, signal, log);
+  const runs = parseMainWorkflows(
+    JSON.parse(
+      await gh([
+        "api",
+        "--paginate",
+        "--slurp",
+        `repos/${repository}/actions/runs?head_sha=${commit}&branch=main&event=push&per_page=100`,
+      ]),
+    ),
+    repository,
+    commit,
+  );
+  const main: MainWorkflows = { runs };
+  const failed = failedMainWorkflows(main);
+  if (failed.length) {
+    if (
+      run.main_workflows?.failureArtifact &&
+      mainFailureKey(run.main_workflows) === mainFailureKey(main)
+    ) {
+      main.failureArtifact = run.main_workflows.failureArtifact;
+    } else {
+      try {
+        const evidence = [];
+        for (const workflow of failed) {
+          const jobs = JSON.parse(
+            await gh([
+              "api",
+              "--paginate",
+              "--slurp",
+              `repos/${repository}/actions/runs/${workflow.id}/attempts/${workflow.run_attempt}/jobs?per_page=100`,
+            ]),
+          );
+          // Cancelled/skipped runs can have no failed-job logs. Job conclusions still explain the state.
+          const hasFailedJobs = jobs.some(
+            (page: { jobs: { conclusion: string }[] }) =>
+              page.jobs.some((job) =>
+                ["failure", "timed_out"].includes(job.conclusion),
+              ),
+          );
+          const output = hasFailedJobs
+            ? await gh([
+                "run",
+                "view",
+                String(workflow.id),
+                "--repo",
+                repository,
+                "--attempt",
+                String(workflow.run_attempt),
+                "--log-failed",
+              ])
+            : "No failed job logs; inspect job conclusions.";
+          evidence.push({ workflow, jobs, output });
+        }
+        main.failureArtifact = log.payload(
+          "github.main_failure",
+          "Main workflow failure evidence",
+          { repository, commit, evidence },
+          "error",
+        ).artifact_id;
+      } catch {
+        signal.throwIfAborted();
+        main.evidenceError =
+          "Main workflow failed, but its diagnostic logs could not be collected. Repair waits for failure evidence; the next GitHub check will try to read it again.";
+        log.event("error", "github.evidence_failed", main.evidenceError, {
+          coding_id: run.id,
+        });
+      }
+    }
+  }
+  return main;
+};
+
 export async function refreshGitHub(
   boss: PgBoss,
   request: RefreshRequest,
   signal: AbortSignal,
   jobId: string,
   read: Reader = readGitHub,
+  readWorkflows: MainReader = readMain,
 ) {
   const { rows } = await boss
     .getDb()
@@ -194,22 +327,27 @@ export async function refreshGitHub(
     });
     const checkedAt = new Date();
     let pr: PullRequestState;
+    let main: MainWorkflows | undefined;
     try {
       pr = await read(run, signal, log);
+      if (pr.state === "MERGED" && pr.baseRefName === "main")
+        main = await readWorkflows(run, pr, signal, log);
     } catch {
       signal.throwIfAborted();
       const error =
-        "GitHub refresh failed. The previous PR state is preserved. Check the GitHub logs and retry.";
+        "GitHub refresh failed. The previous PR/workflow state is preserved. Check the GitHub logs and retry.";
       await recordGitHubObservation(boss, run, checkedAt, { error });
       log.event("error", "github.refresh_failed", error, { coding_id: run.id });
       failures++;
       continue;
     }
-    await recordGitHubObservation(boss, run, checkedAt, { pr });
+    await recordGitHubObservation(boss, run, checkedAt, { pr, main });
     log.event("info", "github.refreshed", "Pull request state checked", {
       coding_id: run.id,
       pr_state: pr.state,
       pr_url: pr.url,
+      main_status: main ? mainWorkflowStatus(main) : null,
+      workflow_count: main?.runs.length ?? 0,
     });
   }
   if (failures)

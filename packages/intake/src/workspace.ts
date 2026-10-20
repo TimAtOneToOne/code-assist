@@ -27,6 +27,7 @@ export type Workspace = {
   id: string;
   machine: string;
   input: WorkspaceInput;
+  source?: RepositorySnapshot;
   state: "preparing" | "ready" | "failed" | "destroyed";
   stage: string;
   createdAt: string;
@@ -156,8 +157,10 @@ export async function prepareWorkspace(
   issueId: string,
   signal: AbortSignal,
   onCreated?: (workspace: Workspace) => Promise<void>,
+  sourceOverride?: RepositorySnapshot,
 ) {
   const input = await approvedWorkspaceInput(db, issueId);
+  const source = sourceOverride ?? input.snapshot;
   const environment = icuEnvironment(
     resolveRepositoryEnvironment(directory, input.snapshot.source),
   );
@@ -166,6 +169,7 @@ export async function prepareWorkspace(
     id,
     machine: `ca-${id}`,
     input,
+    source,
     state: "preparing",
     stage: "creating machine",
     createdAt: new Date().toISOString(),
@@ -182,7 +186,7 @@ export async function prepareWorkspace(
     {
       attempt_id: id,
       ticket_id: issueId,
-      repository_commit: input.snapshot.commit,
+      repository_commit: source.commit,
     },
   );
   const output = (line: string) =>
@@ -217,11 +221,11 @@ export async function prepareWorkspace(
       "/usr/bin/git",
       [
         "-C",
-        input.snapshot.source,
+        source.source,
         "archive",
         "--format=tar",
         `--output=${archive}`,
-        input.snapshot.commit,
+        source.commit,
       ],
       signal,
       output,

@@ -42,7 +42,7 @@ export type WorkItem = {
 
 // Read existing single-repository choices until the user saves a new selection.
 const issueColumns =
-  "*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories, (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status, (SELECT status FROM code_assist.planning_run WHERE discovery_id=current_discovery_id) AS planning_status, (SELECT c.status FROM code_assist.coding_run c JOIN code_assist.planning_run p ON p.id=c.planning_id WHERE p.discovery_id=current_discovery_id AND p.current_version=c.version AND p.status='approved') AS coding_status";
+  "*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories, (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status, (SELECT status FROM code_assist.planning_run WHERE discovery_id=current_discovery_id) AS planning_status, (SELECT c.status FROM code_assist.coding_run c JOIN code_assist.planning_run p ON p.id=c.planning_id WHERE p.discovery_id=current_discovery_id AND p.current_version=c.version AND p.status='approved' AND c.status<>'superseded' ORDER BY c.created_at DESC,c.id DESC LIMIT 1) AS coding_status";
 
 export async function withIntake<T>(
   connectionString: string,

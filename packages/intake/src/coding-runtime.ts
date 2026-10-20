@@ -163,6 +163,56 @@ export async function stopCodingUnit(
     ),
   );
 }
+export async function prepareCodingSource(
+  directory: string,
+  run: CodingRun,
+  signal: AbortSignal,
+  log: Log,
+) {
+  const bare = join(codingDirectory(directory, run.id), "repository.git");
+  await mkdir(codingDirectory(directory, run.id), {
+    recursive: true,
+    mode: 0o700,
+  });
+  const git = (args: string[]) =>
+    executeCoding("/usr/bin/git", args, signal, log);
+  await git(["init", "--bare", bare]);
+  const commit = run.repair?.baseCommit ?? run.input.snapshot.commit;
+  if (run.repair) {
+    const remote = await git([
+      "-C",
+      run.input.snapshot.source,
+      "remote",
+      "get-url",
+      "origin",
+    ]);
+    if (
+      !/^(?:git@github\.com:|https:\/\/github\.com\/)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(
+        remote,
+      )
+    )
+      throw new Error("Expected a credential-free GitHub remote.");
+    await git(["--git-dir", bare, "fetch", remote, "refs/heads/main"]);
+    await git([
+      "--git-dir",
+      bare,
+      "merge-base",
+      "--is-ancestor",
+      commit,
+      "FETCH_HEAD",
+    ]);
+    await git(["--git-dir", bare, "update-ref", "refs/heads/base", commit]);
+  } else {
+    await git([
+      "--git-dir",
+      bare,
+      "fetch",
+      run.input.snapshot.source,
+      `${commit}:refs/heads/base`,
+    ]);
+  }
+  return { ...run.input.snapshot, source: bare, commit };
+}
 export async function setupCodingRuntime(
   directory: string,
   run: CodingRun,
@@ -176,14 +226,7 @@ export async function setupCodingRuntime(
     bare = join(local, "repository.git");
   const cmd = (args: string[]) =>
     executeCoding("/usr/bin/git", args, signal, log);
-  await cmd(["init", "--bare", bare]);
-  await cmd([
-    "--git-dir",
-    bare,
-    "fetch",
-    run.input.snapshot.source,
-    `${run.input.snapshot.commit}:refs/heads/base`,
-  ]);
+
   const bundle = join(local, "source.bundle");
   await cmd(["--git-dir", bare, "bundle", "create", bundle, "refs/heads/base"]);
   await guest(
@@ -198,7 +241,7 @@ export async function setupCodingRuntime(
   await guest(["rm", "/work/source.bundle"]);
   await rm(bundle);
   await ensureCodingRuntime(directory, run, workspace, signal, log);
-  return run.input.snapshot.commit;
+  return run.repair?.baseCommit ?? run.input.snapshot.commit;
 }
 export async function ensureCodingRuntime(
   directory: string,
@@ -324,11 +367,12 @@ export async function codingPrompt(
 ) {
   return `You are ${step.kind === "review" ? "Claude independently reviewing" : "Codex implementing"} Code Assist ticket ${run.identifier}: ${run.title}.
 Tim approved the exact plan below. Implement only that scope. Follow repository AGENTS.md and existing patterns. Do not upgrade Drizzle, add unrelated optimizations, change Linear, access production, push Git, open/merge PRs, or deploy infrastructure. The controller owns commits and publication. Do not create commits or change branches. If a material product decision, missing credential/service, or changed scope blocks progress, return needs_direction with the exact question. Do not invent success or silently skip acceptance criteria.
-Repository: ${repo}. Approved base: ${run.input.snapshot.commit}. Current checkpoint: ${step.input_commit ?? run.input.snapshot.commit}.
+Repository: ${repo}. Approved base: ${run.input.snapshot.commit}. Diff base: ${run.repair?.baseCommit ?? run.input.snapshot.commit}. Current checkpoint: ${step.input_commit ?? run.repair?.baseCommit ?? run.input.snapshot.commit}.
+${run.repair ? `This is a corrective run after the approved feature merged. Read the COMPLETE main workflow failure evidence in /work/evidence/main-workflow-failure.json. The base is the failed merge commit, with the feature already implemented. Diagnose the cause, reproduce it where feasible, and fix only defects within the approved feature and this repository. Do not reimplement the feature or change shared CI, credentials, IAM, Terraform deployment controls, or unrelated scope to make a pipeline pass. Environmental/transient failures with no justified repository fix require needs_direction with a concrete diagnosis. Do not rerun GitHub workflows or deploy. Validate that the fix addresses the failure and preserves the feature. Review the corrective diff against the Diff base, not the original pre-feature approved base. The controller will publish a fresh corrective PR for Tim to merge. Failed runs: ${JSON.stringify(run.repair.workflows.runs)}.` : ""}
 This is an isolated OrbStack Linux guest with a private Docker Engine, PostgreSQL on localhost:5435 and LocalStack on localhost:4566. All commands for the app must use node /work/run.mjs <command> [args]; this loads mapped repository variables and runs in sveltekit/. No host/controller/GitHub credentials are available. Do not inspect or print /work/environment.json or provider secrets. Local fixture credentials are allowed. Use .tmp/ for ad hoc scripts; do not commit temporary evidence, credentials, or patient data.
 Playwright MCP is registered as playwright in this guest. Start the app with node /work/run.mjs pnpm dev --host 127.0.0.1 --port 5173 --strictPort. Use the real local credential sign-in flow with a synthetic user in the attempt database, not a bypass of application authorization. Exercise the approved UI behavior with MCP, inspect desktop and mobile rendering and browser errors. Save screenshots and complete evidence to /work/evidence. The controller runs lint, check, test and build after every implementation; also add/run meaningful regression tests for the plan. Explain unavailable external integration tests honestly.
 Central logging: every SDK event and tool result is captured. Your workspace's redacted log mirror is /work/logs/structured/coding.jsonl with full JSON payloads in /work/logs/artifacts; use normal read/search tools to investigate previous failures. The same events are indexed in the main Logs UI under this coding step. Test/app output may be saved under /work/evidence for diagnosis.
-${step.kind === "review" ? "Review the actual git diff from the approved base and the saved validation/browser evidence. Do not edit source or commit. Re-run targeted checks where useful. Return only unresolved findings, with file evidence and actionable recommendations. Any critical/high/medium finding requires revise; low findings may remain. Use needs_direction for a real unresolved human decision. Verify prior fixes independently." : "Implement or revise the approved feature. Read prior code reviews and failures below. Return implemented only after the approved behavior and browser checks are complete. Return browserEvidence as the paths to evidence you actually saved."}
+${step.kind === "review" ? "Review the actual git diff from the Diff base and the saved validation/browser evidence. Do not edit source or commit. Re-run targeted checks where useful. Return only unresolved findings, with file evidence and actionable recommendations. Any critical/high/medium finding requires revise; low findings may remain. Use needs_direction for a real unresolved human decision. Verify prior fixes independently." : "Implement or revise the approved feature. Read prior code reviews and failures below. Return implemented only after the approved behavior and browser checks are complete. Return browserEvidence as the paths to evidence you actually saved."}
 ${composeInstructions(readPromptSettings(directory), "coding", null, [run.input.snapshot])}
 Approved Plan v${run.version} (${run.input.planHash}):
 ${run.plan.markdown}

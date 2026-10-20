@@ -16,6 +16,7 @@ export function workflowBadgeVariant(status: WorkflowStatus, current = true) {
 		case 'failed':
 		case 'pr_open':
 		case 'pr_closed':
+		case 'main_failed':
 			return 'attention';
 		case 'queued':
 		case 'running':
@@ -27,6 +28,8 @@ export function workflowBadgeVariant(status: WorkflowStatus, current = true) {
 		case 'validate':
 		case 'review':
 		case 'publish':
+		case 'awaiting_main':
+		case 'main_running':
 		case 'done':
 			return 'active';
 		default:
