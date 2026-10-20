@@ -1,4 +1,4 @@
-.PHONY: install dev lint format check build verify
+.PHONY: install dev lint format check test build verify
 
 install:
 	pnpm install --frozen-lockfile
@@ -18,4 +18,7 @@ check:
 build:
 	pnpm build
 
-verify: lint check build
+test:
+	pnpm test
+
+verify: lint check test build

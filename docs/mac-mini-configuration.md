@@ -85,6 +85,8 @@ The fresh instance passed a localhost connection check and a transactional creat
 
 ## Development tools
 
+Code Assist's repository-root setting defaults to `/Users/miasocci/CODE/repos/OnetoOneHealth`. That existing directory contains the clones maintained by Mia's separate repository-sync job. The editable setting lives at `/configuration/mac-mini` and is saved in `~/Library/Application Support/CodeAssist/data/mac-mini.json`.
+
 | Tool | Observed installation |
 | --- | --- |
 | Homebrew | `/opt/homebrew/bin/brew` |
@@ -118,6 +120,6 @@ df -h /System/Volumes/Data
 - Select the first supported repository and prove its unchanged full validation, Docker services, and browser workflows through both SDKs.
 - Prove isolation between two simultaneous workspaces, including databases, container resources, ports, and browser profiles.
 - Web supervision and release locations are configured; choose worker supervision, durable-job storage and backup/restore when implementing the engine. No ongoing database backup schedule was configured during this setup.
-- Implement the application's access boundary. Tailscale and SSH access alone do not define authentication for the future web UI.
+- Mac mini settings require the configured owner's Tailscale identity. Extend required authorization to future private ticket and approval routes as they are introduced.
 
 Optional optimizations and controls introduced by this documentation: none.

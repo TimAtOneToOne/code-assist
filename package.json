@@ -7,6 +7,7 @@
     "node": ">=24.6 <25"
   },
   "scripts": {
+    "test": "pnpm --filter @code-assist/web test",
     "dev": "pnpm --filter @code-assist/web dev",
     "build": "pnpm --filter @code-assist/web build",
     "check": "pnpm --filter @code-assist/web check && tsc -p tsconfig.ops.json",

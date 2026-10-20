@@ -13,8 +13,9 @@ the official `shadcn-svelte` CLI using the Vega preset. See `components.json`.
 From the repository root, run `make install`, then `make dev`. Run `make verify`
 for formatting, lint, type checks and the production build.
 
-The initial shell provides Home, Configuration and `/health`. It does not yet
-connect to Linear, PostgreSQL or agent SDKs. Configuration displays only the
-application's release identity; it does not read or edit credentials.
+The app provides Home, Configuration, Mac mini settings and `/health`. It does not yet
+connect to Linear, PostgreSQL or agent SDKs. Mac mini settings save the repository
+root on the host outside deployment releases and require the configured owner's
+Tailscale identity. The UI does not read or edit credentials.
 
 See [Mac mini deployment](../../docs/deployment.md) for production operation.

@@ -21,7 +21,8 @@
 
 			<a
 				href={resolve('/configuration')}
-				aria-current={page.url.pathname === '/configuration' ? 'page' : undefined}>Configuration</a
+				aria-current={page.url.pathname.startsWith('/configuration') ? 'page' : undefined}
+				>Configuration</a
 			>
 		</nav>
 		<div class="host"><span class="dot"></span> Mia Mac mini <small>Private workspace</small></div>

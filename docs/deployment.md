@@ -1,6 +1,6 @@
 # Mac mini deployment
 
-The initial application is a SvelteKit shell in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, Configuration and `/health` routes. The durable worker, database integration, Linear intake and agent execution are not implemented yet.
+The application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, Configuration, Mac mini settings and `/health` routes. The durable worker, database integration, Linear intake and agent execution are not implemented yet.
 
 The shell uses shadcn-svelte Button, Card and Badge components installed through its CLI. AI Elements and AG-UI preferences are recorded in `AGENTS.md` for future agent/chat features.
 
@@ -14,11 +14,11 @@ make dev
 make verify
 ```
 
-`make verify` runs formatting checks, ESLint, Svelte/TypeScript checks and a production build. The root lockfile is used both locally and on Mia.
+`make verify` runs formatting checks, ESLint, Svelte/TypeScript checks, configuration persistence/validation tests and a production build. The root lockfile is used both locally and on Mia.
 
 ## Deployment and access
 
-Target URL: **http://100.91.0.83:3000**. The server binds directly to Mia's Tailscale IPv4 address. It does not listen on all interfaces. Anyone whose tailnet permissions permit access to this address and port can view this empty shell; application authentication is not implemented. Establish Tim-only authorization before introducing private ticket content, configuration mutations or approval actions.
+Target URL: **http://100.91.0.83:3000**. The server binds directly to Mia's Tailscale IPv4 address. It does not listen on all interfaces. The Home and application overview pages contain no private ticket content and remain visible to devices allowed to reach that address. The editable Mac mini settings page verifies the actual connection's peer using `tailscale whois` and requires an untagged device registered to the configured owner. Forwarded identity headers are not used.
 
 Runtime: native Node 24.22.0 at `~/.nvm/versions/node/v24.22.0/bin/node`, with pnpm 10.28.0 installed alongside it. Service definitions contain the absolute Node path and an explicit PATH. PostgreSQL and OrbStack are independent of this web deployment.
 
@@ -30,6 +30,18 @@ The installation is under `~/Library/Application Support/CodeAssist/`:
 | `releases/<commit>/` | Source, locked dependencies and validated production build for an exact commit |
 | `current` | Symlink to the active release |
 | `logs/` | Web and updater stdout/stderr |
+| `runtime.env` | Operator-managed runtime settings, including `CODE_ASSIST_ADMIN_TAILSCALE_USER`; mode 600, outside Git |
+| `data/mac-mini.json` | Saved Mac mini configuration; preserved across releases |
+
+## Mac mini settings
+
+Open **http://100.91.0.83:3000/configuration/mac-mini** to edit the repository root. The initial value is `/Users/miasocci/CODE/repos/OnetoOneHealth`, the parent of the existing synced clones. Save checks that the supplied absolute path is a readable directory on Mia, then atomically replaces `data/mac-mini.json`. This setting locates source clones; it does not reconfigure the existing sync job, clone repositories, or designate those synced clones as mutable agent workspaces.
+
+The production launcher loads `runtime.env` and sets `CODE_ASSIST_DATA_DIR` to the installation's `data/` directory. The owner ID was obtained from Mia's Tailscale lookup of Tim's connected computer. On a fresh installation, set `CODE_ASSIST_ADMIN_TAILSCALE_USER` to the verified owner's Tailscale user ID in `runtime.env` before accessing settings. Missing owner configuration or a failed identity lookup does not grant access. Keep the server bound directly to Tailscale; adding a proxy requires revisiting trusted peer identity.
+
+Local development permits loopback access and uses the repository's gitignored `.tmp/local-web-data/` directory when `CODE_ASSIST_DATA_DIR` is unset. Production requires an explicit data directory.
+
+## Login services and updates
 
 The installer, `ops/install.ts`, is run once as Mia's logged-in operating user using Node 24. It builds published `main` and registers two user LaunchAgents:
 
