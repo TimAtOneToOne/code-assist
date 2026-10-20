@@ -3,6 +3,55 @@ import { join } from "node:path";
 import type { createLogger } from "@code-assist/observability";
 import type { CodingRun } from "./coding-types.ts";
 import { codingDirectory, executeCoding } from "./coding-runtime.ts";
+export class CodingBranchConflict extends Error {}
+export async function checkCodingBranch(
+  run: CodingRun,
+  signal: AbortSignal,
+  log: ReturnType<typeof createLogger>,
+) {
+  const remote = await executeCoding(
+    "/usr/bin/git",
+    ["-C", run.input.snapshot.source, "remote", "get-url", "origin"],
+    signal,
+    log,
+  );
+  const match = remote.match(
+    /^(?:git@github\.com:|https:\/\/github\.com\/)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?$/,
+  );
+  if (!match)
+    throw new Error(
+      "Expected a GitHub repository without embedded credentials.",
+    );
+  const prs = JSON.parse(
+    await executeCoding(
+      "/opt/homebrew/bin/gh",
+      [
+        "pr",
+        "list",
+        "--repo",
+        match[1],
+        "--state",
+        "all",
+        "--head",
+        run.branch,
+        "--json",
+        "number,state",
+      ],
+      signal,
+      log,
+    ),
+  ) as unknown[];
+  const branch = await executeCoding(
+    "/usr/bin/git",
+    ["ls-remote", "--heads", remote, `refs/heads/${run.branch}`],
+    signal,
+    log,
+  );
+  if (prs.length || branch)
+    throw new CodingBranchConflict(
+      "The requested branch already exists or has PR history. Choose a fresh branch in the coding panel.",
+    );
+}
 export async function publishCoding(
   directory: string,
   run: CodingRun,

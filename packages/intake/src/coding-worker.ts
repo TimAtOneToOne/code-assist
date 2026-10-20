@@ -1,3 +1,4 @@
+import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { readFile } from "node:fs/promises";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
@@ -30,6 +31,7 @@ import {
 } from "./coding.ts";
 import {
   setupCodingRuntime,
+  ensureCodingRuntime,
   guestCommands,
   checkpoint,
   codingPrompt,
@@ -38,7 +40,11 @@ import {
   validation,
   stopCodingUnit,
 } from "./coding-runtime.ts";
-import { publishCoding } from "./coding-publish.ts";
+import {
+  publishCoding,
+  checkCodingBranch,
+  CodingBranchConflict,
+} from "./coding-publish.ts";
 export async function reconcileCodingFailures(boss: PgBoss) {
   const { rows } = await boss
     .getDb()
@@ -121,6 +127,7 @@ export async function registerCodingWorker(
     try {
       await assertCurrent();
       if (step.kind === "prepare") {
+        await checkCodingBranch(run, signal, log);
         workspace = await prepareWorkspace(
           directory,
           boss.getDb(),
@@ -128,6 +135,12 @@ export async function registerCodingWorker(
           signal,
           async (w) => {
             workspace = w;
+            log.event(
+              "info",
+              "coding.workspace",
+              "Workspace preparation started",
+              { workspace_id: w.id },
+            );
             await boss
               .getDb()
               .executeSql(
@@ -161,6 +174,7 @@ export async function registerCodingWorker(
       }
       if (!run.workspace_id) throw new Error("Coding workspace is missing.");
       workspace = await readWorkspace(directory, run.workspace_id);
+      await ensureCodingRuntime(directory, run, workspace, signal, log);
       const commands = guestCommands(workspace, signal, log);
       let environmentText = "";
       await commands.guest(
@@ -173,7 +187,12 @@ export async function registerCodingWorker(
       const environment = JSON.parse(environmentText) as Record<string, string>;
       log = createLogger(
         "coding",
-        { environment: { ...process.env, ...environment } },
+        {
+          environment: workspaceLogEnvironment({
+            ...process.env,
+            ...environment,
+          }),
+        },
         {
           attempt_id: step.id,
           ticket_id: run.identifier,
@@ -182,6 +201,9 @@ export async function registerCodingWorker(
         },
       );
       if (step.kind === "implement") {
+        await checkCodingBranch(run, signal, log);
+        if ((await commands.git("branch", "--show-current")) !== run.branch)
+          await commands.git("checkout", "-b", run.branch, step.input_commit!);
         // Only this attempt's disposable worktree is reset; completed checkpoints live in the host bare repository.
         await commands.git("reset", "--hard", step.input_commit!);
       }
@@ -197,7 +219,13 @@ export async function registerCodingWorker(
           );
         log = createLogger(
           "coding",
-          { environment: { ...process.env, ...environment, [name]: apiKey } },
+          {
+            environment: workspaceLogEnvironment({
+              ...process.env,
+              ...environment,
+              [name]: apiKey,
+            }),
+          },
           {
             attempt_id: step.id,
             ticket_id: run.identifier,
@@ -402,9 +430,11 @@ export async function registerCodingWorker(
         boss,
         run,
         step,
-        shutdown.aborted
-          ? "Coding was interrupted by a worker update. The completed checkpoint is saved; retry to continue."
-          : `Coding failed during ${stage}. Inspect this step's logs and retry after resolving the cause.`,
+        error instanceof CodingBranchConflict
+          ? error.message
+          : shutdown.aborted
+            ? "Coding was interrupted by a worker update. The completed checkpoint is saved; retry to continue."
+            : `Coding failed during ${stage}. Inspect this step's logs and retry after resolving the cause.`,
       );
       // eslint-disable-next-line preserve-caught-error -- Detailed failure is retained only in the redacted artifact.
       throw new Error(`Coding failed during ${stage}.`);

@@ -172,7 +172,7 @@ export async function setupCodingRuntime(
 ) {
   const local = codingDirectory(directory, run.id);
   await mkdir(local, { recursive: true, mode: 0o700 });
-  const { root, guest, git } = guestCommands(workspace, signal, log),
+  const { guest, git } = guestCommands(workspace, signal, log),
     bare = join(local, "repository.git");
   const cmd = (args: string[]) =>
     executeCoding("/usr/bin/git", args, signal, log);
@@ -197,6 +197,25 @@ export async function setupCodingRuntime(
   await git("config", "user.email", "code-assist@localhost");
   await guest(["rm", "/work/source.bundle"]);
   await rm(bundle);
+  await ensureCodingRuntime(directory, run, workspace, signal, log);
+  return run.input.snapshot.commit;
+}
+export async function ensureCodingRuntime(
+  directory: string,
+  run: CodingRun,
+  workspace: Workspace,
+  signal: AbortSignal,
+  log: Log,
+) {
+  const { root, guest } = guestCommands(workspace, signal, log);
+  const release = process.env.CODE_ASSIST_COMMIT ?? "development";
+  const installed = await root([
+    "bash",
+    "-c",
+    "if test -f /opt/code-assist/release; then cat /opt/code-assist/release; fi",
+  ]);
+  if (installed === release) return;
+  const local = codingDirectory(directory, run.id);
   const runtime = join(local, "runtime.tar"),
     source = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
   await executeCoding(
@@ -233,7 +252,13 @@ export async function setupCodingRuntime(
     "cd /opt/code-assist/packages/browser-mcp && pnpm exec playwright-mcp install-browser chromium",
   ]);
   await guest(["mkdir", "-p", "/work/evidence", "/work/logs"]);
-  return run.input.snapshot.commit;
+  await root(["bash", "-c", "cat > /opt/code-assist/release"], release);
+  log.event(
+    "info",
+    "coding.runtime",
+    "Guest runtime matches the worker release",
+    { runtime_release: release },
+  );
 }
 export async function checkpoint(
   directory: string,

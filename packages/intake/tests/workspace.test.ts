@@ -73,3 +73,23 @@ test("workspace setup requires a matching current approval and supports only the
   assert.equal(input.version, 3);
   assert.equal(input.snapshot.commit, "a".repeat(40));
 });
+
+test("LocalStack fixture keys do not redact test commands or filenames, while real provider keys remain", async () => {
+  const { workspaceLogEnvironment } =
+    await import("../src/workspace-environment.ts");
+  const source = {
+    AWS_ACCESS_KEY_ID: "test",
+    AWS_SECRET_ACCESS_KEY: "test",
+    OPENAI_API_KEY: "provider-secret",
+  };
+  const logging = workspaceLogEnvironment(source);
+  assert.equal(logging.AWS_ACCESS_KEY_ID, undefined);
+  assert.equal(logging.AWS_SECRET_ACCESS_KEY, undefined);
+  assert.equal(logging.OPENAI_API_KEY, "provider-secret");
+  assert.equal(source.AWS_SECRET_ACCESS_KEY, "test");
+  assert.equal(
+    workspaceLogEnvironment({ AWS_SECRET_ACCESS_KEY: "real-aws-secret" })
+      .AWS_SECRET_ACCESS_KEY,
+    "real-aws-secret",
+  );
+});

@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { CodingDetail } from '@code-assist/intake/coding';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -50,6 +51,31 @@
 				value={run.id}
 			/><input type="hidden" name="stepId" value={latest.id} /><Button>Retry Coding Step</Button>
 		</form>{/if}
+	{#if run.status === 'failed' && editable && latest && !run.pr_url}
+		<details>
+			<summary class="cursor-pointer text-sm">Choose a Different Branch</summary>
+			<form method="POST" use:enhance class="mt-3 space-y-3">
+				<input type="hidden" name="intent" value="coding-branch" /><input
+					type="hidden"
+					name="codingId"
+					value={run.id}
+				/><input type="hidden" name="stepId" value={latest.id} /><label
+					for={`branch-${run.id}`}
+					class="text-sm font-medium">New Branch Name</label
+				><Input
+					id={`branch-${run.id}`}
+					name="branch"
+					required
+					placeholder={`feature/${run.identifier.toLowerCase()}-code-assist`}
+				/>
+				<p class="text-sm text-muted-foreground">
+					Authorize this run to use the new branch and retry from its saved checkpoint. Existing
+					branches are preserved.
+				</p>
+				<Button variant="outline">Use Branch and Retry</Button>
+			</form>
+		</details>
+	{/if}
 	<div class="space-y-3">
 		{#each run.steps as step (step.id)}
 			<details open={step.id === run.current_step_id} class="rounded-md border p-3">

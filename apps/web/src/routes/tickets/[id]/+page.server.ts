@@ -1,4 +1,4 @@
-import { retryCoding, CodingConflict } from '@code-assist/intake/coding';
+import { retryCoding, changeCodingBranch, CodingConflict } from '@code-assist/intake/coding';
 import { reconcileCodingFailures } from '@code-assist/intake/coding-worker';
 import {
 	approvePlan,
@@ -96,8 +96,21 @@ export const actions = {
 		const approver = await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const id = issueId(event.params.id);
-		if (form.get('intent') === 'coding-retry') {
+		if (form.get('intent') === 'coding-retry' || form.get('intent') === 'coding-branch') {
 			try {
+				if (form.get('intent') === 'coding-branch') {
+					await withController((boss) =>
+						changeCodingBranch(
+							boss,
+							dataDirectory(),
+							id,
+							issueId(String(form.get('codingId'))),
+							issueId(String(form.get('stepId'))),
+							String(form.get('branch') ?? '').trim()
+						)
+					);
+					return { message: 'Branch updated and coding queued.' };
+				}
 				await withController((boss) =>
 					retryCoding(
 						boss,

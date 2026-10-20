@@ -31,3 +31,13 @@ export const containerDefaults = {
     },
   },
 };
+
+// LocalStack fixture values are public literals, not provider credentials.
+export function workspaceLogEnvironment(
+  environment: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const result = { ...environment };
+  for (const key of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"])
+    if (result[key] === "test") delete result[key];
+  return result;
+}

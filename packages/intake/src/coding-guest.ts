@@ -1,3 +1,4 @@
+import { workspaceLogEnvironment } from "./workspace-environment.ts";
 // Executed only inside the attempt's OrbStack guest, under an owned systemd unit.
 import { readFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -25,13 +26,18 @@ const home = "/home/workspace",
   temp = "/work/tmp",
   artifacts = "/work/logs/artifacts";
 mkdirSync(temp, { recursive: true });
+mkdirSync(join(home, ".codex"), { recursive: true, mode: 0o700 });
+mkdirSync(join(home, ".claude"), { recursive: true, mode: 0o700 });
 mkdirSync("/work/evidence", { recursive: true });
 const log = createLogger(
   "coding",
   {
     logDirectory: "/work/logs",
     artifactDirectory: artifacts,
-    environment: { ...environment, API_KEY: input.apiKey },
+    environment: workspaceLogEnvironment({
+      ...environment,
+      API_KEY: input.apiKey,
+    }),
   },
   { attempt_id: input.id },
 );

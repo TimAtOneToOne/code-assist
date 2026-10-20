@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
@@ -32,10 +35,12 @@ import {
   retryCoding,
   currentCoding,
   syncApprovedCoding,
+  changeCodingBranch,
 } from "../src/coding.ts";
 const adminUrl = process.env.TEST_DATABASE_URL;
 if (!adminUrl) throw new Error("TEST_DATABASE_URL is required");
 test("coding binds approval, advances exact checkpoints, rejects duplicate/stale results, preserves retry inputs", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "code-assist-coding-"));
   const admin = new pg.Client({ connectionString: adminUrl });
   await admin.connect();
   const database = "code_assist_coding_" + randomUUID().replaceAll("-", "");
@@ -151,9 +156,44 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     const b = await next();
     assert.equal(b.step.input_commit, "a".repeat(40));
     await failCoding(boss, b.run, b.step, "Fixture failure");
-    await retryCoding(boss, ticket.id, b.run.id, b.step.id);
+    await assert.rejects(
+      changeCodingBranch(
+        boss,
+        directory,
+        ticket.id,
+        b.run.id,
+        b.step.id,
+        "bad branch",
+      ),
+    );
+    await changeCodingBranch(
+      boss,
+      directory,
+      ticket.id,
+      b.run.id,
+      b.step.id,
+      "feature/one-999999-code-assist",
+    );
+    await assert.rejects(retryCoding(boss, ticket.id, b.run.id, b.step.id));
     const c = await next();
     assert.notEqual(c.step.id, b.step.id);
+    assert.equal(c.run.branch, "feature/one-999999-code-assist");
+    await mkdir(join(directory, "coding", c.run.id), { recursive: true });
+    await writeFile(
+      join(directory, "coding", c.run.id, "publication.json"),
+      "{}",
+    );
+    await assert.rejects(
+      changeCodingBranch(
+        boss,
+        directory,
+        ticket.id,
+        c.run.id,
+        c.step.id,
+        "feature/one-999999-another",
+      ),
+      /Reconcile/,
+    );
     assert.equal(c.step.input_commit, b.step.input_commit);
     assert.equal(
       await finishCoding(boss, b.run, b.step, {}, "validate", "b".repeat(40)),
@@ -216,5 +256,6 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     await boss.stop();
     await admin.query(`DROP DATABASE ${database} WITH (FORCE)`);
     await admin.end();
+    await rm(directory, { recursive: true, force: true });
   }
 });

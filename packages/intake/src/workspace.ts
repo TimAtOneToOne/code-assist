@@ -8,7 +8,10 @@ import type { Db } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
 import { resolveRepositoryEnvironment } from "@code-assist/secrets";
 import type { RepositorySnapshot } from "./discovery.ts";
-import { icuEnvironment } from "./workspace-environment.ts";
+import {
+  icuEnvironment,
+  workspaceLogEnvironment,
+} from "./workspace-environment.ts";
 import { bootstrap, environmentLauncher } from "./workspace-bootstrap.ts";
 
 export class WorkspaceApprovalError extends Error {}
@@ -173,7 +176,9 @@ export async function prepareWorkspace(
   await onCreated?.(workspace);
   const log = createLogger(
     "workspace",
-    { environment: { ...process.env, ...environment } },
+    {
+      environment: workspaceLogEnvironment({ ...process.env, ...environment }),
+    },
     {
       attempt_id: id,
       ticket_id: issueId,

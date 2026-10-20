@@ -1,3 +1,7 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { access } from "node:fs/promises";
+import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import type { Db, PgBoss } from "pg-boss";
@@ -296,5 +300,59 @@ export async function readCoding(
         )
       ).rows as CodingStep[],
     })),
+  );
+}
+
+export async function changeCodingBranch(
+  boss: PgBoss,
+  directory: string,
+  issueId: string,
+  runId: string,
+  stepId: string,
+  branch: string,
+) {
+  try {
+    await promisify(execFile)("/usr/bin/git", [
+      "check-ref-format",
+      "--branch",
+      branch,
+    ]);
+  } catch {
+    throw new CodingConflict("Enter a valid Git branch name.");
+  }
+  try {
+    await access(join(directory, "coding", runId, "publication.json"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return codingTransaction(boss, async (db) => {
+      const run = await codingRun(db, runId);
+      if (
+        run.issue_id !== issueId ||
+        !(await currentCoding(db, run, undefined, true)) ||
+        run.status !== "failed" ||
+        run.current_step_id !== stepId ||
+        branch === run.branch
+      )
+        throw new CodingConflict(
+          "Choose a new branch for the current failed coding step.",
+        );
+      await db.executeSql(
+        "UPDATE code_assist.coding_run SET branch=$2 WHERE id=$1",
+        [run.id, branch],
+      );
+      await recordIntakeEvent(boss, db, issueId, "coding_branch_changed", {
+        codingId: run.id,
+        previousBranch: run.branch,
+        branch,
+      });
+      const { rows } = await db.executeSql(
+        "SELECT kind FROM code_assist.coding_step WHERE id=$1",
+        [stepId],
+      );
+      return enqueue(boss, db, { ...run, branch }, rows[0].kind);
+    });
+  }
+  throw new CodingConflict(
+    "Reconcile the previous publication attempt before changing branches.",
   );
 }

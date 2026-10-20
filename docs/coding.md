@@ -6,11 +6,13 @@ Approved single-repository ICU plans enter the `approved-coding` pg-boss queue. 
 
 Each run is bound to the approved plan version, plan hash, requirements hash and source commit. Each step has a separate ID, job, input commit, result and logs. The stages are workspace preparation, Codex implementation, repository validation, Claude adversarial review and controller-owned GitHub publication. Findings of critical, high or medium severity return to implementation; a material decision pauses for Tim. There is no review-round budget or provider fallback.
 
-The ticket page shows these steps, summaries, findings, validation results and log links. Failed steps have a Retry action. A changed ticket, removed Plan label, changed repository selection or revised plan prevents obsolete attempts from advancing. A revised approved plan starts a separate run; previously used branches are not silently reused.
+The ticket page shows these steps, summaries, findings, validation results and log links. Failed steps have a Retry action and a deliberate Use Branch and Retry form when a fresh branch is needed. A publication already in flight must be reconciled before its branch can change. A changed ticket, removed Plan label, changed repository selection or revised plan prevents obsolete attempts from advancing. A revised approved plan starts a separate run; previously used branches are not silently reused.
 
 ## Execution and Evidence
 
 Each run uses the existing isolated OrbStack ICU workspace with its own Docker Engine, PostgreSQL and LocalStack. Repository commands run through `/work/run.mjs`, which loads only the repository's mapped and attempt-owned environment. The source is restored from the approved commit into an independent Git repository. Synced clones are read-only inputs. Provider credentials arrive through stdin, not command arguments or the controller's environment. GitHub and notification credentials are not copied into the guest.
+
+New steps ensure the guest runtime matches the deployed worker release, including its frozen SDK dependencies. Running steps keep their existing runtime.
 
 Both SDKs use Agent Models settings at the start of each step. Global, coding and repository-specific prompt settings apply to implementation and review. The guest has its own official Playwright MCP server, browser profile and Chromium installation. Its localhost points to its own app. The repository's locked Playwright browser is installed separately for its tests.
 
@@ -27,3 +29,9 @@ Publication runs from Mia's login-session worker, where the operator's GitHub ke
 PR feedback handling, automated rebase/revalidation and merge observation are not implemented in this milestone. Workspaces and evidence remain on disk after PR publication; operators can use the workspace CLI for deliberate cleanup.
 
 Optional optimizations and controls: none. Approval fencing, commit-bound validation/review, process ownership and expected-head publication are required workflow integrity checks.
+
+## Verified on Mia — October 20, 2026
+
+The full project verification and four PostgreSQL integration suites pass. Both actual selected SDK models completed a guest-local Playwright MCP interaction and screenshot, then read the workspace log mirror through native tools. The deployed ticket page rendered without browser errors. Initial execution exposed and fixed missing Codex home setup and over-redaction of LocalStack's public `test` credentials. Those literals are excluded only from the workspace logger's credential set; real provider and repository secrets remain redacted.
+
+The real ONE-4767 run is paused at its implementation checkpoint pending a fresh branch choice: `feature/one-4767` already contains a September 16 implementation at `fb9a18ca790c332f84bb4748d43e85229118c6cd`. No existing branch was pushed or overwritten. Full feature implementation, repository acceptance tests, adversarial code review and PR publication remain unverified until that run proceeds.

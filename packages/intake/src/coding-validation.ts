@@ -1,3 +1,4 @@
+import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createLogger } from "@code-assist/observability";
@@ -11,7 +12,11 @@ const environment = JSON.parse(
 const artifacts = "/work/logs/artifacts";
 const log = createLogger(
   "coding",
-  { logDirectory: "/work/logs", artifactDirectory: artifacts, environment },
+  {
+    logDirectory: "/work/logs",
+    artifactDirectory: artifacts,
+    environment: workspaceLogEnvironment(environment),
+  },
   { attempt_id: id },
 );
 const results: Record<string, number> = {};
