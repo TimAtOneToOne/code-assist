@@ -120,7 +120,11 @@ export async function currentCoding(
 }
 async function enqueue(boss: PgBoss, db: Db, run: CodingRun, kind: CodingKind) {
   const id = randomUUID(),
-    job = await boss.send(codingQueue, { stepId: id }, { db });
+    job = await boss.send(
+      codingQueue,
+      { stepId: id },
+      { db, expireInSeconds: 60 * 60 },
+    );
   if (!job) throw new Error("Could not queue coding.");
   await db.executeSql(
     "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status,repository_index,input_commits) VALUES($1,$2,$3,$4,$5,'queued',$6,$7)",

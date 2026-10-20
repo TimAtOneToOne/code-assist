@@ -104,6 +104,7 @@ export async function registerCodingWorker(
   await reconcileCodingFailures(boss);
   await syncApprovedCoding(boss);
   await boss.work<{ stepId: string }>(codingQueue, async ([job]) => {
+    const startedAt = performance.now();
     if (shutdown.aborted) throw new Error("Worker is stopping.");
     const started = await startCoding(boss, job.data.stepId, job.id);
     if (!started) return;
@@ -529,26 +530,25 @@ export async function registerCodingWorker(
         );
       }
     } catch (error) {
-      await pending;
-      if (workspace) await stopCodingUnit(workspace, step.id, log);
-      log.payload(
-        "coding.failure",
-        `Coding failed during ${stage}`,
-        { error },
-        "error",
-      );
-      await failCoding(
-        boss,
-        run,
-        step,
+      const timedOut =
+        job.signal.aborted &&
+        !shutdown.aborted &&
+        !cancelled.signal.aborted &&
+        performance.now() - startedAt >= job.expireInSeconds * 1000;
+      const message =
         error instanceof CodingBranchConflict
           ? error.message
           : shutdown.aborted
             ? "Coding was interrupted by a worker update. The completed checkpoint is saved; retry to continue."
-            : `Coding failed during ${stage}. Inspect this step's logs and retry after resolving the cause.`,
-      );
+            : timedOut
+              ? `Coding timed out after ${job.expireInSeconds / 60} minutes during ${stage}. Completed checkpoints are preserved; retry to continue.`
+              : `Coding failed during ${stage}. Inspect this step's logs and retry after resolving the cause.`;
+      await pending;
+      if (workspace) await stopCodingUnit(workspace, step.id, log);
+      log.payload("coding.failure", message, { error }, "error");
+      await failCoding(boss, run, step, message);
       // eslint-disable-next-line preserve-caught-error -- Detailed failure is retained only in the redacted artifact.
-      throw new Error(`Coding failed during ${stage}.`);
+      throw new Error(message);
     }
   });
 }

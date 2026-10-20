@@ -154,6 +154,7 @@ test("multi-repository coding persists sequential checkpoints, combined review, 
     async function next() {
       const [job] = await boss.fetch<{ stepId: string }>(codingQueue);
       assert(job);
+      assert.equal(job.expireInSeconds, 3600);
       const started = await startCoding(boss, job.data.stepId, job.id);
       assert(started);
       return started;
