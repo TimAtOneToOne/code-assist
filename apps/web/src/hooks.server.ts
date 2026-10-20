@@ -20,6 +20,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 		);
 	response.headers.set('x-request-id', event.locals.requestId);
+	if (event.route.id?.startsWith('/configuration/secrets')) {
+		response.headers.set('Cache-Control', 'no-store');
+	}
 	return response;
 };
 

@@ -46,6 +46,7 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
-		"@code-assist/observability": "workspace:*"
+		"@code-assist/observability": "workspace:*",
+		"@code-assist/secrets": "workspace:*"
 	}
 }

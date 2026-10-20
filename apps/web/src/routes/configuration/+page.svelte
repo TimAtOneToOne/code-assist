@@ -12,6 +12,17 @@
 <h1>Configuration</h1>
 <p class="intro">A home for connections and workspace preferences.</p>
 <Card.Root class="panel">
+	<Card.Title>Secrets & environment</Card.Title>
+	<Card.Description
+		>Manage shared keys and map them to repository-specific environment variables.</Card.Description
+	>
+	<div>
+		<Button href={resolve('/configuration/secrets')} variant="outline"
+			>Manage secrets & mappings →</Button
+		>
+	</div>
+</Card.Root>
+<Card.Root class="panel">
 	<Card.Title>Mac mini</Card.Title>
 	<Card.Description
 		>Choose the folder containing your synced repository clones on Mia.</Card.Description
@@ -56,5 +67,5 @@
 	<Card.Description
 		>Linear, repository selection, and agent settings will be configured here.</Card.Description
 	>
-	<p class="muted">No credentials are displayed or editable in this initial shell.</p>
+	<p class="muted">Shared keys and environment mappings are available above.</p>
 </Card.Root>

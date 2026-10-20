@@ -1,7 +1,5 @@
-import { resolve } from 'node:path';
-import { dev } from '$app/env';
-import { CODE_ASSIST_DATA_DIR } from '$app/env/private';
-import { error, fail } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
+import { dataDirectory } from '#lib/server/data-directory.js';
 import {
 	readMacMiniConfig,
 	validateRepositoryRoot,
@@ -10,12 +8,6 @@ import {
 import { requireSettingsAccess } from '#lib/server/settings-access.js';
 import { logger } from '#lib/server/logs.js';
 import type { Actions, PageServerLoad } from './$types';
-
-function dataDirectory() {
-	if (CODE_ASSIST_DATA_DIR) return CODE_ASSIST_DATA_DIR;
-	if (dev) return resolve('../../.tmp/local-web-data');
-	error(503, 'Settings storage has not been configured.');
-}
 
 export const load: PageServerLoad = async (event) => {
 	await requireSettingsAccess(event);

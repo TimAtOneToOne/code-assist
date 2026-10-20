@@ -35,8 +35,11 @@ The installation is under `~/Library/Application Support/CodeAssist/`:
 | `observability.env` | Container credentials/storage settings; mode 600 |
 | `runtime.env` | Operator-managed runtime settings, including `CODE_ASSIST_ADMIN_TAILSCALE_USER` and `CODE_ASSIST_DATABASE_URL`; mode 600, outside Git |
 | `data/mac-mini.json` | Saved Mac mini configuration; preserved across releases |
+| `data/secrets/store.json` | Shared secret values and repository mappings; mode 600 inside a mode 700 directory |
 
 ## Mac mini settings
+
+[Secrets & environment](secrets.md) provides shared secret management and repository-specific environment-variable mappings. Values live outside releases and are revealed only on request to the verified owner. The future agent runner will consume the resolver; no repository `.env` files are rewritten.
 
 Open **http://100.91.0.83:3000/configuration/mac-mini** to edit the repository root. The initial value is `/Users/miasocci/CODE/repos/OnetoOneHealth`, the parent of the existing synced clones. Save checks that the supplied absolute path is a readable directory on Mia, then atomically replaces `data/mac-mini.json`. This setting locates source clones; it does not reconfigure the existing sync job, clone repositories, or designate those synced clones as mutable agent workspaces.
 

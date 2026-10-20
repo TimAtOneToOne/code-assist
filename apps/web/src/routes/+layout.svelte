@@ -17,11 +17,10 @@
 		<a class="brand" href={resolve('/')}><span class="brand-mark">c/</span> Code Assist</a>
 		<div class="nav-label">WORKSPACE</div>
 		<nav aria-label="Main navigation">
+			<a href={resolve('/')} aria-current={page.url.pathname === '/' ? 'page' : undefined}>Home</a>
 			<a href={resolve('/logs')} aria-current={page.url.pathname === '/logs' ? 'page' : undefined}
 				>Logs</a
 			>
-			<a href={resolve('/')} aria-current={page.url.pathname === '/' ? 'page' : undefined}>Home</a>
-
 			<a
 				href={resolve('/configuration')}
 				aria-current={page.url.pathname.startsWith('/configuration') ? 'page' : undefined}
