@@ -23,7 +23,14 @@
 		<Card.Description>The parent folder containing your synced repository clones.</Card.Description>
 	</Card.Header>
 	<Card.Content class="p-0">
-		<form method="POST" use:enhance class="space-y-5">
+		<form
+			method="POST"
+			use:enhance={() =>
+				async ({ update }) => {
+					await update({ reset: false });
+				}}
+			class="space-y-5"
+		>
 			<div class="space-y-2">
 				<label class="text-sm font-medium" for="repository-root">Repository root folder</label>
 				<Input
