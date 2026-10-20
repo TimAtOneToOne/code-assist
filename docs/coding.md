@@ -38,6 +38,8 @@ All pages of matching workflow runs are read through the GitHub REST API. The wo
 
 GitHub read failures preserve the previous state and show an error. If workflow metadata is available but failure logs are unavailable, the failure remains visible and repair waits for diagnostic evidence. Scheduled/manual refresh reads again. Observations are ordered by check start time so delayed responses cannot overwrite newer evidence. Events and central Logs (`service=github`) retain the transitions; failures, completion and closed-unmerged PRs use the existing Teams flow. Observation never changes Linear state or grants new plan approval.
 
+On Home, tickets remain in the main list for 24 hours after their latest transition to Done. Older completed tickets appear in the collapsed **Completed** section at the bottom, with the same links and green badges. This uses the current coding run’s saved completion event, not the PR merge time or last GitHub check. Refreshing Home updates the grouping; reopened or corrective work returns to the main list.
+
 ## Corrective Coding After a Failed Main Workflow
 
 For a still-current approved ICU plan, a failed main workflow captures the complete failed-job logs and the attempt-specific job list in a redacted central artifact. A separate coding run retains the original plan approval, parent run, merge commit, workflow IDs and attempts. Repeated observations of that failure do not create duplicate coding jobs. A changed failure attempt or observed recovery supersedes unpublished stale repair work; existing published corrective PRs remain for Tim to review.

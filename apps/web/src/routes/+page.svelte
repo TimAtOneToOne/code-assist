@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { WorkItem } from '@code-assist/intake';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { invalidateAll } from '$app/navigation';
@@ -103,9 +105,13 @@
 </div>
 {#if !data.issues.length}<Card.Root class="panel"
 		><Card.Title>No active tickets.</Card.Title>
-		<p>Run a Linear check to bring in tickets labeled Plan.</p></Card.Root
+		<p>
+			{data.completedIssues.length
+				? 'Older completed tickets are below.'
+				: 'Run a Linear check to bring in tickets labeled Plan.'}
+		</p></Card.Root
 	>{/if}
-{#each data.issues as item (item.id)}
+{#snippet ticketCard(item: WorkItem)}
 	<Card.Root class="mb-2 gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
 		<div class="min-w-0 space-y-1">
 			<Card.Title
@@ -153,8 +159,28 @@
 			>
 		</div>
 	</Card.Root>
-{/each}
+{/snippet}
+{#each data.issues as item (item.id)}{@render ticketCard(item)}{/each}
 <p class="mt-5 text-sm text-muted-foreground">
 	Codex drafts and revises plans; Claude reviews them. You approve the exact plan before
 	implementation.
 </p>
+
+{#if data.completedIssues.length}
+	<details class="group mt-8 rounded-xl border bg-card">
+		<summary
+			class="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden"
+		>
+			<span class="text-lg font-semibold">Completed</span>
+			<Badge variant="secondary">{data.completedIssues.length}</Badge>
+			<ChevronDown
+				class="ml-auto size-4 transition-transform group-open:rotate-180"
+				aria-hidden="true"
+			/>
+		</summary>
+		<div class="px-4 pb-3">
+			<p class="mb-3 text-sm text-muted-foreground">Done for more than 24 hours.</p>
+			{#each data.completedIssues as item (item.id)}{@render ticketCard(item)}{/each}
+		</div>
+	</details>
+{/if}

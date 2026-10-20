@@ -427,6 +427,20 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       1,
     );
     assert.equal((await dashboard(boss)).issues[0].coding_status, "done");
+    assert.equal(
+      (await dashboard(boss)).completedIssues.length,
+      0,
+      "Newly done work remains in the main list",
+    );
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.intake_event SET created_at=now()-interval '25 hours' WHERE type='coding_done' AND details->>'codingId'=$1",
+        [published.id],
+      );
+    const archived = await dashboard(boss);
+    assert.equal(archived.issues.length, 0);
+    assert.equal(archived.completedIssues[0].id, ticket.id);
     let githubReads = 0;
     await refreshGitHub(
       boss,
@@ -452,6 +466,12 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       failureArtifact: randomUUID(),
     };
     await observe(again);
+    assert.equal(
+      (await dashboard(boss)).completedIssues.length,
+      0,
+      "Corrective work must return to the main list",
+    );
+    assert.equal((await dashboard(boss)).issues[0].id, ticket.id);
     const rp = await next();
     assert.notEqual(rp.run.id, repair.id);
     await finishCoding(

@@ -36,13 +36,19 @@ export type WorkItem = {
   discovery_status: DiscoveryRun["status"] | null;
   planning_status: PlanningRun["status"] | null;
   coding_status: CodingRun["status"] | null;
+  coding_done_at: Date | null;
   created_at: Date;
   observed_at: Date;
 };
 
 // Read existing single-repository choices until the user saves a new selection.
-const issueColumns =
-  "*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories, (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status, (SELECT status FROM code_assist.planning_run WHERE discovery_id=current_discovery_id) AS planning_status, (SELECT c.status FROM code_assist.coding_run c JOIN code_assist.planning_run p ON p.id=c.planning_id WHERE p.discovery_id=current_discovery_id AND p.current_version=c.version AND p.status='approved' AND c.status<>'superseded' ORDER BY c.created_at DESC,c.id DESC LIMIT 1) AS coding_status";
+const currentCodingQuery =
+  "FROM code_assist.coding_run c JOIN code_assist.planning_run p ON p.id=c.planning_id WHERE p.discovery_id=current_discovery_id AND p.current_version=c.version AND p.status='approved' AND c.status<>'superseded' ORDER BY c.created_at DESC,c.id DESC LIMIT 1";
+const issueColumns = `*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories,
+  (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status,
+  (SELECT status FROM code_assist.planning_run WHERE discovery_id=current_discovery_id) AS planning_status,
+  (SELECT c.status ${currentCodingQuery}) AS coding_status,
+  (SELECT (SELECT max(e.created_at) FROM code_assist.intake_event e WHERE e.type='coding_done' AND e.issue_id=c.issue_id AND e.details->>'codingId'=c.id::text AND c.status='done') ${currentCodingQuery}) AS coding_done_at`;
 
 export async function withIntake<T>(
   connectionString: string,
@@ -233,7 +239,19 @@ export async function dashboard(boss: PgBoss) {
       scan.error = "The queued check was interrupted or expired. Check again.";
     }
   }
-  return { issues: issues as WorkItem[], scan, notifications };
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const currentIssues: WorkItem[] = [],
+    completedIssues: WorkItem[] = [];
+  for (const issue of issues as WorkItem[]) {
+    if (
+      issue.coding_status === "done" &&
+      issue.coding_done_at &&
+      new Date(issue.coding_done_at).getTime() < cutoff
+    )
+      completedIssues.push(issue);
+    else currentIssues.push(issue);
+  }
+  return { issues: currentIssues, completedIssues, scan, notifications };
 }
 
 export async function readWorkItem(db: Db, id: string) {
