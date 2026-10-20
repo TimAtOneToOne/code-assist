@@ -40,7 +40,7 @@
 
 <Card.Root class="panel">
 	<div class="flex flex-wrap items-center justify-between gap-3">
-		<Card.Title>Adversarial planning</Card.Title>
+		<Card.Title>Adversarial Planning</Card.Title>
 		<div class="flex items-center gap-2">
 			<Badge variant="secondary">{label[run.status]}</Badge><Button
 				variant="outline"
@@ -107,7 +107,7 @@
 			/>
 			{#if showChanges && comparison?.removedHtml.length}<details class="rounded-lg border p-3">
 					<summary class="cursor-pointer text-sm font-medium"
-						>Removed text from v{comparison.previousVersion} · {comparison.removedCount} sections</summary
+						>Removed Text from v{comparison.previousVersion} · {comparison.removedCount} sections</summary
 					>
 					<p class="mt-3 text-sm text-muted-foreground">
 						Previous wording that was removed or replaced in this version.
@@ -120,7 +120,7 @@
 				</details>{/if}
 			{#if version.document.responses.length}<details>
 					<summary class="cursor-pointer text-sm font-medium"
-						>Codex responses to review findings</summary
+						>Codex Responses to Review Findings</summary
 					>
 					<div class="mt-3 space-y-3">
 						{#each version.document.responses as response, index (index)}<div class="text-sm">
@@ -132,7 +132,7 @@
 				</details>{/if}
 			{#if review}
 				<div class="border-t pt-4">
-					<h3 class="font-semibold">Claude’s review · v{version.number}</h3>
+					<h3 class="font-semibold">Claude’s Review · v{version.number}</h3>
 					<Markdown html={html[`${run.id}:${version.number}:summary`] ?? ''} />
 				</div>
 				{#each review.findings as finding, index (finding.id)}<div
@@ -242,7 +242,7 @@
 					) || 'none'}.
 				</p>{/if}
 			<details>
-				<summary class="cursor-pointer text-xs text-muted-foreground">Plan identity</summary>
+				<summary class="cursor-pointer text-xs text-muted-foreground">Plan Identity</summary>
 				<p class="mt-2 text-xs break-all">
 					Plan SHA-256: {version.hash}<br />Confirmed input SHA-256: {run.input_hash}
 				</p>
@@ -251,13 +251,13 @@
 	{/if}
 	{#if run.status === 'approved'}<p>Plan approved. Implementation has not started.</p>{/if}
 	{#if run.feedback.length}<details>
-			<summary class="cursor-pointer text-sm font-medium">Your feedback history</summary
+			<summary class="cursor-pointer text-sm font-medium">Your Feedback History</summary
 			>{#each run.feedback as feedback, index (index)}<p class="mt-3 text-sm whitespace-pre-wrap">
 					<strong>v{feedback.version}</strong> · {feedback.note}
 				</p>{/each}
 		</details>{/if}
 	<details>
-		<summary class="cursor-pointer text-sm text-muted-foreground">Agent activity</summary
+		<summary class="cursor-pointer text-sm text-muted-foreground">Agent Activity</summary
 		>{#each run.steps as step (step.id)}<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
 				<span>v{step.version} · {step.kind === 'draft' ? 'Codex' : 'Claude'} · {step.status}</span>
 				<a class="underline" href={resolve(`/logs?attempt=${step.id}`)}>Logs</a

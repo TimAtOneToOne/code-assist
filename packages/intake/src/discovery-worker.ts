@@ -1,3 +1,4 @@
+import { readPromptSettings } from "./prompt-settings.ts";
 import { dirname, join } from "node:path";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
@@ -90,7 +91,12 @@ export async function registerDiscoveryWorker(
           "SELECT ticket->>'updatedAt' AS ticket_updated_at,repositories,result,answers,notes FROM code_assist.discovery_run WHERE issue_id=$1 AND answers IS NOT NULL ORDER BY created_at",
           [run.issue_id],
         );
-      const prompt = discoveryPrompt(run, run.snapshots, priorAnswers);
+      const prompt = discoveryPrompt(
+        run,
+        run.snapshots,
+        priorAnswers,
+        readPromptSettings(directory),
+      );
       log.payload(
         "discovery.input",
         "Discovery ticket, repository commits and prompt",

@@ -10,18 +10,18 @@
 	const selectClass = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm';
 </script>
 
-<svelte:head><title>Secrets & environment · Code Assist</title></svelte:head>
+<svelte:head><title>Secrets & Environment · Code Assist</title></svelte:head>
 <a class="mb-5 inline-block text-sm text-muted-foreground" href={resolve('/configuration')}
 	>← Configuration</a
 >
 <div class="eyebrow">WORKSPACE SETTINGS</div>
-<h1>Secrets & environment</h1>
+<h1>Secrets & Environment</h1>
 <p class="intro">Save shared keys, then map them to each repository’s environment variables.</p>
 
 {#if form?.error}<p role="alert" class="mb-5 text-destructive">{form.error}</p>{/if}
 {#if form?.saved}<p role="status" class="mb-5">Configuration saved.</p>{/if}
 
-<h2 class="mb-4 text-xl font-semibold">Saved secrets</h2>
+<h2 class="mb-4 text-xl font-semibold">Saved Secrets</h2>
 <div class="grid gap-5 xl:grid-cols-2">
 	{#each data.secrets as secret (secret.id + secret.updatedAt)}
 		<SecretEditor {secret} />
@@ -29,7 +29,7 @@
 	<SecretEditor />
 </div>
 
-<h2 class="mt-8 mb-4 text-xl font-semibold">Repository environment mappings</h2>
+<h2 class="mt-8 mb-4 text-xl font-semibold">Repository Environment Mappings</h2>
 <p class="mb-5 text-muted-foreground">
 	Choose which saved key supplies each variable. Saving an existing repository and variable updates
 	its mapping. Rotating a secret updates all mappings that use it.
@@ -41,7 +41,7 @@
 	</p>
 {/if}
 <Card.Root class="panel">
-	<Card.Title>Map a saved secret</Card.Title>
+	<Card.Title>Map a Saved Secret</Card.Title>
 	<form method="POST" action="?/saveMapping" use:enhance class="space-y-4">
 		<div class="grid gap-4 lg:grid-cols-3">
 			<div class="space-y-2">

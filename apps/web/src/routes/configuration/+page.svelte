@@ -12,7 +12,16 @@
 <h1>Configuration</h1>
 <p class="intro">A home for connections and workspace preferences.</p>
 <Card.Root class="panel">
-	<Card.Title>Ticket intake</Card.Title>
+	<Card.Title>Prompt Management</Card.Title>
+	<Card.Description>
+		Edit global, planning, coding, agent-task, and repository-specific instructions.
+	</Card.Description>
+	<div>
+		<Button href={resolve('/configuration/prompts')} variant="outline">Manage Prompts →</Button>
+	</div>
+</Card.Root>
+<Card.Root class="panel">
+	<Card.Title>Ticket Intake</Card.Title>
 	<Card.Description
 		>Connect Linear, choose the polling interval and configure Teams attention links.</Card.Description
 	>
@@ -21,7 +30,7 @@
 	</div>
 </Card.Root>
 <Card.Root class="panel">
-	<Card.Title>Secrets & environment</Card.Title>
+	<Card.Title>Secrets & Environment</Card.Title>
 	<Card.Description
 		>Manage shared keys and map them to repository-specific environment variables.</Card.Description
 	>
@@ -42,10 +51,10 @@
 	</div>
 </Card.Root>
 <Card.Root class="panel">
-	<Card.Title>AWS staging</Card.Title>
+	<Card.Title>AWS Staging</Card.Title>
 	<Card.Description>Configure read-only AWS access for Codex and Claude planning.</Card.Description>
 	<div>
-		<Button href={resolve('/configuration/aws')} variant="outline">Configure AWS staging →</Button>
+		<Button href={resolve('/configuration/aws')} variant="outline">Configure AWS Staging →</Button>
 	</div>
 </Card.Root>
 <Card.Root class="panel" aria-labelledby="deployment-title">
@@ -79,7 +88,7 @@
 	</Card.Content>
 </Card.Root>
 <Card.Root class="panel upcoming">
-	<Card.Title>Connections come next.</Card.Title>
+	<Card.Title>Connections Come Next.</Card.Title>
 	<Card.Description
 		>Linear, repository selection, and agent settings will be configured here.</Card.Description
 	>

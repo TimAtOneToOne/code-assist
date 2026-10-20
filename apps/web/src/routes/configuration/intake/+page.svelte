@@ -13,15 +13,15 @@
 	] as const;
 </script>
 
-<svelte:head><title>Ticket intake · Code Assist</title></svelte:head>
+<svelte:head><title>Ticket Intake · Code Assist</title></svelte:head>
 <a class="mb-5 inline-block text-sm text-muted-foreground" href={resolve('/configuration')}
 	>← Configuration</a
 >
 <div class="eyebrow">WORKSPACE SETTINGS</div>
-<h1>Ticket intake</h1>
+<h1>Ticket Intake</h1>
 <p class="intro">Read Plan tickets from Linear and send attention links to Teams.</p>
 <Card.Root class="panel">
-	<Card.Title>Connections and schedule</Card.Title>
+	<Card.Title>Connections and Schedule</Card.Title>
 	<p>
 		Choose credentials from <a href={resolve('/configuration/secrets')} class="underline"
 			>saved secrets</a

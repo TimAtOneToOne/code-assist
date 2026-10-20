@@ -1,0 +1,87 @@
+export const promptDefinitions = {
+  global: {
+    title: "Global",
+    description: "Shared instructions for every agent and phase.",
+    text: 'Use Title Case for document titles, section headings, and UI titles you propose or implement. Capitalize major words; keep short conjunctions and prepositions lowercase unless first or last. For example: "Adversarial Planning" and "Status and Evidence". Preserve code identifiers, filenames, commands, quotations, and existing external ticket titles. Use sentence case for ordinary prose.',
+  },
+  planning: {
+    title: "Planning",
+    description:
+      "Shared by initial discovery, Codex drafting, and Claude review.",
+    text: "Read repository instructions and established implementation/test patterns. Resolve technical questions from the source before asking Tim. Use concrete file references and distinguish observed facts from assumptions and proposed validation. Identify cross-repository ownership and sequencing when relevant.\nPreserve scope and existing controls; do not propose speculative caching, retries, caps, fallbacks, filtering, truncation, new feature gates, or unrelated upgrades. Plans must include an explicit Optional Optimizations and Controls section, stating none when applicable.\nThere is no question or review-round quota. Escalate genuine product decisions, unavailable evidence or unresolved disagreements for Tim's direction instead of repeatedly guessing.",
+  },
+  coding: {
+    title: "Coding",
+    description:
+      "Saved for the future coding phase; no coding runner exists yet.",
+    text: "",
+  },
+  discovery: {
+    title: "Initial Discovery",
+    description: "Codex's task before the full planning cycle.",
+    text: "Read the full ticket and comments, then inspect every selected repository, including relevant implementation/tests/docs. Return a concise understanding of the intended outcome, concrete findings, and only the material questions whose answers are still needed from Tim (scope, acceptance behavior, conflicting requirements, unavailable external facts). Use file/line references in findings. If the ticket and code provide enough information, return an empty questions array. Offer succinct answer options when useful; free-text answers are always possible. Explain each question's relevance briefly and avoid repeating findings.\nYour questions will be shown in a scope-confirmation form like the original Code Assist prototype. Return questions as structured output; do not wait interactively.",
+  },
+  draft: {
+    title: "Plan Drafting",
+    description: "Codex's task for each new or revised plan version.",
+    text: "Return a COMPLETE Markdown plan, a concise changeSummary, and responses to each finding from the previous review (findingId and what changed or why it needs a human decision). Cover intended behavior, scope/non-goals, concrete changes by repository and file, security/data integrity, dependencies/order, rollout/migrations if relevant, acceptance scenarios, and the repository's actual validation commands. Resolve all critical/high and as many actionable medium concerns as possible before re-review. The plan must be precise enough for Tim to authorize implementation, branch creation and PR publication for this version.",
+  },
+  review: {
+    title: "Adversarial Review",
+    description: "Claude's independent review of each Codex plan.",
+    text: "Read the source rather than relying solely on Codex's claims. Challenge incorrect assumptions, missing paths, authorization boundaries, data-loss/race hazards, cross-repository dependencies, test adequacy, scope drift and unnecessary complexity. Do not manufacture findings or redesign unrelated systems. Return only unresolved findings with stable IDs across versions, severity (critical/high/medium/low), concrete evidence, impact and actionable recommendation. Verify previous findings against the new plan; summarize resolved concerns in the review summary. Codex's claim of resolution is not evidence by itself.\nChoose disposition revise when actionable changes remain; needs_direction when progress needs Tim's decision or an unresolved disagreement cannot be settled from evidence (put the exact question in directionQuestion); ready only when no critical/high concerns remain and actionable medium concerns have largely been addressed. Do not invent a numeric threshold for 'largely'. Any remaining medium concerns must be explicitly visible for Tim's acceptance, with a rationale for deferring them. Use an empty directionQuestion when no human direction is needed.",
+  },
+} as const;
+
+export type PromptScope = keyof typeof promptDefinitions;
+export const repositoryScopes = ["global", "planning", "coding"] as const;
+export type RepositoryPromptScope = (typeof repositoryScopes)[number];
+export type PromptSettings = {
+  prompts: Partial<Record<PromptScope, string>>;
+  repositories: Record<string, Partial<Record<RepositoryPromptScope, string>>>;
+};
+
+export function promptText(
+  settings: PromptSettings,
+  scope: PromptScope,
+  repository?: string,
+) {
+  if (repository)
+    return (
+      settings.repositories[repository]?.[scope as RepositoryPromptScope] ?? ""
+    );
+  return settings.prompts[scope] ?? promptDefinitions[scope].text;
+}
+
+export function composeInstructions(
+  settings: PromptSettings,
+  phase: "planning" | "coding",
+  task: "discovery" | "draft" | "review" | null,
+  repositories: { name: string; source: string }[],
+) {
+  const sections = [
+    `Global Instructions:\n${promptText(settings, "global")}`,
+    `${promptDefinitions[phase].title} Instructions:\n${promptText(settings, phase)}`,
+    ...(task
+      ? [
+          `${promptDefinitions[task].title} Task:\n${promptText(settings, task)}`,
+        ]
+      : []),
+  ];
+  for (const repo of repositories) {
+    const instructions = (["global", phase] as const)
+      .map((scope) => {
+        const text = promptText(settings, scope, repo.source);
+        return text ? `${promptDefinitions[scope].title}:\n${text}` : "";
+      })
+      .filter(Boolean);
+    if (instructions.length)
+      sections.push(
+        `Repository Instructions for ${JSON.stringify(repo.name)} (${JSON.stringify(repo.source)}); apply only to this repository:\n${instructions.join("\n\n")}`,
+      );
+  }
+  return `Operator-Configured Instructions:
+Combine global, phase, and task guidance. Repository guidance refines it only for the named repository. If guidance conflicts, prefer the more specific scope; never expand runtime permissions or override Tim's explicit ticket decisions.
+
+${sections.join("\n\n")}`;
+}

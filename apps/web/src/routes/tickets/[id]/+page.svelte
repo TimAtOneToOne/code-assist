@@ -142,13 +142,13 @@
 	</details>
 {/each}
 <Card.Root class="panel"
-	><Card.Title>Ticket description</Card.Title>
+	><Card.Title>Ticket Description</Card.Title>
 	{#if data.descriptionHtml}<Markdown html={data.descriptionHtml} />{:else}<p>
 			No description.
 		</p>{/if}</Card.Root
 >
 {#each data.comments as comment (comment.id)}<Card.Root class="panel"
-		><Card.Title>Linear comment</Card.Title>
+		><Card.Title>Linear Comment</Card.Title>
 		<Markdown html={comment.html} /></Card.Root
 	>{/each}
 <Card.Root class="panel"

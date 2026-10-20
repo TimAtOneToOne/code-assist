@@ -26,3 +26,5 @@ TypeScript is the default programming language for new application, service, and
 - Consider [Svelte AI Elements](https://svelte-ai-elements.vercel.app/components/context), including its Context component, when an actual agent-facing feature needs them.
 - If building chat interfaces, prefer the [AG-UI protocol](https://docs.ag-ui.com/introduction) for agent/UI interaction.
 - Tim requested these preferences on October 19, 2026. AI Elements and AG-UI are future options, not a requirement to install dependencies or build chat into the initial shell.
+
+- Use Title Case for document titles, section headings, and UI titles (for example, “Adversarial Planning” and “Status and Evidence”). Keep ordinary prose in sentence case; preserve code identifiers and quoted/external titles.

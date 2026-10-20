@@ -18,15 +18,15 @@
 	] as const;
 </script>
 
-<svelte:head><title>AWS staging · Code Assist</title></svelte:head>
+<svelte:head><title>AWS Staging · Code Assist</title></svelte:head>
 <a class="mb-5 inline-block text-sm text-muted-foreground" href={resolve('/configuration')}
 	>← Configuration</a
 >
 <div class="eyebrow">WORKSPACE SETTINGS</div>
-<h1>AWS staging</h1>
+<h1>AWS Staging</h1>
 <p class="intro">Give Codex and Claude read-only staging evidence during planning.</p>
 <Card.Root class="panel">
-	<Card.Title>Planning connection</Card.Title>
+	<Card.Title>Planning Connection</Card.Title>
 	<p>
 		Choose source keys from <a class="underline" href={resolve('/configuration/secrets')}
 			>saved secrets</a
@@ -67,7 +67,7 @@
 	</form>
 </Card.Root>
 <Card.Root class="panel">
-	<Card.Title>Verify connection</Card.Title>
+	<Card.Title>Verify Connection</Card.Title>
 	<p>
 		Assume the saved role and confirm the AWS identity. The role’s IAM policy determines which reads
 		are permitted; this test does not change AWS resources or validate every permission.

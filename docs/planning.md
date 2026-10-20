@@ -1,10 +1,10 @@
-# Adversarial planning
+# Adversarial Planning
 
 After Tim confirms discovery answers, Code Assist queues Codex to draft a plan from the full ticket, answers and recorded repository snapshots. Claude independently reviews the plan against those same snapshots. A review requesting changes queues another Codex version and another Claude review. There is no application-imposed review-round quota. A review needing a product decision pauses for Tim's direction.
 
 The ticket page shows the current plan, findings, agent activity, previous versions, feedback and approval history. Plans download as `plan_vN.md`; saved versions and reviews are never overwritten. Completed discovery is collapsed while planning is active. The original interactive reference is `docs/initial/index.html`.
 
-## Human approval
+## Human Approval
 
 Critical/high findings block approval, even if the reviewer incorrectly labels the plan ready. A ready review may retain medium concerns; Tim must explicitly check each one before approving that exact version. The server validates the current version, plan hash, current discovery and repository scope, review disposition and complete set of accepted medium finding IDs. Approval records the authenticated Tailscale owner, input hash, plan hash, version and accepted concerns.
 
@@ -12,7 +12,7 @@ Feedback on a reviewed plan creates the next version and another independent rev
 
 This release ends at plan approval. It does not yet implement plans, create branches, publish PRs or merge them. Approval captures authorization for the subsequent implementation phase; it does not claim that phase has run.
 
-## Durable checkpoints
+## Durable Checkpoints
 
 Queue: `adversarial-planning`, using native pg-boss defaults and the existing explicit-retry pattern. Each draft and review is a separate durable job.
 
@@ -27,7 +27,7 @@ Completing a job, saving its output, recording history and queuing the next step
 
 Graceful deployment shutdown interrupts the current step and queues a replacement with the same saved inputs. Completed steps are not repeated. Unexpected worker death or expired jobs become visible failures on reconciliation; Retry repeats only the failed step. Pending attention messages are checked against the current step/version and status before sending.
 
-## Providers and evidence
+## Providers and Evidence
 
 Codex SDK 0.163.0 drafts/revises; Claude Agent SDK 0.3.304 reviews. Native model and reasoning defaults apply. Credentials are read from saved secrets at each step: `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`. An optional saved `ANTHROPIC_WORKSPACE_ID` selects the workspace for an unscoped Anthropic key, using the SDK's native `ANTHROPIC_CUSTOM_HEADERS` environment configuration. This is an actual `wrkspc_…` ID, not the literal name `default`; it is validated before constructing the header. No workspace lookup or automatic workspace selection occurs during jobs.
 
@@ -37,7 +37,7 @@ The shared runner uses the previously approved owned-process cleanup on cancella
 
 Full inputs, SDK events, results and failures use the existing redacting log/artifact system with service `planning` and ticket, job, step and provider-session correlation. Provider keys and workspace configuration are not copied into managed repositories. Repository inputs remain the Git archives captured during discovery; source clone updates do not change those inputs. Plans must identify missing history, submodules or live-state evidence honestly.
 
-## Validation and operations
+## Validation and Operations
 
 Run `make verify` and `TEST_DATABASE_URL=postgresql://<user>@localhost:5432/postgres make test-intake`. Integration tests use disposable databases to exercise alternating providers, blocking findings, required medium acceptance, exact-version approval, feedback invalidation, atomic rollback, duplicate result rejection, restart/retry, human direction, scope changes, removal and notification relevance. Unit tests cover structured output and native tool authorization decisions.
 
@@ -50,7 +50,7 @@ Optional optimizations and controls:
 
 References: [Anthropic workspace selection](https://platform.claude.com/docs/en/manage-claude/authentication), [Claude environment variables](https://code.claude.com/docs/en/env-vars), [native permission hooks](https://code.claude.com/docs/en/agent-sdk/permissions), [structured output](https://code.claude.com/docs/en/agent-sdk/structured-outputs).
 
-## Comparing plan versions
+## Comparing Plan Versions
 
 For v2 and later, **Show changes since vN** is enabled by default and compares the selected version with its immediate predecessor in the same planning run. Only added or changed words and phrases are yellow, including within headings, list items, code and tables. A small edit no longer colors its entire paragraph. Inline formatting is preserved, and unchanged wording keeps its normal appearance. Turning the toggle off shows the clean plan.
 
@@ -60,7 +60,7 @@ Comparison runs on the server using the same sanitized Markdown renderer. Only g
 
 Optional optimizations and controls for comparison: Tim requested and approved the display toggle and removed-text disclosure. They affect only presentation: turning highlighting off hides comparison annotations, while the saved version remains visible. No caching, truncation, semantic filtering or workflow controls were added.
 
-## AWS staging evidence
+## AWS Staging Evidence
 
 [Configuration → AWS staging](http://100.91.0.83:3000/configuration/aws) configures the shared planning connection. Select the source access-key ID and secret access key from saved secrets, then set the expected account, read-only role ARN, region and profile. **Test saved connection** assumes the role and verifies its caller identity; it does not validate every IAM permission. Configuration is stored in `data/aws-staging.json` with secret references, never credential values. Referenced keys cannot be deleted until the connection selects replacements. Key rotation is picked up at the next planning step.
 
@@ -75,3 +75,9 @@ Prompts identify the connection, session expiration and staging-only scope. Live
 Optional optimizations and controls: none beyond the requested temporary read-only staging access and preservation of the existing planning boundaries. No caching, extra retries, command-result limits, or new workflow gates were added. STS session duration and SDK retry behavior use AWS defaults.
 
 References: [AWS temporary role credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_request.html), [Codex filesystem and network permissions](https://learn.chatgpt.com/docs/permissions), [Claude native Bash sandbox](https://code.claude.com/docs/en/sandboxing).
+
+## Prompt Configuration
+
+Global, planning, task, and repository instructions are editable in
+[Prompt Management](prompts.md). Both discovery and planning workers load them
+at the start of each execution. Saved plan versions retain their original content.

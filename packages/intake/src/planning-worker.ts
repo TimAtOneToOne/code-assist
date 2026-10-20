@@ -1,3 +1,4 @@
+import { readPromptSettings } from "./prompt-settings.ts";
 import { dirname, join } from "node:path";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
@@ -113,7 +114,7 @@ export async function registerPlanningWorker(
           { ...awsEvidenceContext(aws), identity },
         );
       }
-      const prompt = planningPrompt(step, aws);
+      const prompt = planningPrompt(step, aws, readPromptSettings(directory));
       log.payload(
         "planning.input",
         `${provider} ${step.kind} for plan v${step.version}`,

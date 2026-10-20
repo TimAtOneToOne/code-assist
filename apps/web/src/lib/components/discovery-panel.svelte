@@ -27,12 +27,12 @@
 				>{run.status === 'queued'
 					? 'Waiting for Codex'
 					: run.status === 'running'
-						? 'Reading the ticket and repositories'
+						? 'Reading the Ticket and Repositories'
 						: run.status === 'failed'
-							? 'Discovery needs attention'
+							? 'Discovery Needs Attention'
 							: run.answers
-								? 'Scope and answers saved'
-								: 'Confirm scope and answer open questions'}</Card.Title
+								? 'Scope and Answers Saved'
+								: 'Confirm Scope and Answer Open Questions'}</Card.Title
 			>
 		</div>
 		{#if ['queued', 'running'].includes(run.status)}<Button
@@ -77,7 +77,7 @@
 					<p class="whitespace-pre-wrap">{run.answers[index]}</p>
 				</div>{/each}
 			{#if run.notes}<div>
-					<h3 class="font-medium">Additional direction</h3>
+					<h3 class="font-medium">Additional Direction</h3>
 					<p class="whitespace-pre-wrap">{run.notes}</p>
 				</div>{/if}
 			<p>These answers are saved as the planning baseline. Full planning has not started.</p>
@@ -118,7 +118,7 @@
 					</p>{/each}
 				<div class="space-y-2">
 					<label for={`notes-${run.id}`} class="text-sm font-medium"
-						>Additional direction (optional)</label
+						>Additional Direction (optional)</label
 					><Textarea
 						id={`notes-${run.id}`}
 						name="notes"
