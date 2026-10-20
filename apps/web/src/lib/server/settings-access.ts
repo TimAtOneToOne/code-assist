@@ -13,11 +13,12 @@ export async function requireSettingsAccess(event: RequestEvent) {
 
 	let identity: { Node?: { User?: number; Tags?: string[] }; UserProfile?: { ID?: number } };
 	try {
-		const { stdout } = await execute('/Applications/Tailscale.app/Contents/MacOS/Tailscale', [
-			'whois',
-			'--json',
-			address
-		]);
+		const { stdout } = await execute(
+			'/Applications/Tailscale.app/Contents/MacOS/Tailscale',
+			['whois', '--json', address],
+			// launchd has no terminal environment, so explicitly select Tailscale's CLI mode.
+			{ env: { ...process.env, TAILSCALE_BE_CLI: '1' } }
+		);
 		identity = JSON.parse(stdout);
 	} catch {
 		error(403, 'Connect from a Tailscale device registered to the workspace owner.');
