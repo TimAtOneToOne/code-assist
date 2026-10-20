@@ -13,6 +13,7 @@
     "./planning": "./src/planning.ts",
     "./planning-worker": "./src/planning-worker.ts",
     "./prompt-settings": "./src/prompt-settings.ts",
+    "./model-settings": "./src/model-settings.ts",
     "./prompt-defaults": "./src/prompt-defaults.ts",
     "./aws-settings": "./src/aws-settings.ts",
     "./planning-aws": "./src/planning-aws.ts",

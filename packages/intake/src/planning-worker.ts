@@ -1,4 +1,5 @@
 import { readPromptSettings } from "./prompt-settings.ts";
+import { readModelSettings } from "./model-settings.ts";
 import { dirname, join } from "node:path";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
@@ -54,6 +55,7 @@ export async function registerPlanningWorker(
     let pending = Promise.resolve();
     let stage = "configuration";
     try {
+      const model = readModelSettings(directory)[provider];
       const secret = listConfiguration(directory).secrets.find(
         (s) => s.name === secretName,
       );
@@ -118,12 +120,17 @@ export async function registerPlanningWorker(
       log.payload(
         "planning.input",
         `${provider} ${step.kind} for plan v${step.version}`,
-        { input: step.input, prompt },
+        { input: step.input, prompt, model },
       );
+      log.event("info", "planning.model", "Agent model selected", {
+        provider,
+        model,
+      });
       stage = `${provider} ${step.kind}`;
       const result = await runAgentProcess(
         {
           apiKey,
+          model,
           provider,
           anthropicWorkspaceId,
           workspace: dirname(snapshots[0].directory),

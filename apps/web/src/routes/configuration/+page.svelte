@@ -12,6 +12,13 @@
 <h1>Configuration</h1>
 <p class="intro">A home for connections and workspace preferences.</p>
 <Card.Root class="panel">
+	<Card.Title>Agent Models</Card.Title>
+	<Card.Description>Choose the Codex and Claude models used for new agent steps.</Card.Description>
+	<div>
+		<Button href={resolve('/configuration/models')} variant="outline">Configure Models →</Button>
+	</div>
+</Card.Root>
+<Card.Root class="panel">
 	<Card.Title>Prompt Management</Card.Title>
 	<Card.Description>
 		Edit global, planning, coding, agent-task, and repository-specific instructions.

@@ -169,6 +169,7 @@ export type AgentEvent = {
 };
 export type AgentInput = {
   apiKey: string;
+  model?: string;
   aws?: PlanningAws;
   workspace: string;
   home: string;
@@ -229,7 +230,7 @@ export async function runCodex(
     ],
   });
   const thread = codex.startThread({
-    model: codexModel,
+    model: input.model ?? codexModel,
     workingDirectory: input.workspace,
     skipGitRepoCheck: true,
     approvalPolicy: "never",

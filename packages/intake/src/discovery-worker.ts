@@ -1,4 +1,5 @@
 import { readPromptSettings } from "./prompt-settings.ts";
+import { readModelSettings } from "./model-settings.ts";
 import { dirname, join } from "node:path";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
@@ -40,6 +41,7 @@ export async function registerDiscoveryWorker(
     );
     let pending = Promise.resolve();
     try {
+      const model = readModelSettings(directory).codex;
       const secret = listConfiguration(directory).secrets.find(
         (s) => s.name === "OPENAI_API_KEY",
       );
@@ -61,6 +63,7 @@ export async function registerDiscoveryWorker(
         "info",
         "discovery.started",
         "Codex is inspecting the ticket and selected repositories",
+        { model },
       );
       stage = "repository snapshots";
       const available = await discoverRepositories(directory);
@@ -100,12 +103,13 @@ export async function registerDiscoveryWorker(
       log.payload(
         "discovery.input",
         "Discovery ticket, repository commits and prompt",
-        { ticket: run.ticket, snapshots: run.snapshots, prompt },
+        { ticket: run.ticket, snapshots: run.snapshots, prompt, model },
       );
       stage = "Codex investigation";
       const result = await runAgentProcess(
         {
           apiKey,
+          model,
           workspace: prepared.workspace,
           home: join(directory, "discovery", run.id, "home"),
           prompt,

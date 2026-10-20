@@ -111,7 +111,7 @@ export async function runClaude(
     for await (const event of query({
       prompt: input.prompt,
       options: {
-        model: claudeModel,
+        model: input.model ?? claudeModel,
         cwd: input.workspace,
         env: {
           PATH: input.aws

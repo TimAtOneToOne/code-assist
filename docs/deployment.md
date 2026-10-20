@@ -36,6 +36,7 @@ The installation is under `~/Library/Application Support/CodeAssist/`:
 | `runtime.env` | Operator-managed runtime settings, including `CODE_ASSIST_ADMIN_TAILSCALE_USER` and `CODE_ASSIST_DATABASE_URL`; mode 600, outside Git |
 | `data/mac-mini.json` | Saved Mac mini configuration; preserved across releases |
 | `data/intake.json` | Linear/attention secret references and polling interval |
+| `data/models.json` | Operator-selected Codex and Claude model IDs for new agent steps |
 | `data/discovery/<attempt>/` | Captured repository commits, isolated Codex home and native session files |
 | `data/secrets/store.json` | Shared secret values and repository mappings; mode 600 inside a mode 700 directory |
 | `data/workspaces/<uuid>/workspace.json` | Preparation state and approved inputs for an isolated coding workspace; no environment values |
