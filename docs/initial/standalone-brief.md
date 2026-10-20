@@ -12,7 +12,7 @@ Build the observability application in SvelteKit and serve it from the Mia Mac m
 
 ## First-Release Workflow
 
-1. Poll all pages of Linear issues with `Plan` and without `Code`. Use the stable issue UUID to maintain one tracked work record. Keep observing tracked work when its labels change; a partial poll cannot establish removal. Five minutes was proposed, not finalized.
+1. Poll all pages of Linear issues with `Plan` and without `Code`. Use the stable issue UUID to maintain one tracked work record. Keep observing tracked work when its labels change; a partial poll cannot establish removal. On October 20, Tim requested marking tickets Removed and hiding them from Home when a returned ticket no longer has `Plan`. Preserve history and choices, pause pending attention prompts, and restore the record if `Plan` returns. The configured initial cadence is five minutes.
 2. Tim confirms all applicable repositories. On October 20, 2026, he expanded intake to a searchable multi-select, prefilled with suggestions and without explanatory suggestion cards. Saved choices take precedence. Cross-repository planning, execution dependencies and coordinated PRs remain to be implemented; selecting repositories does not approve GitOps changes.
 3. Read the ticket and repository, ask needed questions in the application and persist the answers. `Plan` authorizes planning, not implementation. Do not automatically comment on Linear, change its labels or move tickets between states.
 4. Codex drafts a versioned plan; Claude reviews; Codex revises; Claude reviews again. Preserve every version and review. Before presentation, address all critical/high and most medium concerns; show remaining medium findings for Tim's decision. Do not invent a numeric meaning for “most.”
@@ -70,6 +70,6 @@ For migration conflicts, preserve the updated base history and intended schema c
 2. Deliver intake, durable questions/answers, plan/review versions, exact-version approval and notifications together.
 3. Deliver implementation, code review, browser evidence, guarded PR publication, feedback/rebase handling and merge observation.
 
-Remaining product decisions: label-removal behavior, initial repository, poll cadence, how Tim accepts medium plan findings, how non-converging reviews request help, and Mac access/secret/process arrangements. Keep these visible instead of inventing controls.
+Remaining product decisions: interruption of active agent work after label removal, how Tim accepts medium plan findings, how non-converging reviews request help, and remaining Mac access/secret/process arrangements. Keep these visible instead of inventing controls.
 
 Do not add a broker, cache, automatic provider fallback, global concurrency cap, review-round budget or arbitrary shorter timeout to v1. New controls require a demonstrated need and Tim's approval. Optional optimizations and controls introduced by this document: none.

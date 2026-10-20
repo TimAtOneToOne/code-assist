@@ -51,7 +51,10 @@ export async function deliverNotification(
 ) {
   const { rows } = await boss.getDb().executeSql(
     `UPDATE code_assist.attention_outbox SET attempts=attempts+1,error=NULL
-     WHERE id=$1 AND job_id=$2 AND sent_at IS NULL RETURNING issue_id`,
+     WHERE id=$1 AND job_id=$2 AND sent_at IS NULL
+     AND EXISTS (SELECT 1 FROM code_assist.intake_issue i
+                 WHERE i.id=issue_id AND i.removed_at IS NULL)
+     RETURNING issue_id`,
     [notificationId, jobId],
   );
   if (!rows.length) return;

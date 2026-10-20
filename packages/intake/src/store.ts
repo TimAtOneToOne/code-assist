@@ -17,6 +17,7 @@ export type WorkItem = {
   selected_repositories: string[];
   selected_at: Date | null;
   eligible: boolean;
+  removed_at: Date | null;
   created_at: Date;
   observed_at: Date;
 };
@@ -63,6 +64,7 @@ export async function initializeIntake(boss: PgBoss) {
       type text NOT NULL, details jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now()
     );
     ALTER TABLE code_assist.intake_issue ADD COLUMN IF NOT EXISTS selected_repositories text[];
+    ALTER TABLE code_assist.intake_issue ADD COLUMN IF NOT EXISTS removed_at timestamptz;
     CREATE TABLE IF NOT EXISTS code_assist.intake_scan (
       job_id uuid PRIMARY KEY, status text NOT NULL,
       started_at timestamptz, finished_at timestamptz, issue_count integer, error text,
@@ -146,17 +148,30 @@ export async function recordScan(
           [notificationId, notificationJob],
         );
       } else {
+        const { rows: current } = await tx.db.executeSql(
+          `SELECT removed_at FROM code_assist.intake_issue
+           WHERE id=$1 AND (ticket->>'updatedAt')::timestamptz <= $2::timestamptz FOR UPDATE`,
+          [ticket.id, ticket.updatedAt],
+        );
+        if (!current.length) continue;
+        const removed = !ticket.labels.includes("Plan");
         await tx.db.executeSql(
-          `UPDATE code_assist.intake_issue SET ticket=$2,suggestions=$3,eligible=$4,observed_at=now()
-           WHERE id=$1 AND (ticket->>'updatedAt')::timestamptz <= $5::timestamptz`,
+          `UPDATE code_assist.intake_issue SET ticket=$2,suggestions=$3,eligible=$4,observed_at=now(),
+           removed_at=CASE WHEN $5 THEN COALESCE(removed_at,now()) ELSE NULL END
+           WHERE id=$1`,
           [
             ticket.id,
             JSON.stringify(ticket),
             JSON.stringify(suggestions),
             isReady(ticket),
-            ticket.updatedAt,
+            removed,
           ],
         );
+        if (removed !== (current[0].removed_at !== null))
+          await tx.db.executeSql(
+            "INSERT INTO code_assist.intake_event(issue_id,type) VALUES($1,$2)",
+            [ticket.id, removed ? "issue_removed" : "issue_restored"],
+          );
       }
     }
     await tx.db.executeSql(
@@ -173,7 +188,7 @@ export async function recordScan(
 export async function dashboard(boss: PgBoss) {
   const db = boss.getDb();
   const { rows: issues } = await db.executeSql(
-    `SELECT ${issueColumns} FROM code_assist.intake_issue ORDER BY
+    `SELECT ${issueColumns} FROM code_assist.intake_issue WHERE removed_at IS NULL ORDER BY
      (cardinality(COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL))) = 0) DESC,
      created_at DESC,id`,
   );
@@ -181,7 +196,9 @@ export async function dashboard(boss: PgBoss) {
     "SELECT * FROM code_assist.intake_scan ORDER BY created_at DESC,job_id DESC LIMIT 1",
   );
   const { rows: notifications } = await db.executeSql(
-    "SELECT id,issue_id,attempts,sent_at,error FROM code_assist.attention_outbox WHERE sent_at IS NULL ORDER BY id",
+    `SELECT n.id,n.issue_id,n.attempts,n.sent_at,n.error
+     FROM code_assist.attention_outbox n JOIN code_assist.intake_issue i ON i.id=n.issue_id
+     WHERE n.sent_at IS NULL AND i.removed_at IS NULL ORDER BY n.id`,
   );
   const scan = scans[0] ?? null;
   if (scan && ["queued", "running"].includes(scan.status)) {
@@ -226,6 +243,10 @@ export async function selectRepositories(
     );
     const item = rows[0] as WorkItem | undefined;
     if (!item) throw new Error("Ticket not found.");
+    if (item.removed_at)
+      throw new SelectionConflict(
+        "This ticket was removed because its Plan label is gone. Refresh to see its history.",
+      );
     if (item.ticket.updatedAt !== expectedUpdatedAt)
       throw new SelectionConflict(
         "The ticket changed. Refresh and review it before choosing repositories.",
@@ -254,11 +275,11 @@ export async function selectRepositories(
 }
 
 export async function requeuePendingNotifications(boss: PgBoss) {
-  const { rows } = await boss
-    .getDb()
-    .executeSql(
-      "SELECT id,job_id FROM code_assist.attention_outbox WHERE sent_at IS NULL",
-    );
+  const { rows } = await boss.getDb().executeSql(
+    `SELECT n.id,n.job_id FROM code_assist.attention_outbox n
+       JOIN code_assist.intake_issue i ON i.id=n.issue_id
+       WHERE n.sent_at IS NULL AND i.removed_at IS NULL`,
+  );
   for (const row of rows) {
     const job = row.job_id
       ? await boss.getJobById(notificationQueue, row.job_id)

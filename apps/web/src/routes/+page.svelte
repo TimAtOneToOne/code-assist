@@ -56,7 +56,7 @@
 {/if}
 <h2 class="mb-4 text-xl font-semibold">Tickets</h2>
 {#if !data.issues.length}<Card.Root class="panel"
-		><Card.Title>No tickets tracked yet.</Card.Title>
+		><Card.Title>No active tickets.</Card.Title>
 		<p>Run a Linear check to bring in tickets labeled Plan.</p></Card.Root
 	>{/if}
 {#each data.issues as item (item.id)}

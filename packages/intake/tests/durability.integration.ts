@@ -140,7 +140,7 @@ test("durable intake, selection, rollback and notification delivery across resta
     const changed = {
       ...ticket,
       updatedAt: "2026-10-21T00:00:00.000Z",
-      labels: ["Code"],
+      labels: ["Plan", "Code"],
     };
     await recordScan(boss, scan, [changed], repositories);
     await assert.rejects(
@@ -156,6 +156,7 @@ test("durable intake, selection, rollback and notification delivery across resta
       "/repos/repo-one",
     ]);
     assert.equal(item?.events.length, 2);
+    assert.equal(item?.removed_at, null);
     await recordScan(
       boss,
       scan,
@@ -175,6 +176,85 @@ test("durable intake, selection, rollback and notification delivery across resta
       ),
     );
     assert.equal((await dashboard(boss)).issues.length, 1);
+    const removed = {
+      ...changed,
+      updatedAt: "2026-10-22T00:00:00.000Z",
+      labels: [],
+    };
+    await assert.rejects(
+      recordScan(
+        boss,
+        scan,
+        [removed, { ...ticket, id: "invalid" }],
+        repositories,
+      ),
+    );
+    assert.equal(
+      (await readWorkItem(boss.getDb(), ticket.id))?.removed_at,
+      null,
+    );
+    await recordScan(boss, scan, [removed], repositories);
+    const removedAt = (await readWorkItem(boss.getDb(), ticket.id))?.removed_at;
+    assert(removedAt);
+    await recordScan(boss, scan, [removed], repositories);
+    await recordScan(boss, scan, [], repositories);
+    await recordScan(boss, scan, [changed], repositories);
+    await boss.stop();
+    boss = new PgBoss(url.toString());
+    boss.on("error", () => {});
+    await boss.start();
+    await initializeIntake(boss);
+    const hidden = await readWorkItem(boss.getDb(), ticket.id);
+    assert.deepEqual(hidden?.removed_at, removedAt);
+    assert.deepEqual(
+      hidden?.selected_repositories,
+      item?.selected_repositories,
+    );
+    assert.equal(hidden?.events.length, 3);
+    assert.equal(hidden?.events.at(-1)?.type, "issue_removed");
+    assert.equal((await dashboard(boss)).issues.length, 0);
+    assert.equal((await dashboard(boss)).notifications.length, 0);
+    await assert.rejects(
+      selectRepositories(boss, ticket.id, ["/repos/other"], removed.updatedAt),
+      /Plan label is gone/,
+    );
+    const [suppressed] = await boss.fetch<{ notificationId: string }>(
+      notificationQueue,
+    );
+    assert(suppressed);
+    await deliverNotification(
+      boss,
+      directory,
+      suppressed.data.notificationId,
+      suppressed.id,
+    );
+    await boss.complete(notificationQueue, suppressed.id);
+    await requeuePendingNotifications(boss);
+    assert.equal((await boss.fetch(notificationQueue)).length, 0);
+    assert.equal(delivered.length, 0);
+    assert.equal(
+      (
+        await boss
+          .getDb()
+          .executeSql("SELECT attempts FROM code_assist.attention_outbox")
+      ).rows[0].attempts,
+      0,
+    );
+    const restored = { ...ticket, updatedAt: "2026-10-23T00:00:00.000Z" };
+    await recordScan(boss, scan, [restored], repositories);
+    await recordScan(boss, scan, [restored], repositories);
+    await recordScan(boss, scan, [removed], repositories);
+    const visible = await readWorkItem(boss.getDb(), ticket.id);
+    assert.equal(visible?.removed_at, null);
+    assert.deepEqual(
+      visible?.selected_repositories,
+      item?.selected_repositories,
+    );
+    assert.equal(visible?.events.length, 4);
+    assert.equal(visible?.events.at(-1)?.type, "issue_restored");
+    assert.equal((await dashboard(boss)).issues.length, 1);
+    assert.equal((await dashboard(boss)).notifications.length, 1);
+    await requeuePendingNotifications(boss);
     const [job] = await boss.fetch<{ notificationId: string }>(
       notificationQueue,
     );
