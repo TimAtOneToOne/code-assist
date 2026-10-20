@@ -10,6 +10,9 @@ import { registerIntakeWorker } from "@code-assist/intake/worker";
 import { discoveryQueue } from "@code-assist/intake/discovery";
 import { registerDiscoveryWorker } from "@code-assist/intake/discovery-worker";
 
+import { planningQueue } from "@code-assist/intake/planning";
+import { registerPlanningWorker } from "@code-assist/intake/planning-worker";
+
 const release = process.env.CODE_ASSIST_COMMIT ?? "development";
 const boss = connectBoss(`code-assist-worker:${release}`);
 const stopping = new AbortController();
@@ -33,9 +36,11 @@ try {
   await registerProbeWorker(boss, release);
   await registerIntakeWorker(boss, dataDirectory);
   await registerDiscoveryWorker(boss, dataDirectory, stopping.signal);
+  await registerPlanningWorker(boss, dataDirectory, stopping.signal);
   logger.event("info", "worker.ready", "Worker ready");
   const signal = await shutdown;
   logger.event("info", "worker.draining", "Worker draining", { signal });
+  await boss.offWork(planningQueue);
   await boss.offWork(discoveryQueue);
   await boss.offWork(probeQueue);
   await boss.offWork(intakeQueue);

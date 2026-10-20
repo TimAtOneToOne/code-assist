@@ -1,3 +1,9 @@
+import { recordIntakeEvent } from "./intake-events.ts";
+import {
+  initializePlanning,
+  syncPlanning,
+  supersedePlanning,
+} from "./planning.ts";
 import { createHash, randomUUID } from "node:crypto";
 import type { Db, PgBoss } from "pg-boss";
 import type { Ticket } from "./linear.ts";
@@ -7,6 +13,13 @@ export const currentAttention = `(e.type='repository_needed' OR
   (e.details->>'runId'=i.current_discovery_id::text AND EXISTS (
     SELECT 1 FROM code_assist.discovery_run d WHERE d.id=i.current_discovery_id
     AND ((e.type='discovery_questions' AND d.status='questions') OR (e.type='discovery_failed' AND d.status='failed'))
+  )) OR (i.eligible AND EXISTS (
+    SELECT 1 FROM code_assist.planning_run p WHERE p.discovery_id=i.current_discovery_id
+    AND e.details->>'planningId'=p.id::text AND (
+      (e.type='plan_ready' AND p.status='awaiting_approval' AND e.details->>'version'=p.current_version::text) OR
+      (e.type='planning_direction' AND p.status='needs_direction' AND e.details->>'version'=p.current_version::text) OR
+      (e.type='planning_failed' AND p.status='failed' AND e.details->>'stepId'=p.current_step_id::text)
+    )
   )))`;
 export class DiscoveryConflict extends Error {}
 export type DiscoveryResult = {
@@ -52,41 +65,13 @@ export async function initializeDiscovery(boss: PgBoss) {
     );
   `);
   await boss.createQueue(discoveryQueue, { retryLimit: 0 });
+  await initializePlanning(boss);
 }
 
 export function discoveryHash(ticket: Ticket, repositories: string[]) {
   return createHash("sha256")
     .update(JSON.stringify({ ticket, repositories: [...repositories].sort() }))
     .digest("hex");
-}
-
-async function event(
-  boss: PgBoss,
-  db: Db,
-  issueId: string,
-  type: string,
-  details: Record<string, unknown>,
-  notify = false,
-) {
-  const { rows } = await db.executeSql(
-    "INSERT INTO code_assist.intake_event(issue_id,type,details) VALUES($1,$2,$3) RETURNING id",
-    [issueId, type, JSON.stringify(details)],
-  );
-  if (!notify) return;
-  const { rows: notifications } = await db.executeSql(
-    "INSERT INTO code_assist.attention_outbox(issue_id,event_id) VALUES($1,$2) RETURNING id",
-    [issueId, rows[0].id],
-  );
-  const jobId = await boss.send(
-    "attention-notification",
-    { notificationId: notifications[0].id },
-    { db },
-  );
-  if (!jobId) throw new Error("Could not queue discovery notification.");
-  await db.executeSql(
-    "UPDATE code_assist.attention_outbox SET job_id=$2 WHERE id=$1",
-    [notifications[0].id, jobId],
-  );
 }
 
 // Caller owns a short transaction; issue lock serializes input changes and result acceptance.
@@ -119,11 +104,12 @@ export async function syncDiscovery(
       return current.id;
   }
   if (current && current.status !== "superseded") {
+    await supersedePlanning(boss, db, current.id);
     await db.executeSql(
       "UPDATE code_assist.discovery_run SET status='superseded' WHERE id=$1",
       [current.id],
     );
-    await event(boss, db, issueId, "discovery_superseded", {
+    await recordIntakeEvent(boss, db, issueId, "discovery_superseded", {
       runId: current.id,
     });
   }
@@ -147,7 +133,7 @@ export async function syncDiscovery(
     "UPDATE code_assist.intake_issue SET current_discovery_id=$2 WHERE id=$1",
     [issueId, id],
   );
-  await event(boss, db, issueId, "discovery_queued", { runId: id });
+  await recordIntakeEvent(boss, db, issueId, "discovery_queued", { runId: id });
   return id;
 }
 
@@ -218,7 +204,9 @@ export async function startDiscovery(boss: PgBoss, id: string, jobId: string) {
       "UPDATE code_assist.discovery_run SET status='running',worker_pid=$2,error=NULL WHERE id=$1",
       [id, process.pid],
     );
-    await event(boss, tx.db, run.issue_id, "discovery_started", { runId: id });
+    await recordIntakeEvent(boss, tx.db, run.issue_id, "discovery_started", {
+      runId: id,
+    });
     await tx.commit();
     return { ...run, status: "running" as const, worker_pid: process.pid };
   } catch (error) {
@@ -270,7 +258,7 @@ export async function finishDiscovery(
       "UPDATE code_assist.discovery_run SET status=$2,result=$3,error=$4,finished_at=now() WHERE id=$1",
       [run.id, status, result ? JSON.stringify(result) : null, errorMessage],
     );
-    await event(
+    await recordIntakeEvent(
       boss,
       tx.db,
       run.issue_id,
@@ -349,6 +337,7 @@ export async function answerDiscovery(
       JSON.stringify(run.answers) === JSON.stringify(answers) &&
       run.notes === notes
     ) {
+      await syncPlanning(boss, tx.db, runId);
       await tx.commit();
       return;
     }
@@ -367,7 +356,10 @@ export async function answerDiscovery(
       "UPDATE code_assist.discovery_run SET status='ready',answers=$2,notes=$3 WHERE id=$1",
       [runId, JSON.stringify(answers), notes],
     );
-    await event(boss, tx.db, issueId, "discovery_answered", { runId });
+    await recordIntakeEvent(boss, tx.db, issueId, "discovery_answered", {
+      runId,
+    });
+    await syncPlanning(boss, tx.db, runId);
     await tx.commit();
   } catch (error) {
     await tx.rollback();
@@ -423,9 +415,15 @@ export async function restartInterruptedDiscovery(
         "UPDATE code_assist.discovery_run SET status='failed',error='Interrupted by worker shutdown.' WHERE id=$1",
         [run.id],
       );
-      await event(boss, tx.db, run.issue_id, "discovery_interrupted", {
-        runId: run.id,
-      });
+      await recordIntakeEvent(
+        boss,
+        tx.db,
+        run.issue_id,
+        "discovery_interrupted",
+        {
+          runId: run.id,
+        },
+      );
       const next = await syncDiscovery(boss, tx.db, run.issue_id, true);
       if (next && run.snapshots)
         await tx.db.executeSql(

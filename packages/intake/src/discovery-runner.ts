@@ -17,7 +17,11 @@ process.on("message", async (message: { type: string; input?: AgentInput }) => {
   if (message.type !== "start" || !message.input || started) return;
   started = true;
   try {
-    const result = await runCodex(message.input, abort.signal, (event) => {
+    const execute =
+      message.input.provider === "claude"
+        ? (await import("./planning-agent.ts")).runClaude
+        : runCodex;
+    const result = await execute(message.input, abort.signal, (event) => {
       if (process.connected) process.send!({ type: "event", event });
     });
     if (process.connected) process.send!({ type: "result", result });

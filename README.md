@@ -14,6 +14,8 @@ Run `make verify` before pushing. Mia checks published `main` once a minute, bui
 - [Browser testing](docs/browser-testing.md): Playwright MCP for coding agents on Mia, client setup and live verification.
 - [Secrets and environments](docs/secrets.md): shared keys, Reveal/Hide and repository-specific environment-variable mappings.
 - [Linear intake](docs/intake.md): scheduled Plan-ticket discovery, repository suggestions, human selection and attention notifications.
+- [Initial discovery](docs/discovery.md): Codex investigations and confirmed answers.
+- [Adversarial planning](docs/planning.md): versioned Codex plans, Claude reviews, feedback and exact-version approval.
 - [Product brief](docs/initial/standalone-brief.md): durable ticket-to-PR workflow.
 - [Implementation and deployment plan](docs/plans/plan_v1.md): SvelteKit, PostgreSQL worker, Tailscale access and automatic deployment from `main`.
 - [Mac mini configuration](docs/mac-mini-configuration.md): hardware, local services, development tools, verification results, and remaining setup.

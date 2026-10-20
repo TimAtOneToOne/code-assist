@@ -8,7 +8,7 @@ const execute = promisify(execFile);
 
 export async function requireSettingsAccess(event: RequestEvent) {
 	const address = event.getClientAddress().replace(/^::ffff:/, '');
-	if (dev && (address === '127.0.0.1' || address === '::1')) return;
+	if (dev && (address === '127.0.0.1' || address === '::1')) return 'local-development';
 	if (!CODE_ASSIST_ADMIN_TAILSCALE_USER) error(503, 'Settings access has not been configured.');
 
 	let identity: { Node?: { User?: number; Tags?: string[] }; UserProfile?: { ID?: number } };
@@ -30,4 +30,5 @@ export async function requireSettingsAccess(event: RequestEvent) {
 	) {
 		error(403, 'Only the workspace owner can access these settings.');
 	}
+	return `tailscale:${identity.UserProfile?.ID}`;
 }

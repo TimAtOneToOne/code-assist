@@ -1,3 +1,4 @@
+import { reconcilePlanningFailures } from "./planning.ts";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
 import { revealSecret } from "@code-assist/secrets";
@@ -35,24 +36,45 @@ export function attentionMessage(
     dateStyle: "medium",
     timeStyle: "long",
   }).format(date);
+  const planningMessages: Record<string, string[]> = {
+    plan_ready: [
+      "🔎 Ready for review · Plan ready",
+      "Codex drafted the plan and Claude completed its adversarial review. Versions and findings are saved.",
+      "Review the current plan and explicitly accept any remaining medium concerns before approving.",
+    ],
+    planning_direction: [
+      "⏳ Approval needed · Planning needs your direction",
+      "The adversarial review identified a decision for you. The agents have paused with their findings saved.",
+      "Answer the planning question on the ticket page to start the next revision.",
+    ],
+    planning_failed: [
+      "⚠️ Blocked · Planning step failed",
+      "A planning step could not finish. Completed versions and reviews are preserved.",
+      "Review the logs and retry the failed step.",
+    ],
+  };
+  const planning = planningMessages[eventType];
   const heading =
-    eventType === "discovery_failed"
+    planning?.[0] ??
+    (eventType === "discovery_failed"
       ? "⚠️ Blocked · Initial discovery failed"
       : eventType === "discovery_questions"
         ? "🔎 Ready for review · Confirm scope and answer questions"
-        : "🔎 Ready for review · Choose repositories";
+        : "🔎 Ready for review · Choose repositories");
   const outcome =
-    eventType === "discovery_failed"
+    planning?.[1] ??
+    (eventType === "discovery_failed"
       ? "Codex could not finish the initial investigation. The ticket page has the failure and a Retry action."
       : eventType === "discovery_questions"
         ? "Codex inspected the ticket and selected repositories. Initial findings and any open questions are saved. Full planning has not started."
-        : "This Plan ticket is waiting for your repository selection. Review the prefilled selection and add or remove repositories from Mia's clones. Planning has not started.";
+        : "This Plan ticket is waiting for your repository selection. Review the prefilled selection and add or remove repositories from Mia's clones. Planning has not started.");
   const action =
-    eventType === "discovery_failed"
+    planning?.[2] ??
+    (eventType === "discovery_failed"
       ? "Review the failure, correct any missing configuration, and retry."
       : eventType === "discovery_questions"
         ? "Review the findings, answer any questions, and confirm scope."
-        : "Confirm the applicable repositories on the ticket page.";
+        : "Confirm the applicable repositories on the ticket page.");
   return `<p><b>Code Assist · ${html(identifier)}</b><br><b>${heading}</b><br><br><b>Time:</b> ${html(timestamp)}<br><br>${html(title)}<br><br>${outcome}<br><br><b>Action needed:</b> ${action}<br><br><a href="${applicationOrigin}/tickets/${encodeURIComponent(id)}">Review ${html(identifier)}</a></p>`;
 }
 
@@ -192,6 +214,7 @@ export async function registerIntakeWorker(boss: PgBoss, directory: string) {
       throw new Error(message);
     } finally {
       await reconcileDiscoveryFailures(boss);
+      await reconcilePlanningFailures(boss);
       await requeuePendingNotifications(boss);
     }
   });

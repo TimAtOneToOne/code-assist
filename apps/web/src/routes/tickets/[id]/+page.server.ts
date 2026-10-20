@@ -1,3 +1,10 @@
+import {
+	approvePlan,
+	submitPlanFeedback,
+	retryPlanning,
+	reconcilePlanningFailures,
+	PlanningConflict
+} from '@code-assist/intake/planning';
 import { error, fail } from '@sveltejs/kit';
 import { readWorkItem, selectRepositories, SelectionConflict } from '@code-assist/intake';
 import {
@@ -21,11 +28,17 @@ export const load: PageServerLoad = async (event) => {
 	await requireSettingsAccess(event);
 	const item = await withController(async (boss) => {
 		await reconcileDiscoveryFailures(boss);
+		await reconcilePlanningFailures(boss);
 		return readWorkItem(boss.getDb(), issueId(event.params.id));
 	});
 	if (!item) error(404, 'Ticket not found.');
 	return {
 		item,
+		planHtml: Object.fromEntries(
+			item.planning.flatMap((run) =>
+				run.versions.map((v) => [`${run.id}:${v.number}`, renderMarkdown(v.document.markdown)])
+			)
+		),
 		discoverySummaries: Object.fromEntries(
 			item.discoveries
 				.filter((run) => run.result)
@@ -41,9 +54,46 @@ export const load: PageServerLoad = async (event) => {
 };
 export const actions = {
 	default: async (event) => {
-		await requireSettingsAccess(event);
+		const approver = await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const id = issueId(event.params.id);
+		if (String(form.get('intent')).startsWith('plan-')) {
+			const runId = String(form.get('planningId') ?? '');
+			issueId(runId);
+			const intent = form.get('intent');
+			try {
+				if (intent === 'plan-retry') {
+					const stepId = issueId(String(form.get('stepId') ?? ''));
+					await withController((boss) => retryPlanning(boss, id, runId, stepId));
+					return { message: 'Planning step queued again.' };
+				}
+				const version = Number(form.get('version')),
+					hash = String(form.get('hash') ?? '');
+				if (!Number.isSafeInteger(version) || version < 1 || !/^[a-f0-9]{64}$/.test(hash))
+					return fail(400, { error: 'Choose a saved plan version.' });
+				if (intent === 'plan-approve') {
+					if (form.get('authorization') !== 'confirmed')
+						return fail(400, { error: 'Confirm authorization for this exact plan version.' });
+					const accepted = form.getAll('acceptedMedium');
+					if (!accepted.every((value) => typeof value === 'string'))
+						return fail(400, { error: 'Invalid concern selection.' });
+					await withController((boss) =>
+						approvePlan(boss, id, runId, version, hash, accepted as string[], approver)
+					);
+					return {
+						message: 'Plan approved. Implementation is the next phase and is not running yet.'
+					};
+				}
+				if (intent !== 'plan-feedback') return fail(400, { error: 'Unknown planning action.' });
+				await withController((boss) =>
+					submitPlanFeedback(boss, id, runId, version, hash, String(form.get('feedback') ?? ''))
+				);
+				return { message: 'Feedback saved. Codex will create a new version for Claude to review.' };
+			} catch (cause) {
+				if (cause instanceof PlanningConflict) return fail(409, { error: cause.message });
+				throw cause;
+			}
+		}
 		if (form.get('intent') === 'answers' || form.get('intent') === 'retry') {
 			const runId = form.get('runId');
 			if (typeof runId !== 'string') return fail(400, { error: 'Choose a discovery run.' });
@@ -65,8 +115,7 @@ export const actions = {
 					answerDiscovery(boss, id, runId, answers as string[], notes)
 				);
 				return {
-					message:
-						'Scope and answers saved. Ready for the planning cycle; planning has not started.'
+					message: 'Scope and answers saved. Adversarial planning is queued.'
 				};
 			} catch (cause) {
 				if (cause instanceof DiscoveryConflict) return fail(409, { error: cause.message });

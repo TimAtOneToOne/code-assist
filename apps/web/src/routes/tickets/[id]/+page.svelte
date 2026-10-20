@@ -6,17 +6,21 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import RepositoryPicker from '#lib/components/repository-picker.svelte';
 	import Markdown from '#lib/components/markdown.svelte';
+	import PlanningPanel from '#lib/components/planning-panel.svelte';
 	import DiscoveryPanel from '#lib/components/discovery-panel.svelte';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	let discovery = $derived(
 		data.item.discoveries.find((run) => run.id === data.item.current_discovery_id)
 	);
+	let planning = $derived(
+		data.item.planning.find((run) => run.discovery_id === data.item.current_discovery_id)
+	);
 	const phase = {
 		queued: ['Codex discovery is queued', 'Codex inspects the ticket and repository scope'],
 		running: ['Codex is investigating', 'You review the findings and answer open questions'],
 		questions: ['Your scope confirmation is needed', 'Your answers become the planning baseline'],
-		ready: ['Scope and answers are saved', 'Full planning cycle — not started yet'],
+		ready: ['Scope and answers are saved', 'Codex drafts, Claude reviews, then you approve'],
 		failed: ['Initial discovery needs attention', 'Review the failure and retry'],
 		superseded: [
 			'Previous discovery is no longer current',
@@ -74,18 +78,35 @@
 		selections are saved. Adding Plan back restores this ticket on the next check.
 	</p>
 {:else if !data.item.eligible}<p class="mb-4">
-		This ticket no longer matches Plan without Code. Initial discovery is paused.
+		This ticket no longer matches Plan without Code. Agent work is paused.
 	</p>{/if}
-{#if discovery && !data.item.removed_at}
-	<div class="mb-5 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-		<div><span class="mr-2 font-semibold">Now</span>{phase[discovery.status][0]}</div>
-		<div><span class="mr-2 font-semibold">Next</span>{phase[discovery.status][1]}</div>
-	</div>
-	<DiscoveryPanel
-		run={discovery}
-		summaryHtml={data.discoverySummaries[discovery.id] ?? ''}
+{#if planning && !data.item.removed_at}<PlanningPanel
+		run={planning}
+		html={data.planHtml}
 		editable={data.item.eligible}
-	/>
+	/>{/if}
+{#each data.item.planning.filter((run) => run.id !== planning?.id || data.item.removed_at) as previous (previous.id)}<details
+		class="mb-5"
+	>
+		<summary class="cursor-pointer text-sm text-muted-foreground"
+			>Earlier planning · {new Date(previous.created_at).toLocaleString()} · {previous.status}</summary
+		><PlanningPanel run={previous} html={data.planHtml} editable={false} />
+	</details>{/each}
+{#if discovery && !data.item.removed_at}
+	<details open={!planning} class="mb-5">
+		<summary class="mb-3 cursor-pointer text-sm font-medium"
+			>Initial discovery and confirmed answers</summary
+		>
+		<div class="mb-5 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+			<div><span class="mr-2 font-semibold">Now</span>{phase[discovery.status][0]}</div>
+			<div><span class="mr-2 font-semibold">Next</span>{phase[discovery.status][1]}</div>
+		</div>
+		<DiscoveryPanel
+			run={discovery}
+			summaryHtml={data.discoverySummaries[discovery.id] ?? ''}
+			editable={data.item.eligible}
+		/>
+	</details>
 {/if}
 {#if !data.item.removed_at}<Card.Root class="panel">
 		<details open={!data.item.selected_repositories.length}>

@@ -158,11 +158,19 @@ Previously saved discovery answers:
 ${JSON.stringify(priorAnswers)}`;
 }
 
+export type AgentEvent = {
+  type: string;
+  thread_id?: string;
+  session_id?: string;
+};
 export type AgentInput = {
   apiKey: string;
   workspace: string;
   home: string;
   prompt: string;
+  provider?: "codex" | "claude";
+  anthropicWorkspaceId?: string;
+  outputSchema?: Record<string, unknown>;
 };
 export async function runCodex(
   input: AgentInput,
@@ -201,7 +209,7 @@ export async function runCodex(
     webSearchMode: "disabled",
   });
   const { events } = await thread.runStreamed(input.prompt, {
-    outputSchema: resultSchema,
+    outputSchema: input.outputSchema ?? resultSchema,
     signal,
   });
   let final = "",
@@ -216,16 +224,28 @@ export async function runCodex(
   }
   signal.throwIfAborted();
   if (!completed) throw new Error("Codex ended without a completed turn.");
-  return parseDiscoveryResult(final);
+  return input.outputSchema
+    ? (JSON.parse(final) as unknown)
+    : parseDiscoveryResult(final);
 }
 
 // A separate service process keeps provider credentials out of the controller environment.
 // Its IPC disconnect handler aborts the native SDK if the owning worker dies.
 export function runAgentProcess(
+  input: AgentInput & { outputSchema: Record<string, unknown> },
+  signal: AbortSignal,
+  onEvent: (event: AgentEvent) => void,
+): Promise<unknown>;
+export function runAgentProcess(
   input: AgentInput,
   signal: AbortSignal,
-  onEvent: (event: ThreadEvent) => void,
-): Promise<DiscoveryResult> {
+  onEvent: (event: AgentEvent) => void,
+): Promise<DiscoveryResult>;
+export function runAgentProcess(
+  input: AgentInput,
+  signal: AbortSignal,
+  onEvent: (event: AgentEvent) => void,
+): Promise<unknown> {
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {
     const child = fork(
@@ -237,7 +257,7 @@ export function runAgentProcess(
         stdio: ["ignore", "pipe", "pipe", "ipc"],
       },
     );
-    let result: DiscoveryResult | undefined, failure: Error | undefined;
+    let result: unknown, failure: Error | undefined;
     let diagnostics = "";
     child.stdout?.on("data", (chunk) => {
       diagnostics += chunk.toString();
@@ -253,8 +273,8 @@ export function runAgentProcess(
       "message",
       (message: {
         type: string;
-        event?: ThreadEvent;
-        result?: DiscoveryResult;
+        event?: AgentEvent;
+        result?: unknown;
         error?: string;
       }) => {
         if (message.type === "event" && message.event) {

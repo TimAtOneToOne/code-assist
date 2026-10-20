@@ -1,6 +1,6 @@
 # Initial Codex discovery
 
-This step reads a Plan ticket and its user-confirmed repositories, records initial findings and open questions, and saves Tim's answers as the planning baseline. It stops before the full plan/review cycle. Codex is the discovery agent; Claude review comes later.
+This step reads a Plan ticket and its user-confirmed repositories, records initial findings and open questions, and saves Tim's answers as the planning baseline. Confirming the answers queues the [adversarial planning cycle](planning.md): Codex drafts and revises, Claude reviews, and Tim approves the exact plan.
 
 The UI follows `docs/initial/index.html`: a Now/Next summary, a scope-and-questions checkpoint, saved answers, and earlier activity. Home retains the compact ticket cards. Repository selection is collapsed after confirmation; it remains editable. A changed scope creates a new discovery, preserving earlier findings and answers.
 
@@ -11,7 +11,7 @@ Confirming repository selection atomically queues `initial-discovery`. Worker st
 `queued → running → questions → ready`
 
 - `questions` means findings are ready for human review. Codex may return zero questions when the evidence is sufficient; Tim still confirms scope.
-- `ready` means the answers and scope are saved, not that a plan was generated or approved.
+- `ready` means the answers and scope are saved and planning is queued; it does not imply plan approval.
 - Failures are visible with a Retry action. Retry creates a new attempt and retains the old one.
 - Changed ticket data or repository choices supersede the prior attempt. Only the current attempt/job can save a result or accept answers. Older pages receive a conflict instead of silently saving stale input.
 
@@ -35,7 +35,7 @@ Native pg-boss defaults apply, including active-job expiration; automatic retrie
 
 A real crash test on Mia showed SDK 0.163.0 terminates the Codex CLI on AbortSignal but leaves an active `/bin/sleep 60` shell subprocess orphaned. Tim approved cleanup of the run's owned subprocesses on October 20, 2026. Before SDK cancellation, the separate runner identifies its descendants by parent relationships, freezes them to stop further spawning, and terminates them. It checks PID/start-time identity before each signal and excludes its own inspection process. This covers commands in separate process sessions; it never kills by a global process name or signals the controller.
 
-Worker IPC disconnect, explicit cancellation and runner SIGTERM invoke this cleanup. Interrupted discovery can restart from its recorded repository snapshots. Cleanup is specific to discovery runners; a direct SIGKILL of the runner itself cannot execute a cleanup handler. The runner must stay alive long enough to handle its worker's disconnect or cancellation.
+Worker IPC disconnect, explicit cancellation and runner SIGTERM invoke this cleanup. Interrupted discovery can restart from its recorded repository snapshots. Cleanup applies to the shared discovery/planning runner; a direct SIGKILL of the runner itself cannot execute a cleanup handler. The runner must stay alive long enough to handle its worker's disconnect or cancellation.
 
 ## Validation
 

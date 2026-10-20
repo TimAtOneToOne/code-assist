@@ -1,3 +1,8 @@
+import {
+  readPlanning,
+  reconcilePlanningFailures,
+  type PlanningRun,
+} from "./planning.ts";
 import { PgBoss, type Db } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
 import { isReady, type Ticket } from "./linear.ts";
@@ -27,13 +32,14 @@ export type WorkItem = {
   removed_at: Date | null;
   current_discovery_id: string | null;
   discovery_status: DiscoveryRun["status"] | null;
+  planning_status: PlanningRun["status"] | null;
   created_at: Date;
   observed_at: Date;
 };
 
 // Read existing single-repository choices until the user saves a new selection.
 const issueColumns =
-  "*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories, (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status";
+  "*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories, (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status, (SELECT status FROM code_assist.planning_run WHERE discovery_id=current_discovery_id) AS planning_status";
 
 export async function withIntake<T>(
   connectionString: string,
@@ -198,6 +204,7 @@ export async function recordScan(
 
 export async function dashboard(boss: PgBoss) {
   await reconcileDiscoveryFailures(boss);
+  await reconcilePlanningFailures(boss);
   const db = boss.getDb();
   const { rows: issues } = await db.executeSql(
     `SELECT ${issueColumns} FROM code_assist.intake_issue WHERE removed_at IS NULL ORDER BY
@@ -242,6 +249,7 @@ export async function readWorkItem(db: Db, id: string) {
     ...(rows[0] as WorkItem),
     events,
     discoveries: discoveries as DiscoveryRun[],
+    planning: await readPlanning(db, id),
   };
 }
 

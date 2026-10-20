@@ -109,7 +109,7 @@ export async function registerDiscoveryWorker(
           log.payload("codex.event", event.type, event);
           pending = pending
             .then(async () => {
-              if (event.type === "thread.started") {
+              if (event.type === "thread.started" && event.thread_id) {
                 await boss
                   .getDb()
                   .executeSql(
