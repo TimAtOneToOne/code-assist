@@ -7,7 +7,9 @@
     "./linear": "./src/linear.ts",
     "./repositories": "./src/repositories.ts",
     "./settings": "./src/settings.ts",
-    "./worker": "./src/worker.ts"
+    "./worker": "./src/worker.ts",
+    "./discovery": "./src/discovery.ts",
+    "./discovery-worker": "./src/discovery-worker.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",
@@ -20,10 +22,11 @@
     "@code-assist/observability": "workspace:*",
     "@code-assist/secrets": "workspace:*",
     "@linear/sdk": "98.0.0",
+    "@openai/codex-sdk": "0.163.0",
     "pg-boss": "12.38.0"
   },
   "devDependencies": {
-    "pg": "8.23.1",
-    "@types/pg": "^8.23.1"
+    "@types/pg": "^8.23.1",
+    "pg": "8.23.1"
   }
 }

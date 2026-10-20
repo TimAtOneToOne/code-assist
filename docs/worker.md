@@ -2,15 +2,15 @@
 
 Code Assist uses pg-boss 12.38.0 in `apps/worker`, running as a separate native Node process with PostgreSQL 18 on Mia. Tim selected pg-boss on October 19, 2026. SvelteKit remains the UI; HTTP requests will record commands, not execute agents.
 
-The worker now runs [Linear intake and attention notifications](intake.md). The original diagnostic workflow remains available:
+The deployed worker runs [Linear intake and attention notifications](intake.md). The new [initial Codex discovery](discovery.md) implementation is awaiting a subprocess-cleanup decision before publication. The original diagnostic workflow remains available:
 
 `queued → waiting for confirmation → confirmed → completed`
 
-The probe exercises job creation, execution, a human-style wait, explicit continuation and durable history. Probe confirmation is an operator CLI command, separate from ticket repository selection and the future plan-approval API. Neither workflow runs models, approves a plan or publishes a PR.
+The probe exercises job creation, execution, a human-style wait, explicit continuation and durable history. Probe confirmation is an operator CLI command, separate from ticket repository selection and the future plan-approval API. The probe does not run models, approve a plan or publish a PR.
 
 ## State and transaction boundaries
 
-The `code_assist` database is owned by the local `code_assist` role, which is not a PostgreSQL superuser. The existing localhost-only PostgreSQL listener and local trust authentication remain in use. This is not yet an OS/credential boundary between agents and the controller; no agent subprocesses are launched.
+The `code_assist` database is owned by the local `code_assist` role, which is not a PostgreSQL superuser. The existing localhost-only PostgreSQL listener and local trust authentication remain in use. Discovery shell tools use Codex's native read-only filesystem profile with network access disabled. They do not inherit controller credentials or its environment; see the validated scope and remaining lifecycle limitation in [discovery](discovery.md).
 
 - pg-boss owns its `pgboss` schema and native migrations.
 - `code_assist.engine_probe` stores probe state and the current job ID.
@@ -27,9 +27,9 @@ The worker loads `CODE_ASSIST_DATABASE_URL` from the operator-managed `~/Library
 
 The diagnostic queue explicitly sets `retryLimit: 0`, matching the brief's visible failure/manual Retry behavior. Its remaining queue/worker settings use pg-boss defaults: one handler per process for this queue, one job per poll, a two-second poll, a 15-minute active-job expiration, 14-day queued-job retention and seven-day completed-job retention. Human waits and checkpoint history are in application tables and do not expire with queue records. A failed job can be retried explicitly with the CLI while its queue record remains available.
 
-These are diagnostic-queue settings, not a global ticket concurrency policy or an agent execution budget. Agent liveness, time bounds, queued-work recovery and retention need their own implementation before adding real agent queues. A killed active job remains active until pg-boss detects expiration; with automatic retries disabled it then fails. Queue durability does not provide exactly-once external effects.
+These are diagnostic-queue settings, not a global ticket concurrency policy or an agent execution budget. Discovery also uses native queue defaults and explicit failure/manual Retry. Its reconciliation detects missing worker PIDs and expired jobs; durable application history retains questions and answers after queue retention. Queue durability does not provide exactly-once external effects.
 
-`SIGTERM` and `SIGINT` stop fetching probe, intake and attention jobs, wait for in-flight handlers through native `offWork()`, then close pg-boss. The updater sends `SIGTERM` after activating a release; launchd starts the replacement when the old worker exits. Web and worker may briefly report different releases during draining. The LaunchAgent retains macOS shutdown defaults: machine shutdown or unloading the service may terminate a handler before it finishes, leaving its uncommitted transaction rolled back. Long-running agent descendant management is not yet implemented.
+`SIGTERM` and `SIGINT` abort discovery through the native SDK and checkpoint a replacement attempt with captured repository snapshots. Native `offWork()` waits for discovery, probe, intake and attention handlers before closing pg-boss. The updater sends `SIGTERM` after activating a release; launchd starts the replacement when the old worker exits. Web and worker may briefly report different releases during draining. The LaunchAgent retains macOS shutdown defaults: machine shutdown or unloading the service may terminate a handler before it finishes, leaving its uncommitted transaction rolled back. Complete agent descendant cleanup remains a deployment blocker.
 
 ## Operations
 
@@ -60,7 +60,7 @@ TEST_DATABASE_URL=postgresql://<local-admin>@127.0.0.1:5432/postgres make test-w
 
 The test creates a uniquely named disposable database and removes only that database afterward. It proves queued work is consumed, waiting survives a killed worker, confirmation survives worker downtime, a new release completes the continuation, duplicate confirmation is rejected, state/event failure rolls back completion, explicit retry succeeds, enqueue rolls back with application state, and SIGTERM waits for an active SQL handler without claiming the next job.
 
-Before agent execution, implement attempt fencing and descendant cleanup, exact-version approvals, GitHub-write reconciliation, compatible application migrations and database backup/restore. No claim is made that an active Codex/Claude process survives deployment or a full machine reboot.
+Discovery implements attempt fencing, additive migrations and saved human checkpoints. Descendant cleanup remains pending. Full planning/implementation still needs exact-version plan approvals, GitHub-write reconciliation and database backup/restore. No claim is made that an active Codex/Claude process survives deployment or a full machine reboot.
 
 ### Initial installation evidence — October 19, 2026
 

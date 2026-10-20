@@ -1,6 +1,6 @@
 # Linear intake and repository selection
 
-Home shows real Linear tickets and links to their repository-selection pages. This slice ends at Tim's repository choice. It does not run agents, start planning, write to Linear, change managed clones or publish GitHub branches.
+Home shows real Linear tickets and links to their repository-selection pages. Confirming repositories queues [initial Codex discovery](discovery.md): read the ticket and repository snapshots, then collect scope answers before planning. That implementation is awaiting the subprocess-cleanup decision documented there; the deployed release still ends at repository selection. Intake does not write to Linear, change managed clones or publish GitHub branches.
 
 ## Configuration
 
@@ -18,7 +18,7 @@ The native Linear SDK reads every page of issues carrying exact label `Plan` wit
 
 The stable Linear issue UUID identifies one work record. Repeated checks update the stored ticket and candidate evidence while preserving Tim's selected repositories. A known newer ticket version cannot be replaced by an older response. When a returned ticket no longer has `Plan`, the next check marks it **Removed** and hides it from Home. Its direct page retains its description and history, but repository selection is disabled. Adding `Plan` back restores the same record and saved choices on the next check. Adding `Code` while retaining `Plan` does not mark it Removed. Missing tickets or failed checks do not establish label removal.
 
-Removal and restoration each append one history event in the same transaction as the state change. Repeated observations do not repeat the event. Pending attention notifications are hidden and neither sent nor requeued while removed; unsent intents resume after restoration. An HTTP request already in flight may still arrive. No new initial attention event is created on restoration. This slice has no agent execution to cancel; interruption of future active agent work remains to be designed.
+Removal and restoration each append one history event in the same transaction as the state change. Repeated observations do not repeat the event. Pending attention notifications are hidden and neither sent nor requeued while removed; unsent initial intents resume after restoration. An HTTP request already in flight may still arrive. No new initial attention event is created on restoration. Removal supersedes discovery and prevents stale results or answers from being accepted. A running agent observes that change on its next SDK event; native job expiration also aborts active work.
 
 Candidate repositories are immediate child Git repositories of the configured Mac mini repository root. Discovery reads each clone's name and origin URL. Suggestions identify explicit repository names and matching GitHub repository links in the title, description and comments. The stored evidence identifies its supporting source; linked repositories may describe related work. This is literal reference matching, not model inference or repository-code analysis. Tim can select any discovered repository when suggestions are absent or incorrect.
 
@@ -26,7 +26,7 @@ The searchable multi-select is prefilled with suggestions until Tim saves a sele
 
 Descriptions and comments render sanitized Markdown, including headings, links, lists, code, tables, task lists and images. Raw ticket text remains intact in the database.
 
-The additive database migration retains the legacy single-repository field. Unconverted choices read as a one-element array; new selections are stored in `selected_repositories`. Both web startup and worker startup ensure the schema exists before using it. Existing history remains readable. An old application release cannot display new multi-repository selections; rollback must use a release that understands the new field. Cross-repository agent execution and coordinated PRs are still future work.
+The additive database migration retains the legacy single-repository field. Unconverted choices read as a one-element array; new selections are stored in `selected_repositories`. Both web startup and worker startup ensure the schema exists before using it. Existing history remains readable. An old application release cannot display new multi-repository selections; rollback must use a release that understands the new field. Initial discovery reads all selected repositories; coordinated implementation and PRs remain future work.
 
 ## Durability and attention delivery
 
@@ -36,7 +36,7 @@ Application tables are `code_assist.intake_issue`, `intake_event`, `intake_scan`
 
 Each newly tracked ticket generates an attention message with a direct page link. Repeated discovery of that ticket does not create another initial attention event. The outbox keeps attempt count, safe errors and `sent_at`. Pending failed notifications are queued again on the next scan, worker startup or Home's **Retry pending notifications** action. HTTP success means the flow accepted the message, not proven Teams receipt. If a process stops after HTTP acceptance but before saving `sent_at`, delivery may repeat; this is the brief's accepted at-least-once behavior.
 
-Both queues use explicit `retryLimit: 0`, consistent with the existing worker's visible failure handling. Notification retry is driven by the persistent outbox as described above. Remaining pg-boss queue and worker defaults apply, including active-job expiration; see [worker operation](worker.md). The worker drains these handlers on deployment. Agent process interruption and GitHub-write reconciliation remain future work.
+Both queues use explicit `retryLimit: 0`, consistent with the existing worker's visible failure handling. Notification retry is driven by the persistent outbox as described above. Remaining pg-boss queue and worker defaults apply, including active-job expiration; see [worker operation](worker.md). The worker drains these handlers on deployment. Discovery has a separate queue and checkpoint lifecycle; its outstanding process-cleanup limitation is documented in [discovery](discovery.md). GitHub-write reconciliation remains future work.
 
 Credentials are read at execution time from the existing private [secret store](secrets.md). Linear SDK errors can retain request headers and fetch errors can contain a signed URL, so these boundaries persist credential-safe errors and HTTP status rather than raw errors.
 

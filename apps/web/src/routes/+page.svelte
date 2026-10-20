@@ -8,12 +8,20 @@
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	const date = (value: string | Date) => new Date(value).toLocaleString();
+	const discoveryLabel = {
+		queued: 'Discovery queued',
+		running: 'Codex investigating',
+		questions: 'Review discovery',
+		ready: 'Ready for planning',
+		failed: 'Discovery failed',
+		superseded: 'Discovery paused'
+	};
 </script>
 
 <svelte:head><title>Home · Code Assist</title></svelte:head>
 <div class="eyebrow">YOUR WORKSPACE</div>
 <h1>Ready for your next decision.</h1>
-<p class="intro">Plan tickets from Linear, with repository suggestions for your review.</p>
+<p class="intro">Plan tickets, repository scope, and initial questions from Codex.</p>
 <div class="mb-6 flex flex-wrap gap-3">
 	<form method="POST" action="?/check" use:enhance>
 		<Button type="submit" disabled={!data.settings}>Check Linear now</Button>
@@ -71,9 +79,11 @@
 			>
 			<div class="flex flex-wrap items-center gap-2">
 				<Badge variant={item.selected_repositories.length ? 'secondary' : 'default'}
-					>{item.selected_repositories.length
-						? 'Repositories selected'
-						: 'Needs repositories'}</Badge
+					>{item.discovery_status
+						? discoveryLabel[item.discovery_status]
+						: item.selected_repositories.length
+							? 'Repositories selected'
+							: 'Needs repositories'}</Badge
 				>
 				<p class="text-sm">
 					{#if item.selected_repositories.length}Selected: {item.selected_repositories
@@ -94,5 +104,6 @@
 	</Card.Root>
 {/each}
 <p class="mt-5 text-sm text-muted-foreground">
-	Repository selection is the current step. Planning and implementation have not started.
+	Codex investigates selected repositories and asks any initial questions. Full planning and
+	implementation have not started.
 </p>

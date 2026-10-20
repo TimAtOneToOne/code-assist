@@ -4,6 +4,7 @@ import { revealSecret } from "@code-assist/secrets";
 import { fetchTickets, LinearScanError } from "./linear.ts";
 import { discoverRepositories } from "./repositories.ts";
 import { readSettings } from "./settings.ts";
+import { currentAttention, reconcileDiscoveryFailures } from "./discovery.ts";
 import {
   intakeQueue,
   notificationQueue,
@@ -27,13 +28,32 @@ export function attentionMessage(
   identifier: string,
   title: string,
   date = new Date(),
+  eventType = "repository_needed",
 ) {
   const timestamp = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     dateStyle: "medium",
     timeStyle: "long",
   }).format(date);
-  return `<p><b>Code Assist · ${html(identifier)}</b><br><b>🔎 Ready for review · Choose repositories</b><br><br><b>Time:</b> ${html(timestamp)}<br><br>${html(title)}<br><br>This Plan ticket is waiting for your repository selection. Review the prefilled selection and add or remove repositories from Mia's clones. Planning has not started.<br><br><b>Action needed:</b> Confirm the applicable repositories on the ticket page.<br><br><a href="${applicationOrigin}/tickets/${encodeURIComponent(id)}">Review ${html(identifier)}</a></p>`;
+  const heading =
+    eventType === "discovery_failed"
+      ? "⚠️ Blocked · Initial discovery failed"
+      : eventType === "discovery_questions"
+        ? "🔎 Ready for review · Confirm scope and answer questions"
+        : "🔎 Ready for review · Choose repositories";
+  const outcome =
+    eventType === "discovery_failed"
+      ? "Codex could not finish the initial investigation. The ticket page has the failure and a Retry action."
+      : eventType === "discovery_questions"
+        ? "Codex inspected the ticket and selected repositories. Initial findings and any open questions are saved. Full planning has not started."
+        : "This Plan ticket is waiting for your repository selection. Review the prefilled selection and add or remove repositories from Mia's clones. Planning has not started.";
+  const action =
+    eventType === "discovery_failed"
+      ? "Review the failure, correct any missing configuration, and retry."
+      : eventType === "discovery_questions"
+        ? "Review the findings, answer any questions, and confirm scope."
+        : "Confirm the applicable repositories on the ticket page.";
+  return `<p><b>Code Assist · ${html(identifier)}</b><br><b>${heading}</b><br><br><b>Time:</b> ${html(timestamp)}<br><br>${html(title)}<br><br>${outcome}<br><br><b>Action needed:</b> ${action}<br><br><a href="${applicationOrigin}/tickets/${encodeURIComponent(id)}">Review ${html(identifier)}</a></p>`;
 }
 
 export async function reconcileSchedule(boss: PgBoss, directory: string) {
@@ -50,10 +70,10 @@ export async function deliverNotification(
   jobId: string,
 ) {
   const { rows } = await boss.getDb().executeSql(
-    `UPDATE code_assist.attention_outbox SET attempts=attempts+1,error=NULL
-     WHERE id=$1 AND job_id=$2 AND sent_at IS NULL
-     AND EXISTS (SELECT 1 FROM code_assist.intake_issue i
-                 WHERE i.id=issue_id AND i.removed_at IS NULL)
+    `UPDATE code_assist.attention_outbox n SET attempts=attempts+1,error=NULL
+     WHERE n.id=$1 AND n.job_id=$2 AND n.sent_at IS NULL
+     AND EXISTS (SELECT 1 FROM code_assist.intake_issue i JOIN code_assist.intake_event e ON e.id=n.event_id
+                 WHERE i.id=n.issue_id AND i.removed_at IS NULL AND ${currentAttention})
      RETURNING issue_id`,
     [notificationId, jobId],
   );
@@ -65,9 +85,10 @@ export async function deliverNotification(
     if (!settings) throw new Error("Configure attention notifications.");
     const { rows: issues } = await boss
       .getDb()
-      .executeSql("SELECT ticket FROM code_assist.intake_issue WHERE id=$1", [
-        rows[0].issue_id,
-      ]);
+      .executeSql(
+        "SELECT i.ticket,e.type FROM code_assist.intake_issue i JOIN code_assist.attention_outbox n ON n.issue_id=i.id JOIN code_assist.intake_event e ON e.id=n.event_id WHERE n.id=$1",
+        [notificationId],
+      );
     const ticket = issues[0].ticket;
     const response = await fetch(
       revealSecret(directory, settings.teamsWebhookSecretId),
@@ -75,7 +96,13 @@ export async function deliverNotification(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: attentionMessage(ticket.id, ticket.identifier, ticket.title),
+          message: attentionMessage(
+            ticket.id,
+            ticket.identifier,
+            ticket.title,
+            new Date(),
+            issues[0].type,
+          ),
           "conversation-id": revealSecret(
             directory,
             settings.teamsConversationSecretId,
@@ -164,6 +191,7 @@ export async function registerIntakeWorker(boss: PgBoss, directory: string) {
       // eslint-disable-next-line preserve-caught-error -- Persist only the credential-safe boundary error.
       throw new Error(message);
     } finally {
+      await reconcileDiscoveryFailures(boss);
       await requeuePendingNotifications(boss);
     }
   });

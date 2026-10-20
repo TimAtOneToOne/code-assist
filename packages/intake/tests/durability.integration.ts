@@ -92,7 +92,9 @@ test("durable intake, selection, rollback and notification delivery across resta
     assert.equal(state.issues.length, 1);
     assert.equal(state.notifications.length, 1);
     assert.equal(
-      (await readWorkItem(boss.getDb(), ticket.id))?.events.length,
+      (await readWorkItem(boss.getDb(), ticket.id))?.events.filter(
+        (event) => !event.type.startsWith("discovery_"),
+      ).length,
       1,
     );
     // Reproduce a database from the single-repository release.
@@ -155,7 +157,11 @@ test("durable intake, selection, rollback and notification delivery across resta
       "/repos/repo-two",
       "/repos/repo-one",
     ]);
-    assert.equal(item?.events.length, 2);
+    assert.equal(
+      item?.events.filter((event) => !event.type.startsWith("discovery_"))
+        .length,
+      2,
+    );
     assert.equal(item?.removed_at, null);
     await recordScan(
       boss,
@@ -210,8 +216,17 @@ test("durable intake, selection, rollback and notification delivery across resta
       hidden?.selected_repositories,
       item?.selected_repositories,
     );
-    assert.equal(hidden?.events.length, 3);
-    assert.equal(hidden?.events.at(-1)?.type, "issue_removed");
+    assert.equal(
+      hidden?.events.filter((event) => !event.type.startsWith("discovery_"))
+        .length,
+      3,
+    );
+    assert.equal(
+      hidden?.events
+        .filter((event) => !event.type.startsWith("discovery_"))
+        .at(-1)?.type,
+      "issue_removed",
+    );
     assert.equal((await dashboard(boss)).issues.length, 0);
     assert.equal((await dashboard(boss)).notifications.length, 0);
     await assert.rejects(
@@ -250,8 +265,17 @@ test("durable intake, selection, rollback and notification delivery across resta
       visible?.selected_repositories,
       item?.selected_repositories,
     );
-    assert.equal(visible?.events.length, 4);
-    assert.equal(visible?.events.at(-1)?.type, "issue_restored");
+    assert.equal(
+      visible?.events.filter((event) => !event.type.startsWith("discovery_"))
+        .length,
+      4,
+    );
+    assert.equal(
+      visible?.events
+        .filter((event) => !event.type.startsWith("discovery_"))
+        .at(-1)?.type,
+      "issue_restored",
+    );
     assert.equal((await dashboard(boss)).issues.length, 1);
     assert.equal((await dashboard(boss)).notifications.length, 1);
     await requeuePendingNotifications(boss);

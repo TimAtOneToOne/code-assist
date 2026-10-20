@@ -7,12 +7,21 @@ import {
   notificationQueue,
 } from "@code-assist/intake";
 import { registerIntakeWorker } from "@code-assist/intake/worker";
+import { discoveryQueue } from "@code-assist/intake/discovery";
+import { registerDiscoveryWorker } from "@code-assist/intake/discovery-worker";
 
 const release = process.env.CODE_ASSIST_COMMIT ?? "development";
 const boss = connectBoss(`code-assist-worker:${release}`);
+const stopping = new AbortController();
 const shutdown = new Promise<string>((resolve) => {
-  process.once("SIGTERM", () => resolve("SIGTERM"));
-  process.once("SIGINT", () => resolve("SIGINT"));
+  process.once("SIGTERM", () => {
+    stopping.abort();
+    resolve("SIGTERM");
+  });
+  process.once("SIGINT", () => {
+    stopping.abort();
+    resolve("SIGINT");
+  });
 });
 
 try {
@@ -23,9 +32,11 @@ try {
   if (!dataDirectory) throw new Error("CODE_ASSIST_DATA_DIR is required");
   await registerProbeWorker(boss, release);
   await registerIntakeWorker(boss, dataDirectory);
+  await registerDiscoveryWorker(boss, dataDirectory, stopping.signal);
   logger.event("info", "worker.ready", "Worker ready");
   const signal = await shutdown;
   logger.event("info", "worker.draining", "Worker draining", { signal });
+  await boss.offWork(discoveryQueue);
   await boss.offWork(probeQueue);
   await boss.offWork(intakeQueue);
   await boss.offWork(notificationQueue);
