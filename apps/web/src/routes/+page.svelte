@@ -16,6 +16,7 @@
 	let { data, form }: PageProps = $props();
 	const pausedStorageKey = 'code-assist:paused-work';
 	let pausedIds = $state<string[]>([]);
+	let preferencesReady = $state(false);
 	const visibleIssues = $derived(data.issues.filter((item) => !pausedIds.includes(item.id)));
 	const completedIssues = $derived(
 		data.completedIssues.filter((item) => !pausedIds.includes(item.id))
@@ -29,6 +30,8 @@
 			if (Array.isArray(saved) && saved.every((id) => typeof id === 'string')) pausedIds = saved;
 		} catch {
 			toast.error('Could not load your Paused Work display preference.');
+		} finally {
+			preferencesReady = true;
 		}
 	});
 	function togglePaused(id: string) {
@@ -191,6 +194,7 @@
 				<Button
 					variant="ghost"
 					size="icon-sm"
+					disabled={!preferencesReady}
 					aria-label={`${paused ? 'Resume Work' : 'Pause Work'} for ${item.ticket.identifier}`}
 					title={paused ? 'Return to Tickets' : 'Move to Paused Work (display only)'}
 					onclick={() => togglePaused(item.id)}
