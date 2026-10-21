@@ -28,6 +28,8 @@ systemctl restart docker
 id workspace >/dev/null 2>&1 || useradd --create-home --shell /bin/bash workspace
 usermod -aG docker workspace
 install -d -m 0700 -o workspace -g workspace /work
+# Root-run installers may otherwise create this directory before Chromium does.
+install -d -m 0755 -o workspace -g workspace /home/workspace/.config
 mkdir -p /tmp/code-assist-toolchain
 cd /tmp/code-assist-toolchain
 curl -fsSLO https://nodejs.org/dist/v24.22.0/node-v24.22.0-linux-arm64.tar.xz

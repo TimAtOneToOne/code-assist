@@ -55,6 +55,10 @@ Microsoft credentials configure OAuth but do not provide a signed-in user. Sign-
 
 The saved profile initializes Git metadata inside the disposable checkout so actionlint can discover workflows from the exported source archive. On synced commit `fb82b52baf51bd1668262e578b79c371e433ce9f`, lint, 24 Python tests, bootstrap/staging/production Terraform validation, and 21 mocked Terraform tests pass. Native Terraform module downloads resolve through the controller-fetched GitOps snapshots without guest GitHub credentials. No infrastructure was applied. See [the passing setup-test logs](http://100.91.0.83:3000/logs?attempt=81547254-a375-4f26-9903-cab824408e35).
 
+Coding validation runs `TF_CLI_ARGS_init=-lockfile=readonly make validate`. Default Terraform initialization adds Linux ARM provider checksums to tracked lockfiles, which changes the candidate source during validation. Terraform's native read-only lockfile mode preserves checksum verification and keeps the candidate unchanged. This setting applies only to the validation command; intentional dependency updates during implementation remain possible.
+
+The committed lockfiles must also contain the Linux ARM unpacked-provider checksums for subsequent `terraform validate` calls. Read-only initialization alone does not supply them. If they are missing, update them during implementation with native `terraform providers lock -platform=linux_arm64`, review/checkpoint the resulting lockfile changes, then validate the new candidate.
+
 ### Medusa Baseline Findings — October 20, 2026
 
 On synced commit `eb8b6fbe5906b837dca8a6d303121423c640019d`, the isolated setup completes installation and migrations, and Ruff formatting/lint plus mypy pass. The full suite has **1,623 passing tests and two failing Linear credential tests**: `test_scope_mismatch_triggers_remint` and `test_near_expiry_triggers_remint` in `tests/app/api/v2/linear/test_credentials_db.py`. Both expect a second token mint but observe only one. These failures remain visible; the profile does not skip them. See [the final setup-test logs](http://100.91.0.83:3000/logs?attempt=83cf3a10-668a-4b73-b87a-58562b368f63).
