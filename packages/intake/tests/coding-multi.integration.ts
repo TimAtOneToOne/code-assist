@@ -43,6 +43,7 @@ import {
   retryCoding,
   currentCoding,
   syncApprovedCoding,
+  initializeCoding,
 } from "../src/coding.ts";
 const adminUrl = process.env.TEST_DATABASE_URL;
 if (!adminUrl) throw new Error("TEST_DATABASE_URL is required");
@@ -342,6 +343,37 @@ test("multi-repository coding persists sequential checkpoints, combined review, 
       main: workflow(1),
     });
     assert.equal((await readCoding(boss.getDb(), ticket.id))[0].status, "done");
+    async function completionCounts() {
+      const { rows } = await boss.getDb().executeSql(
+        `SELECT count(*)::int AS events, count(n.id)::int AS notifications
+         FROM code_assist.intake_event e
+         LEFT JOIN code_assist.attention_outbox n ON n.event_id=e.id
+         WHERE e.issue_id=$1 AND e.type='coding_done'`,
+        [ticket.id],
+      );
+      return rows[0];
+    }
+    assert.deepEqual(await completionCounts(), { events: 1, notifications: 1 });
+    for (const offset of [1100, 1200]) {
+      await initializeCoding(boss);
+      assert.equal(
+        (await readCoding(boss.getDb(), ticket.id))[0].status,
+        "done",
+        "Startup must preserve completion backed by per-repository workflows",
+      );
+      for (const index of [0, 1]) {
+        await recordGitHubObservation(
+          boss,
+          observed(index),
+          new Date(at.getTime() + offset),
+          { pr: merge(index), main: workflow(index) },
+        );
+      }
+      assert.deepEqual(await completionCounts(), {
+        events: 1,
+        notifications: 1,
+      });
+    }
     assert.equal(
       await recordGitHubObservation(boss, observed(1), at, { error: "stale" }),
       false,
@@ -371,6 +403,7 @@ test("multi-repository coding persists sequential checkpoints, combined review, 
       { pr: merge(1), main: workflow(1) },
     );
     assert(!(await currentCoding(boss.getDb(), repair.run, repair.step)));
+    assert.deepEqual(await completionCounts(), { events: 2, notifications: 2 });
   } finally {
     await boss.stop({ graceful: false });
     await admin.query(`DROP DATABASE ${database} WITH (FORCE)`);

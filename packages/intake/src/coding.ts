@@ -54,7 +54,8 @@ export async function initializeCoding(boss: PgBoss) {
  ALTER TABLE code_assist.coding_run DROP CONSTRAINT IF EXISTS coding_run_planning_id_version_key;
  CREATE UNIQUE INDEX IF NOT EXISTS coding_original_plan ON code_assist.coding_run(planning_id,version) WHERE parent_run_id IS NULL;
  CREATE UNIQUE INDEX IF NOT EXISTS coding_repair_failure ON code_assist.coding_run(parent_run_id,repair_key);
- UPDATE code_assist.coding_run SET status='awaiting_main' WHERE status='done' AND main_workflows IS NULL;
+ -- Legacy merge-only completion predates per-repository workflow evidence.
+ UPDATE code_assist.coding_run SET status='awaiting_main' WHERE status='done' AND repositories IS NULL AND main_workflows IS NULL;
  `);
   await boss.createQueue(codingQueue, { retryLimit: 0 });
 }
