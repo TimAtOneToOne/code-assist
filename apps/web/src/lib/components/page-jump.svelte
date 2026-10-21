@@ -1,6 +1,8 @@
 <script lang="ts">
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
+	import House from '@lucide/svelte/icons/house';
+	import { resolve } from '$app/paths';
 	import { Button } from '#lib/components/ui/button/index.js';
 
 	function jump(to: 'top' | 'bottom') {
@@ -20,6 +22,15 @@
 		aria-label="Jump to the top"
 		title="Jump to the top"
 		onclick={() => jump('top')}><ArrowUp aria-hidden="true" /></Button
+	>
+	<Button
+		variant="ghost"
+		size="icon"
+		class="size-11"
+		href={resolve('/')}
+		data-sveltekit-reload
+		aria-label="Home"
+		title="Home"><House aria-hidden="true" /></Button
 	>
 	<Button
 		variant="ghost"
