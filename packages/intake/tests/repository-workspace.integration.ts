@@ -53,6 +53,10 @@ test(
       "-m",
       "fixture",
     );
+    git("remote", "add", "origin", "git@github.com:Example/setup-fixture.git");
+    git("config", "credential.helper", "must-not-be-copied");
+    const dependencyCommit = git("rev-parse", "HEAD");
+    await writeFile(join(repo, ".env"), "SECRET=not-in-git-bundle");
     const admin = new pg.Client({ connectionString: adminUrl });
     await admin.connect();
     const database = "setup_orb_" + randomUUID().replaceAll("-", "");
@@ -67,10 +71,11 @@ test(
     boss.on("error", () => {});
     const config = {
       ...emptyRepositorySetup(),
+      gitDependencies: [{ repository: "fixture", commits: [dependencyCommit] }],
       systemSetupScript: 'test "$(id -u)" = 0\ntouch /tmp/system-installed',
       setupScript: 'test "$(id -u)" != 0\ntest -f /tmp/system-installed',
       validationScript:
-        'test "$FIXTURE" = "local"\ntest "${#SESSION_SECRET}" = 64\ntest ! -w /etc/code-assist/profiles.json\nnode --check app.mjs',
+        'test "$FIXTURE" = "local"\ntest "${#SESSION_SECRET}" = 64\ntest ! -w /etc/code-assist/profiles.json\nnode --check app.mjs\nmkdir -p .tmp\ngit clone https://github.com/Example/setup-fixture.git .tmp/dependency\ntest ! -e .tmp/dependency/.env\ntest ! -w /opt/code-assist/dependencies/fixture.git/config\n! git -C .tmp/dependency config --get credential.helper',
       startScript: "node app.mjs",
       readyScript:
         "curl --retry 20 --retry-delay 1 --retry-connrefused --fail http://127.0.0.1:5173",

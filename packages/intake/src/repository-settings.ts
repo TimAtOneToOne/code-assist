@@ -13,6 +13,7 @@ import {
 } from "./repository-profiles.ts";
 
 export type RepositorySetup = {
+  gitDependencies?: { repository: string; commits: string[] }[];
   workingDirectory: string;
   systemSetupScript: string;
   setupScript: string;
@@ -155,11 +156,35 @@ export function validateRepositorySetup(value: unknown): RepositorySetup {
     throw new RepositorySettingsError(
       "Generated variables must be valid names without a local override of the same name.",
     );
-  return structuredClone(
-    Object.fromEntries(
+  if (
+    v.gitDependencies !== undefined &&
+    (!Array.isArray(v.gitDependencies) ||
+      v.gitDependencies.some(
+        (dependency) =>
+          !dependency ||
+          typeof dependency.repository !== "string" ||
+          !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(dependency.repository) ||
+          !Array.isArray(dependency.commits) ||
+          !dependency.commits.length ||
+          dependency.commits.some(
+            (commit) =>
+              typeof commit !== "string" || !/^[a-f0-9]{40}$/.test(commit),
+          ),
+      ) ||
+      new Set(v.gitDependencies.map((d) => d.repository)).size !==
+        v.gitDependencies.length)
+  )
+    throw new RepositorySettingsError(
+      "Git dependencies need unique synced repository names and full commit hashes.",
+    );
+  return structuredClone({
+    ...Object.fromEntries(
       Object.keys(template).map((k) => [k, v[k as keyof RepositorySetup]]),
     ),
-  ) as RepositorySetup;
+    ...(v.gitDependencies?.length
+      ? { gitDependencies: v.gitDependencies }
+      : {}),
+  }) as RepositorySetup;
 }
 function readSettings(directory: string): Record<string, RepositorySetup> {
   try {

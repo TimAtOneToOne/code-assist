@@ -64,15 +64,27 @@ export const actions = {
 					].map((key) => [key, String(form.get(key) ?? '')])
 				),
 				environment: JSON.parse(String(form.get('environment') ?? '{}')),
+				gitDependencies: JSON.parse(String(form.get('gitDependencies') ?? '[]')),
 				generatedVariables: String(form.get('generatedVariables') ?? '')
 					.split(/[\s,]+/)
 					.filter(Boolean)
 			};
+			const available = await listRepositories(dataDirectory());
+			if (
+				Array.isArray(configuration.gitDependencies) &&
+				configuration.gitDependencies.some(
+					(dependency) => !available.some((repo) => repo.name === dependency?.repository)
+				)
+			)
+				return fail(400, { error: 'Choose synced repositories for Git dependencies.' });
 			writeRepositorySetup(dataDirectory(), repository, configuration);
 		} catch (err) {
 			if (err instanceof RepositorySettingsError || err instanceof SyntaxError)
 				return fail(400, {
-					error: err instanceof SyntaxError ? 'Local overrides must be valid JSON.' : err.message
+					error:
+						err instanceof SyntaxError
+							? 'Overrides and Git dependencies must be valid JSON.'
+							: err.message
 				});
 			throw err;
 		}

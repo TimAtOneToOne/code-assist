@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { Db } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
@@ -10,6 +10,7 @@ import { resolveRepositoryEnvironment } from "@code-assist/secrets";
 import type { RepositorySnapshot } from "./discovery.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { bootstrap, environmentLauncher } from "./workspace-bootstrap.ts";
+import { bundleGitDependency } from "./workspace-git-dependencies.ts";
 
 import { snapshots } from "./coding-repositories.ts";
 import {
@@ -354,6 +355,66 @@ export async function provisionWorkspace<T extends WorkspaceSources>(
       environmentLauncher,
     );
     await guest(["chown", "-R", "workspace:workspace", "/work"]);
+    const dependencies = new Map<
+      string,
+      { source: string; commits: Set<string> }
+    >();
+    for (const repository of repositories) {
+      for (const dependency of profiles[repository.name].configuration
+        .gitDependencies ?? []) {
+        const source = join(dirname(repository.source), dependency.repository);
+        const previous = dependencies.get(dependency.repository);
+        if (previous && previous.source !== source)
+          throw new Error("Conflicting Git dependency sources.");
+        const combined = previous ?? { source, commits: new Set<string>() };
+        for (const commit of dependency.commits) combined.commits.add(commit);
+        dependencies.set(dependency.repository, combined);
+      }
+    }
+    for (const [name, dependency] of dependencies) {
+      await stage(`copying pinned Git dependency ${name}`);
+      const bundle = join(folder(directory, id), "dependency.bundle");
+      try {
+        const origin = await bundleGitDependency(
+          dependency.source,
+          [...dependency.commits],
+          bundle,
+          folder(directory, id),
+          signal,
+        );
+        const target = `/opt/code-assist/dependencies/${name}.git`;
+        await guest(
+          ["bash", "-c", "cat > /tmp/code-assist-dependency.bundle"],
+          createReadStream(bundle),
+        );
+        await guest([
+          "git",
+          "clone",
+          "--bare",
+          "/tmp/code-assist-dependency.bundle",
+          target,
+        ]);
+        await guest(["chmod", "-R", "a+rX", target]);
+        await guest([
+          "git",
+          "config",
+          "--system",
+          "--add",
+          "safe.directory",
+          target,
+        ]);
+        await guest([
+          "git",
+          "config",
+          "--system",
+          `url.file://${target}.insteadOf`,
+          origin,
+        ]);
+        await guest(["rm", "/tmp/code-assist-dependency.bundle"]);
+      } finally {
+        await rm(bundle, { force: true });
+      }
+    }
     for (const source of sources) {
       const profile = profiles[source.name];
       const run = (args: string[]) =>

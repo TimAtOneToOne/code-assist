@@ -114,6 +114,20 @@
 							client, and a private container engine are already installed. Other command fields run
 							as the workspace user.
 						</p>
+						<label for="gitDependencies">Pinned Git Dependencies (JSON)</label>
+						<Textarea
+							id="gitDependencies"
+							name="gitDependencies"
+							class="font-mono text-sm"
+							rows={4}
+							value={JSON.stringify(data.configuration.gitDependencies ?? [], null, 2)}
+						/>
+						<p class="field-help">
+							For private modules, list synced repository names and full commit hashes: <code
+								>{'{"repository":"gitops","commits":["full commit hash"]}'}</code
+							> inside a JSON array. The controller copies Git objects into the guest; credentials stay
+							on the controller. Dependencies are read-only and are not coding targets.
+						</p>
 						<label for="setupScript">Install and Service Setup</label>
 						<Textarea
 							class="font-mono text-sm"

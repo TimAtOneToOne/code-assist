@@ -6,6 +6,7 @@ Open **Configuration → Repository Setup** to search synced repositories and ed
 
 - **Working Directory:** relative to the repository; use `.` for its root.
 - **Additional System Dependencies:** optional installation script, run as root inside the isolated OrbStack guest. The shared bootstrap already installs Node, pnpm, Git, Make, a PostgreSQL client, and a private container engine.
+- **Pinned Git Dependencies:** a JSON array of synced repository names and full commit hashes, for example `[{"repository":"gitops","commits":["41f4871cc6820b2f33b1c5d2089aae557779b541"]}]`. The controller exports Git bundles from sibling synced clones. Native Git URL rewriting lets tools such as Terraform clone the pinned modules locally without guest GitHub credentials. Bundles include the requested commits and their Git history, not untracked files, host Git configuration, hooks, or credentials. The guest copies are root-owned under `/opt/code-assist/dependencies`; they are dependency sources, not approved coding targets. When multiple selected repositories need the same dependency, its requested commits share one bundle. Missing commits fail setup explicitly; sync the source clone and update the pins when requirements change.
 - **Install and Service Setup:** install locked dependencies, start private services, apply local migrations, and prepare synthetic fixtures using repository-owned commands.
 - **Validation Commands:** the repository's lint, type, test, and build checks. Required before the profile can be saved.
 - **Playwright Package Directory / Browser Install Commands:** optional repository-relative directory for Chromium system dependencies and the command to install the repository's browser. The command runs from Working Directory.
@@ -30,6 +31,23 @@ Tests use the coding workflow's one-hour job expiration and explicit retry appro
 Saved profiles live in `CODE_ASSIST_DATA_DIR/repository-setups.json` (mode 0600), keyed by the original synced repository path. New coding workspaces use them even when source is exported from a controller-owned checkpoint repository. The exact profile is retained in the workspace manifest and in the guest's root-owned `/etc/code-assist/profiles.json`. Coding prompts and validation use this pinned profile, so editing settings does not change a running workspace. Existing workspaces created before profiles were saved retain their built-in behavior.
 
 The setup-test records are in `code_assist.repository_setup_test`; the worker consumes `repository-setup-test`. Tests run the same provisioning function as coding, without fabricating a plan approval. Approved coding work still checks the current exact plan before and after provisioning.
+
+## Current Ticket Repositories
+
+Profiles are saved on Mia for the six repositories selected across the current ticket set. Edit them in the UI; the saved configuration and each setup test's frozen copy are the source of truth.
+
+| Repository | Runtime and Local Services | Validation |
+| --- | --- | --- |
+| `internal-chat-ui` | SvelteKit in `sveltekit`; PostgreSQL 5435, LocalStack 4566, app 5173 | Lint, Svelte checks, unit/component tests, build, startup and Microsoft sign-in-page rendering |
+| `workplace-agents` | Root Makefile; portal 6001, PostgreSQL 65432 | `make validate`, startup and Microsoft sign-in-page rendering |
+| `elation_companion` | Unpacked Chrome extension | `bash ./build.sh`; paired browser acceptance belongs to the approved feature's tests |
+| `windmill-work` | Elation Router 4178 and Windmill Catalog 4182; both apps and Chromium installed | Root lint/flow tests, `make app-check`, `make catalog-check` including browser/generated-bundle tests; app startup |
+| `windmill` | Terraform 1.16.3, Python 3.12, uv, Ruff 0.14.0, actionlint 1.7.12, ShellCheck | `make lint`, `make test`, backend-disabled Terraform validation and mocked tests; pinned GitOps dependencies |
+| `medusa-api` | Python 3.12/uv; private PostgreSQL 5433 and Valkey 6380; API 8000 | Non-mutating Ruff checks, mypy, `make test-all`; health/Swagger/OpenAPI checks |
+
+Medusa's development database is `fastapi`; tests must unset the explicit reader/writer URL overrides so `ENVIRONMENT=test` selects `fastapi_test`. Python dependencies live outside the source checkout. Mypy diagnostics remain informational, matching Medusa's Makefile; Ruff and pytest failures fail validation. Olive integration destinations are local; a full Olive schema and synthetic fixtures are separate from Medusa's own migrations.
+
+Microsoft credentials configure OAuth but do not provide a signed-in user. Sign-in-page checks do **not** establish authenticated UI readiness. Workplace Agents requires an interactive Microsoft session/test identity for that acceptance. Windmill Work's local browser suites use synthetic responses; hosted Windmill fork/Git Sync acceptance remains distinct and follows the approved feature's scope.
 
 ## Verification
 

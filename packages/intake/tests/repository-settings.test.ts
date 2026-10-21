@@ -90,6 +90,20 @@ test("built-in configurations preserve local overrides and require complete setu
       /not configured/,
     );
     const config = { ...emptyRepositorySetup(), validationScript: "make test" };
+    for (const gitDependencies of [
+      [{ repository: "../outside", commits: ["a".repeat(40)] }],
+      [{ repository: "gitops", commits: ["main"] }],
+      [{ repository: "gitops", commits: [] }],
+      [{ repository: 123, commits: ["a".repeat(40)] }],
+    ])
+      assert.throws(
+        () => validateRepositorySetup({ ...config, gitDependencies }),
+        /Git dependencies/,
+      );
+    assert.deepEqual(
+      validateRepositorySetup({ ...config, gitDependencies: [] }),
+      config,
+    );
     for (const workingDirectory of [
       "/etc",
       "../other",
