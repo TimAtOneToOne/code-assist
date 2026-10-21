@@ -159,8 +159,7 @@
 			{:else if data.scan}
 				{data.scan.status === 'completed' ? 'Linear checked' : `Linear check ${data.scan.status}`} · {date(
 					data.scan.created_at
-				)}{#if data.scan.issue_count !== null}
-					· {data.scan.issue_count} tickets{/if}
+				)}{#if data.scan.issue_count !== null}{` · ${data.scan.issue_count} tickets`}{/if}
 			{:else}No Linear check yet{/if}
 		</p>
 	</div>
