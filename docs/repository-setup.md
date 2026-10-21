@@ -51,6 +51,12 @@ ICU seeds `code-assist@example.invalid` in its private development database with
 
 Microsoft credentials configure OAuth but do not provide a signed-in user. Sign-in-page checks do **not** establish authenticated UI readiness. Workplace Agents requires an interactive Microsoft session/test identity for that acceptance. Windmill Work's local browser suites use synthetic responses; hosted Windmill fork/Git Sync acceptance remains distinct and follows the approved feature's scope.
 
+### Medusa Baseline Findings — October 20, 2026
+
+On synced commit `eb8b6fbe5906b837dca8a6d303121423c640019d`, the isolated setup completes installation and migrations, and Ruff formatting/lint plus mypy pass. The full suite has **1,623 passing tests and two failing Linear credential tests**: `test_scope_mismatch_triggers_remint` and `test_near_expiry_triggers_remint` in `tests/app/api/v2/linear/test_credentials_db.py`. Both expect a second token mint but observe only one. These failures remain visible; the profile does not skip them. See [the final setup-test logs](http://100.91.0.83:3000/logs?attempt=83cf3a10-668a-4b73-b87a-58562b368f63).
+
+A separate disposable [runtime probe](http://100.91.0.83:3000/logs?attempt=5499937a-c4d8-4a72-afda-4d55ddc8aacd) verifies startup plus `/health`, `/docs`, and `/openapi.json`. This proves basic runtime readiness, not authenticated Entra or full Olive integration. Both probe machines were removed afterward.
+
 ## Verification
 
 `make verify` runs normal validation. Database integration coverage lives in `repository-setup.integration.ts`. To exercise real OrbStack provisioning, app startup, validation failure, and machine cleanup on Mia:
