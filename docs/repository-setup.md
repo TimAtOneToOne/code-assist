@@ -38,14 +38,16 @@ Profiles are saved on Mia for the six repositories selected across the current t
 
 | Repository | Runtime and Local Services | Validation |
 | --- | --- | --- |
-| `internal-chat-ui` | SvelteKit in `sveltekit`; PostgreSQL 5435, LocalStack 4566, app 5173 | Lint, Svelte checks, unit/component tests, build, startup and Microsoft sign-in-page rendering |
+| `internal-chat-ui` | SvelteKit in `sveltekit`; PostgreSQL 5435, LocalStack 4566, app 5173 | Lint, Svelte checks, unit/component tests, build, startup and a real browser password-sign-in with a synthetic local account |
 | `workplace-agents` | Root Makefile; portal 6001, PostgreSQL 65432 | `make validate`, startup and Microsoft sign-in-page rendering |
 | `elation_companion` | Unpacked Chrome extension | `bash ./build.sh`; paired browser acceptance belongs to the approved feature's tests |
 | `windmill-work` | Elation Router 4178 and Windmill Catalog 4182; both apps and Chromium installed | Root lint/flow tests, `make app-check`, `make catalog-check` including browser/generated-bundle tests; app startup |
 | `windmill` | Terraform 1.16.3, Python 3.12, uv, Ruff 0.14.0, actionlint 1.7.12, ShellCheck | `make lint`, `make test`, backend-disabled Terraform validation and mocked tests; pinned GitOps dependencies |
 | `medusa-api` | Python 3.12/uv; private PostgreSQL 5433 and Valkey 6380; API 8000 | Non-mutating Ruff checks, mypy, `make test-all`; health/Swagger/OpenAPI checks |
 
-Medusa's development database is `fastapi`; tests must unset the explicit reader/writer URL overrides so `ENVIRONMENT=test` selects `fastapi_test`. Python dependencies live outside the source checkout. Mypy diagnostics remain informational, matching Medusa's Makefile; Ruff and pytest failures fail validation. Olive integration destinations are local; a full Olive schema and synthetic fixtures are separate from Medusa's own migrations.
+Medusa's development database is `fastapi`; tests must unset `OLIVE_DB_PASSWORD` and the explicit reader/writer URL overrides so `ENVIRONMENT=test` selects `fastapi_test`. Python dependencies live outside the source checkout. Mypy diagnostics remain informational, matching Medusa's Makefile; Ruff and pytest failures fail validation. Olive integration destinations are local; a full Olive schema and synthetic fixtures are separate from Medusa's own migrations.
+
+ICU seeds `code-assist@example.invalid` in its private development database with a fresh `LOCAL_TEST_PASSWORD` per workspace. The browser uses the existing password sign-in form and verifies the resulting session; no session cookie is fabricated, and no verification email is sent. This local account has no Microsoft delegated permissions.
 
 Microsoft credentials configure OAuth but do not provide a signed-in user. Sign-in-page checks do **not** establish authenticated UI readiness. Workplace Agents requires an interactive Microsoft session/test identity for that acceptance. Windmill Work's local browser suites use synthetic responses; hosted Windmill fork/Git Sync acceptance remains distinct and follows the approved feature's scope.
 
