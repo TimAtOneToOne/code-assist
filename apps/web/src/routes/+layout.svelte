@@ -16,7 +16,7 @@
 <Toaster richColors closeButton />
 
 <div class="shell">
-	<aside>
+	<aside data-sveltekit-reload>
 		<a class="brand" href={resolve('/')}><span class="brand-mark">c/</span> Code Assist</a>
 		<div class="nav-label">WORKSPACE</div>
 		<nav aria-label="Main navigation">
