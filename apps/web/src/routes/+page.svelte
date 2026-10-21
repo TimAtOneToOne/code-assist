@@ -1,6 +1,10 @@
 <script lang="ts">
 	import type { WorkItem } from '@code-assist/intake';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import Pause from '@lucide/svelte/icons/pause';
+	import Play from '@lucide/svelte/icons/play';
+	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { invalidateAll } from '$app/navigation';
@@ -10,6 +14,33 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
+	const pausedStorageKey = 'code-assist:paused-work';
+	let pausedIds = $state<string[]>([]);
+	const visibleIssues = $derived(data.issues.filter((item) => !pausedIds.includes(item.id)));
+	const completedIssues = $derived(
+		data.completedIssues.filter((item) => !pausedIds.includes(item.id))
+	);
+	const pausedIssues = $derived(
+		[...data.issues, ...data.completedIssues].filter((item) => pausedIds.includes(item.id))
+	);
+	onMount(() => {
+		try {
+			const saved: unknown = JSON.parse(localStorage.getItem(pausedStorageKey) ?? '[]');
+			if (Array.isArray(saved) && saved.every((id) => typeof id === 'string')) pausedIds = saved;
+		} catch {
+			toast.error('Could not load your Paused Work display preference.');
+		}
+	});
+	function togglePaused(id: string) {
+		pausedIds = pausedIds.includes(id)
+			? pausedIds.filter((value) => value !== id)
+			: [...pausedIds, id];
+		try {
+			localStorage.setItem(pausedStorageKey, JSON.stringify(pausedIds));
+		} catch {
+			toast.error('This view changed, but your browser could not save it for next time.');
+		}
+	}
 	const date = (value: string | Date) => new Date(value).toLocaleString();
 	const codingLabel = {
 		prepare: 'Preparing Workspace',
@@ -105,15 +136,15 @@
 		<Badge variant="active">Working or Done</Badge>
 	</div>
 </div>
-{#if !data.issues.length}<Card.Root class="panel"
+{#if !visibleIssues.length}<Card.Root class="panel"
 		><Card.Title>No active tickets.</Card.Title>
 		<p>
-			{data.completedIssues.length
-				? 'Older completed tickets are below.'
+			{pausedIssues.length || completedIssues.length
+				? 'Your paused or older completed tickets are below.'
 				: 'Run a Linear check to bring in tickets labeled Plan.'}
 		</p></Card.Root
 	>{/if}
-{#snippet ticketCard(item: WorkItem)}
+{#snippet ticketCard(item: WorkItem, paused = false, canPause = true)}
 	<Card.Root class="mb-2 gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
 		<div class="min-w-0 space-y-1">
 			<Card.Title
@@ -155,26 +186,61 @@
 				{#if !item.eligible}<Badge variant="outline">Plan Trigger No Longer Present</Badge>{/if}
 			</div>
 		</div>
-		<div class="shrink-0">
+		<div class="flex shrink-0 items-center gap-2">
+			{#if canPause}
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					aria-label={`${paused ? 'Resume Work' : 'Pause Work'} for ${item.ticket.identifier}`}
+					title={paused ? 'Return to Tickets' : 'Move to Paused Work (display only)'}
+					onclick={() => togglePaused(item.id)}
+				>
+					{#if paused}<Play class="size-4" aria-hidden="true" />{:else}<Pause
+							class="size-4"
+							aria-hidden="true"
+						/>{/if}
+				</Button>
+			{/if}
 			<Button href={resolve('/tickets/[id]', { id: item.id })} variant="outline" size="sm"
 				>Review ticket →</Button
 			>
 		</div>
 	</Card.Root>
 {/snippet}
-{#each data.issues as item (item.id)}{@render ticketCard(item)}{/each}
+{#each visibleIssues as item (item.id)}{@render ticketCard(item)}{/each}
 <p class="mt-5 text-sm text-muted-foreground">
 	Codex drafts and revises plans; Claude reviews them. You approve the exact plan before
 	implementation.
 </p>
 
-{#if data.completedIssues.length}
+{#if pausedIssues.length}
+	<details class="group mt-8 rounded-xl border bg-card">
+		<summary
+			class="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden"
+		>
+			<span class="text-lg font-semibold">Paused Work</span>
+			<Badge variant="secondary">{pausedIssues.length}</Badge>
+			<ChevronDown
+				class="ml-auto size-4 transition-transform group-open:rotate-180"
+				aria-hidden="true"
+			/>
+		</summary>
+		<div class="px-4 pb-3">
+			<p class="mb-3 text-sm text-muted-foreground">
+				Saved in this browser. This only changes your view; running jobs continue.
+			</p>
+			{#each pausedIssues as item (item.id)}{@render ticketCard(item, true)}{/each}
+		</div>
+	</details>
+{/if}
+
+{#if completedIssues.length}
 	<details class="group mt-8 rounded-xl border bg-card">
 		<summary
 			class="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden"
 		>
 			<span class="text-lg font-semibold">Completed</span>
-			<Badge variant="secondary">{data.completedIssues.length}</Badge>
+			<Badge variant="secondary">{completedIssues.length}</Badge>
 			<ChevronDown
 				class="ml-auto size-4 transition-transform group-open:rotate-180"
 				aria-hidden="true"
@@ -182,7 +248,7 @@
 		</summary>
 		<div class="px-4 pb-3">
 			<p class="mb-3 text-sm text-muted-foreground">Done for more than 24 hours.</p>
-			{#each data.completedIssues as item (item.id)}{@render ticketCard(item)}{/each}
+			{#each completedIssues as item (item.id)}{@render ticketCard(item, false, false)}{/each}
 		</div>
 	</details>
 {/if}
