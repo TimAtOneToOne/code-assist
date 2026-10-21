@@ -191,15 +191,15 @@ importers:
       '@openai/codex-sdk':
         specifier: 0.163.0
         version: 0.163.0
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
       pg-boss:
         specifier: 12.38.0
         version: 12.38.0(@opentelemetry/api@1.9.1)
     devDependencies:
       '@types/pg':
         specifier: ^8.23.1
-        version: 8.23.1
-      pg:
-        specifier: 8.23.1
         version: 8.23.1
 
   packages/observability: {}

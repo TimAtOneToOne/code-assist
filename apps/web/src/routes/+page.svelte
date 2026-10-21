@@ -19,6 +19,22 @@
 	let { data }: PageProps = $props();
 	let linearForm: HTMLFormElement;
 	let githubForm: HTMLFormElement;
+	let liveUpdateError = $state<string | null>(null);
+	onMount(() => {
+		const events = new EventSource(resolve('/api/dashboard/events'));
+		events.onmessage = async () => {
+			try {
+				await invalidateAll();
+				liveUpdateError = null;
+			} catch {
+				liveUpdateError = 'Could not update tickets. Use Refresh Results in Actions.';
+			}
+		};
+		events.onerror = () => {
+			liveUpdateError = 'Live updates disconnected. Reconnecting…';
+		};
+		return () => events.close();
+	});
 	const actionFeedback: SubmitFunction =
 		() =>
 		async ({ result, update }) => {
@@ -115,6 +131,9 @@
 </script>
 
 <svelte:head><title>Home · Code Assist</title></svelte:head>
+{#if liveUpdateError}<p role="status" class="mb-3 text-sm text-muted-foreground">
+		{liveUpdateError}
+	</p>{/if}
 <div class="mb-7 flex flex-wrap items-start justify-between gap-4">
 	<h1>Your Workspace</h1>
 	<div class="ml-auto flex flex-col items-end gap-2">

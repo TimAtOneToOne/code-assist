@@ -14,14 +14,14 @@ export const actions = {
 	github: async (event) => {
 		await requireSettingsAccess(event);
 		await withController((boss) => requestGitHubRefresh(boss));
-		return { message: 'GitHub refresh queued. Refresh results to see the latest PR states.' };
+		return { message: 'GitHub refresh queued. Results will update automatically.' };
 	},
 	check: async (event) => {
 		await requireSettingsAccess(event);
 		if (!readSettings(dataDirectory()))
 			return fail(400, { error: 'Configure the Linear connection first.' });
 		await withController(requestScan);
-		return { message: 'Linear check queued. Refresh to see its result.' };
+		return { message: 'Linear check queued. Results will update automatically.' };
 	},
 	notifications: async (event) => {
 		await requireSettingsAccess(event);

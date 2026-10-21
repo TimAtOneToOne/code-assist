@@ -4,6 +4,12 @@ The web application is in `apps/web`, generated with the official Svelte CLI and
 
 The shell uses shadcn-svelte Button, Card and Badge components installed through its CLI. AI Elements and AG-UI preferences are recorded in `AGENTS.md` for future agent/chat features.
 
+## Live Home Updates
+
+Home subscribes to `/api/dashboard/events` using server-sent events, with the same Tailscale owner check as the page. PostgreSQL triggers notify the web process after dashboard source data commits; the browser reloads page data in place, preserving scroll and Paused Work preferences. No polling job is involved. Each open Home tab owns one database listener, released when the tab closes or navigates away. Native EventSource reconnection fetches the latest state again, including changes missed while disconnected. The existing Actions menu remains available for manual refreshes.
+
+Worker initialization installs the triggers. The integration check is `TEST_DATABASE_URL=postgresql://localhost/postgres node --test packages/intake/tests/dashboard-events.integration.ts`; it creates and removes a disposable database and covers commit/rollback delivery, reconnect initialization and listener cleanup.
+
 ## Development
 
 Use Node 24 LTS and pnpm 10.28.0. The repository is a pnpm workspace; add future applications under `apps/`.

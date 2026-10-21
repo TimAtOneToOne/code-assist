@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/store.ts",
     "./linear": "./src/linear.ts",
+    "./dashboard-events": "./src/dashboard-events.ts",
     "./repositories": "./src/repositories.ts",
     "./settings": "./src/settings.ts",
     "./worker": "./src/worker.ts",
@@ -39,10 +40,10 @@
     "@code-assist/secrets": "workspace:*",
     "@linear/sdk": "98.0.0",
     "@openai/codex-sdk": "0.163.0",
-    "pg-boss": "12.38.0"
+    "pg-boss": "12.38.0",
+    "pg": "8.23.1"
   },
   "devDependencies": {
-    "@types/pg": "^8.23.1",
-    "pg": "8.23.1"
+    "@types/pg": "^8.23.1"
   }
 }
