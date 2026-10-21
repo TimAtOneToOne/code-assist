@@ -164,6 +164,7 @@
 		</p>
 	</div>
 </div>
+<hr class="mb-6 border-border" />
 <form
 	bind:this={linearForm}
 	method="POST"
