@@ -17,6 +17,12 @@ checks that this explanation stays accurate as the plan changes. Both instructio
 are editable in Prompt Management. Existing saved versions and approvals remain
 unchanged; the preference applies when the next draft or revision starts.
 
+The default **Adversarial Review** prompt also asks Claude to avoid over-engineering:
+prefer the simplest adequate solution, justify added complexity with a concrete
+failure scenario and evidence, and recommend the smallest correction. Speculative
+future needs and optional improvements must not become blockers. Necessary
+correctness, authorization, security, and data-integrity requirements still apply.
+
 ## Scopes
 
 | Scope | Applies To |
