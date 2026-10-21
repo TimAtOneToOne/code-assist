@@ -1,4 +1,8 @@
 import {
+  cleanupQueue,
+  registerCleanupWorker,
+} from "@code-assist/intake/coding-cleanup";
+import {
   registerSetupTestWorker,
   setupTestQueue,
 } from "@code-assist/intake/repository-setup-tests";
@@ -47,11 +51,13 @@ try {
   await registerPlanningWorker(boss, dataDirectory, stopping.signal);
   await registerCodingWorker(boss, dataDirectory, stopping.signal);
   await registerGitHubWorker(boss, stopping.signal);
+  await registerCleanupWorker(boss, dataDirectory, stopping.signal);
   logger.event("info", "worker.ready", "Worker ready");
   const signal = await shutdown;
   logger.event("info", "worker.draining", "Worker draining", { signal });
   await boss.offWork(setupTestQueue);
   await boss.offWork(codingQueue);
+  await boss.offWork(cleanupQueue);
   await boss.offWork(githubQueue);
   await boss.offWork(planningQueue);
   await boss.offWork(discoveryQueue);

@@ -1,5 +1,6 @@
+import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { dirname, join } from "node:path";
@@ -541,6 +542,15 @@ export async function provisionWorkspace<T extends WorkspaceSources>(
   }
 }
 
+export async function workspaceExists(machine: string, signal: AbortSignal) {
+  const { stdout } = await promisify(execFile)(
+    "/usr/local/bin/orb",
+    ["list", "--quiet"],
+    { signal },
+  );
+  return stdout.split(/\r?\n/).includes(machine);
+}
+
 export async function destroyWorkspace(
   directory: string,
   id: string,
@@ -548,12 +558,13 @@ export async function destroyWorkspace(
 ) {
   const workspace = await readWorkspace(directory, id);
   if (workspace.state === "destroyed") return workspace;
-  await workspaceCommand(
-    "/usr/local/bin/orb",
-    ["delete", "--force", workspace.machine],
-    signal,
-    () => {},
-  );
+  if (await workspaceExists(workspace.machine, signal))
+    await workspaceCommand(
+      "/usr/local/bin/orb",
+      ["delete", "--force", workspace.machine],
+      signal,
+      () => {},
+    );
   workspace.state = "destroyed";
   workspace.stage = "destroyed";
   await save(directory, workspace);

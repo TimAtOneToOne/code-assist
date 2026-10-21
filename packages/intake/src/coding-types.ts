@@ -23,6 +23,8 @@ export type CodingRepository = {
   main_workflows?: MainWorkflows | null;
 };
 export type CodingRun = {
+  workspace_cleaned_at?: Date | null;
+  workspace_cleanup_error?: string | null;
   repositories?: CodingRepository[] | null;
   repository_index?: number;
   id: string;

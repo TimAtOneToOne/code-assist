@@ -22,7 +22,8 @@
     "./coding-worker": "./src/coding-worker.ts",
     "./github": "./src/github.ts",
     "./repository-settings": "./src/repository-settings.ts",
-    "./repository-setup-tests": "./src/repository-setup-tests.ts"
+    "./repository-setup-tests": "./src/repository-setup-tests.ts",
+    "./coding-cleanup": "./src/coding-cleanup.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",

@@ -117,6 +117,19 @@
 			{/each}
 		</div>
 	{/if}
+	{#if run.workspace_cleaned_at}
+		<p class="text-sm text-muted-foreground">
+			Workspace cleaned up {new Date(run.workspace_cleaned_at).toLocaleString()}. Code checkpoints,
+			evidence, logs, and ticket history are retained.
+		</p>
+	{:else if run.workspace_cleanup_error}
+		<p role="alert" class="text-sm">Workspace Cleanup: {run.workspace_cleanup_error}</p>
+	{:else if run.status === 'done' && run.workspace_id}
+		<p class="text-sm text-muted-foreground">
+			Workspace cleanup runs automatically after 24 hours in Done, once saved code and evidence are
+			verified.
+		</p>
+	{/if}
 	{#if run.error}<p role="alert">{run.error}</p>{/if}
 	{#if latest?.kind === 'collect'}<p class="text-sm text-muted-foreground">
 			The agent result and code checkpoint are saved. Evidence collection resumes from that

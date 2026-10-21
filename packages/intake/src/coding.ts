@@ -35,6 +35,8 @@ export async function initializeCoding(boss: PgBoss) {
  CREATE TABLE IF NOT EXISTS code_assist.coding_step (
  id uuid PRIMARY KEY,run_id uuid NOT NULL REFERENCES code_assist.coding_run(id),job_id uuid NOT NULL,kind text NOT NULL,input_commit text,
  status text NOT NULL,worker_pid integer,result jsonb,error text,created_at timestamptz NOT NULL DEFAULT now(),finished_at timestamptz);
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS workspace_cleaned_at timestamptz;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS workspace_cleanup_error text;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repositories jsonb;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repository_index integer NOT NULL DEFAULT 0;
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS repository_index integer NOT NULL DEFAULT 0;
