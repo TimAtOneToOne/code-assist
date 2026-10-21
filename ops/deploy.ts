@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { cleanupReleases } from "./release-cleanup.ts";
 import {
   existsSync,
   mkdirSync,
@@ -9,7 +10,7 @@ import {
   rmSync,
   symlinkSync,
 } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   domain,
@@ -54,13 +55,7 @@ export async function deploy(restart = true) {
 
   if (active === commit) {
     if (restart) {
-      const response = await fetch(`${origin}/health`);
-      const health = await response.json();
-      if (!response.ok || health.status !== "ok" || health.commit !== commit) {
-        throw new Error(
-          `Active release ${commit} did not pass its health check`,
-        );
-      }
+      await cleanupReleases(root, commit);
     }
     return;
   }
@@ -105,5 +100,7 @@ if (
   process.argv[1] &&
   realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
+  // Keep this updater's loaded release visible during process inspection.
+  process.chdir(dirname(dirname(fileURLToPath(import.meta.url))));
   await deploy();
 }
