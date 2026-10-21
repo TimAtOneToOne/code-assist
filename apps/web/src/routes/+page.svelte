@@ -3,17 +3,42 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Pause from '@lucide/svelte/icons/pause';
 	import Play from '@lucide/svelte/icons/play';
+	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+	import Settings from '@lucide/svelte/icons/settings';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { enhance } from '$app/forms';
+	import { enhance, type SubmitFunction } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { invalidateAll } from '$app/navigation';
-	import { Button } from '#lib/components/ui/button/index.js';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { workflowBadgeVariant } from '#lib/workflow-status.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import type { PageProps } from './$types';
-	let { data, form }: PageProps = $props();
+	let { data }: PageProps = $props();
+	let linearForm: HTMLFormElement;
+	let githubForm: HTMLFormElement;
+	const actionFeedback: SubmitFunction =
+		() =>
+		async ({ result, update }) => {
+			if (result.type === 'error') {
+				toast.error('Could not complete the request. Please try again.');
+				return;
+			}
+			if (result.type === 'failure')
+				toast.error(result.data?.error ?? 'Could not complete the request.');
+			if (result.type === 'success' && result.data?.message) toast.success(result.data.message);
+			await update({ reset: false });
+		};
+	async function refreshResults() {
+		try {
+			await invalidateAll();
+			toast.success('Results refreshed.');
+		} catch {
+			toast.error('Could not refresh results. Please try again.');
+		}
+	}
 	const pausedStorageKey = 'code-assist:paused-work';
 	let pausedIds = $state<string[]>([]);
 	let preferencesReady = $state(false);
@@ -44,7 +69,13 @@
 			toast.error('This view changed, but your browser could not save it for next time.');
 		}
 	}
-	const date = (value: string | Date) => new Date(value).toLocaleString();
+	const date = (value: string | Date) =>
+		new Date(value).toLocaleString(undefined, {
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		});
 	const codingLabel = {
 		prepare: 'Preparing Workspace',
 		implement: 'Codex Implementing',
@@ -84,50 +115,78 @@
 </script>
 
 <svelte:head><title>Home · Code Assist</title></svelte:head>
-<div class="eyebrow">YOUR WORKSPACE</div>
-<h1>Ready for your next decision.</h1>
-<p class="intro">Plan tickets, agent investigations, and plans awaiting your decision.</p>
-<div class="mb-6 flex flex-wrap gap-3">
-	<form method="POST" action="?/check" use:enhance>
-		<Button type="submit" disabled={!data.settings}>Check Linear now</Button>
-	</form>
-	<Button variant="outline" onclick={() => invalidateAll()}>Refresh results</Button>
-	<form method="POST" action="?/github" use:enhance>
-		<Button type="submit" variant="outline">Refresh GitHub</Button>
-	</form>
-	<Button href={resolve('/configuration/intake')} variant="outline">Intake settings</Button>
+<div class="mb-7 flex flex-wrap items-start justify-between gap-4">
+	<h1>Your Workspace</h1>
+	<div class="ml-auto flex flex-col items-end gap-2">
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger class={buttonVariants({ variant: 'outline', class: 'gap-3 px-3' })}>
+				Actions <ChevronDown class="size-4" aria-hidden="true" />
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="w-60">
+				<DropdownMenu.Item onSelect={() => linearForm.requestSubmit()} disabled={!data.settings}>
+					Check Linear Now
+				</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => githubForm.requestSubmit()}
+					>Refresh GitHub</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onSelect={refreshResults}>
+					<RefreshCw class="size-4" aria-hidden="true" /> Refresh Results
+				</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item>
+					{#snippet child({ props })}
+						<a {...props} href={resolve('/configuration/intake')}>
+							<Settings class="size-4" aria-hidden="true" /> Intake Settings
+						</a>
+					{/snippet}
+				</DropdownMenu.Item>
+				{#if data.settings}
+					<DropdownMenu.Separator />
+					<p class="px-2 py-1.5 text-xs text-muted-foreground">
+						{data.settings.pollMinutes
+							? `Checks every ${data.settings.pollMinutes} minutes.`
+							: 'Checks run when requested.'}
+						New tickets need Plan without Code.
+					</p>
+				{/if}
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+		<p class="text-right text-xs text-muted-foreground" aria-live="polite">
+			{#if !data.settings}
+				<a class="underline underline-offset-4" href={resolve('/configuration/intake')}
+					>Set Up Linear Intake</a
+				>
+			{:else if data.scan}
+				{data.scan.status === 'completed' ? 'Linear checked' : `Linear check ${data.scan.status}`} · {date(
+					data.scan.created_at
+				)}{#if data.scan.issue_count !== null}
+					· {data.scan.issue_count} tickets{/if}
+			{:else}No Linear check yet{/if}
+		</p>
+	</div>
 </div>
-{#if form?.error}<p role="alert" class="mb-4 text-destructive">{form.error}</p>{/if}
-{#if form?.message}<p role="status" class="mb-4">{form.message}</p>{/if}
-{#if !data.settings}<p class="mb-5">
-		Configure the Linear credential and attention flow to start intake.
-	</p>
-{:else}<p class="mb-5 text-sm text-muted-foreground">
-		{data.settings.pollMinutes
-			? `Checks every ${data.settings.pollMinutes} minute(s).`
-			: 'Checks run when requested.'} New tickets need Plan and must not have Code.
-	</p>{/if}
-{#if data.scan}
-	<Card.Root class="mb-5 gap-2 px-4 py-3">
-		<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-			<Card.Title class="text-sm">Latest Linear check: {data.scan.status}</Card.Title>
-			<p class="text-sm">
-				{date(data.scan.created_at)}{#if data.scan.issue_count !== null}
-					· {data.scan.issue_count} tickets observed{/if}
-			</p>
-		</div>
-		{#if data.scan.error}<p role="alert" class="text-destructive">
-				{data.scan.error}
-			</p>{/if}
-	</Card.Root>
-{/if}
+<form
+	bind:this={linearForm}
+	method="POST"
+	action="?/check"
+	use:enhance={actionFeedback}
+	hidden
+></form>
+<form
+	bind:this={githubForm}
+	method="POST"
+	action="?/github"
+	use:enhance={actionFeedback}
+	hidden
+></form>
+{#if data.scan?.error}<p role="alert" class="mb-4 text-destructive">{data.scan.error}</p>{/if}
 {#if data.notifications.length}
 	<Card.Root class="panel"
 		><Card.Title>{data.notifications.length} attention notification(s) pending</Card.Title>
 		{#each data.notifications as notification (notification.id)}<p class="text-sm">
 				{notification.error ?? 'Waiting for the notification worker.'} Attempts: {notification.attempts}
 			</p>{/each}
-		<form method="POST" action="?/notifications" use:enhance>
+		<form method="POST" action="?/notifications" use:enhance={actionFeedback}>
 			<Button type="submit" variant="outline">Retry pending notifications</Button>
 		</form></Card.Root
 	>
