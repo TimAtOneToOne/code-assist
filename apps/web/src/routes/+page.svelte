@@ -14,6 +14,8 @@
 	const codingLabel = {
 		prepare: 'Preparing Workspace',
 		implement: 'Codex Implementing',
+		checkpoint: 'Saving Code Checkpoint',
+		collect: 'Collecting Saved Evidence',
 		validate: 'Running Validation',
 		review: 'Claude Reviewing',
 		publish: 'Publishing PR',

@@ -12,6 +12,8 @@
 	const titles = {
 		prepare: 'Preparing Workspace',
 		implement: 'Codex Implementing',
+		checkpoint: 'Saving Code Checkpoint',
+		collect: 'Collecting Saved Evidence',
 		validate: 'Running Validation',
 		review: 'Claude Reviewing',
 		publish: 'Publishing Pull Request',
@@ -38,7 +40,13 @@
 		<Card.Title>{run.repair ? 'Main Workflow Repair' : 'Coding'}</Card.Title>
 		<div class="flex items-center gap-2">
 			<Badge variant={workflowBadgeVariant(run.status, editable)}
-				>{editable ? titles[run.status] : 'Previous Approved Scope'}</Badge
+				>{editable
+					? run.status === 'failed' && latest?.kind === 'collect'
+						? 'Evidence Collection Failed'
+						: run.status === 'failed' && latest?.kind === 'checkpoint'
+							? 'Checkpoint Save Failed'
+							: titles[run.status]
+					: 'Previous Approved Scope'}</Badge
 			><Button variant="outline" size="sm" onclick={() => invalidateAll()}>Refresh</Button>
 		</div>
 	</div>
@@ -57,11 +65,17 @@
 				<div class="space-y-2 rounded-md border p-3">
 					<div class="flex flex-wrap items-center gap-2">
 						<span class="font-medium">{index + 1}. {repository.name}</span>
-						<Badge variant={workflowBadgeVariant(repository.status, editable)}
+						<Badge
+							variant={workflowBadgeVariant(
+								index === run.repository_index ? run.status : repository.status,
+								editable
+							)}
 							>{index === run.repository_index &&
 							[
 								'prepare',
 								'implement',
+								'checkpoint',
+								'collect',
 								'validate',
 								'review',
 								'publish',
@@ -104,6 +118,10 @@
 		</div>
 	{/if}
 	{#if run.error}<p role="alert">{run.error}</p>{/if}
+	{#if latest?.kind === 'collect'}<p class="text-sm text-muted-foreground">
+			The agent result and code checkpoint are saved. Evidence collection resumes from that
+			checkpoint without running the agent again.
+		</p>{/if}
 	{#if run.pr_url}
 		<div class="flex flex-wrap items-center gap-3">
 			{#if !run.repositories}
@@ -191,7 +209,11 @@
 				name="codingId"
 				value={run.id}
 			/><input type="hidden" name="stepId" value={latest.id} /><Button type="submit"
-				>Retry Coding Step</Button
+				>{latest.kind === 'collect'
+					? 'Retry Evidence Collection'
+					: latest.kind === 'checkpoint'
+						? 'Retry Saving Checkpoint'
+						: 'Retry Coding Step'}</Button
 			>
 		</form>{/if}
 	{#if run.status === 'failed' && editable && latest && !run.pr_url}

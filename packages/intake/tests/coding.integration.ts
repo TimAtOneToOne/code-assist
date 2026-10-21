@@ -47,6 +47,7 @@ import {
   syncApprovedCoding,
   changeCodingBranch,
 } from "../src/coding.ts";
+import { reconcileCodingFailures } from "../src/coding-worker.ts";
 const adminUrl = process.env.TEST_DATABASE_URL;
 if (!adminUrl) throw new Error("TEST_DATABASE_URL is required");
 test("coding binds approval, advances exact checkpoints, rejects duplicate/stale results, preserves retry inputs", async () => {
@@ -141,7 +142,12 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     async function next() {
       const [job] = await boss.fetch<{ stepId: string }>(codingQueue);
       assert(job);
-      const started = await startCoding(boss, job.data.stepId, job.id);
+      const started = await startCoding(
+        boss,
+        job.data.stepId,
+        job.id,
+        job.retryCount,
+      );
       assert(started);
       return started;
     }
@@ -209,14 +215,129 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       await finishCoding(boss, b.run, b.step, {}, "validate", "b".repeat(40)),
       false,
     );
+    const continuation = {
+      agentStepId: c.step.id,
+      kind: "implement" as const,
+      result: {
+        summary: "Implemented",
+        disposition: "implemented",
+        directionQuestion: "",
+        browserEvidence: ["/work/evidence/browser/"],
+      },
+      browserCalls: ["browser_navigate"],
+    };
     assert(
       await finishCoding(
         boss,
         c.run,
         c.step,
-        { summary: "Implemented" },
-        "validate",
+        continuation.result,
+        "checkpoint",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        continuation,
+      ),
+    );
+    const checkpoint = await next();
+    assert.deepEqual(checkpoint.step.continuation, continuation);
+    assert(
+      await finishCoding(
+        boss,
+        checkpoint.run,
+        checkpoint.step,
+        { commit: "b".repeat(40) },
+        "collect",
         "b".repeat(40),
+        undefined,
+        undefined,
+        undefined,
+        continuation,
+      ),
+    );
+    const collection = await next();
+    assert.equal(collection.step.kind, "collect");
+    assert.equal(collection.step.input_commit, "b".repeat(40));
+    assert.equal(
+      (await boss.getJobById(codingQueue, collection.step.job_id))?.retryLimit,
+      2,
+    );
+    // A dead worker leaves a running row. Reconciliation resumes only collection through pg-boss.
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.coding_step SET worker_pid=2147483647 WHERE id=$1",
+        [collection.step.id],
+      );
+    await reconcileCodingFailures(boss);
+    assert.equal(
+      (await boss.getJobById(codingQueue, collection.step.job_id))?.state,
+      "retry",
+    );
+    await boss
+      .getDb()
+      .executeSql("UPDATE pgboss.job SET start_after=now() WHERE id=$1", [
+        collection.step.job_id,
+      ]);
+    await boss.stop();
+    await boss.start();
+    const recovered = await next();
+    assert.equal(recovered.step.id, collection.step.id);
+    assert.equal(recovered.step.job_retry_count, 1);
+    assert.deepEqual(recovered.step.continuation, continuation);
+    assert.equal(
+      await finishCoding(boss, collection.run, collection.step, {}, "validate"),
+      false,
+    );
+    await failCoding(boss, collection.run, collection.step, "Late old worker");
+    assert.equal(
+      (await readCoding(boss.getDb(), ticket.id))[0].status,
+      "collect",
+    );
+    // Repeated interrupted collection consumes exactly the two native retries, then pauses.
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.coding_step SET worker_pid=2147483647 WHERE id=$1",
+        [recovered.step.id],
+      );
+    await reconcileCodingFailures(boss);
+    await boss
+      .getDb()
+      .executeSql("UPDATE pgboss.job SET start_after=now() WHERE id=$1", [
+        recovered.step.job_id,
+      ]);
+    const exhausted = await next();
+    assert.equal(exhausted.step.job_retry_count, 2);
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.coding_step SET worker_pid=2147483647 WHERE id=$1",
+        [exhausted.step.id],
+      );
+    await reconcileCodingFailures(boss);
+    assert.equal(
+      (await boss.getJobById(codingQueue, exhausted.step.job_id))?.state,
+      "failed",
+    );
+    assert.equal(
+      (await readCoding(boss.getDb(), ticket.id))[0].status,
+      "failed",
+    );
+    // Manual retry retains the candidate and never queues implementation.
+    await retryCoding(boss, ticket.id, exhausted.run.id, exhausted.step.id);
+    const resumed = await next();
+    assert.equal(resumed.step.kind, "collect");
+    assert.equal(resumed.step.input_commit, "b".repeat(40));
+    assert.deepEqual(resumed.step.continuation, continuation);
+    assert(
+      await finishCoding(
+        boss,
+        resumed.run,
+        resumed.step,
+        { evidence: "/fixture/evidence.tar.gz" },
+        "validate",
       ),
     );
     const validation = await next();
@@ -640,7 +761,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     assert.equal(completed.commit, "b".repeat(40));
     assert.equal(
       completed.steps.filter((s) => s.status === "completed").length,
-      5,
+      7,
     );
   } finally {
     await boss.stop();

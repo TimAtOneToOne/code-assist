@@ -20,6 +20,7 @@ import type {
   CodingStep,
   CodingKind,
   CodingDetail,
+  CodingContinuation,
 } from "./coding-types.ts";
 export * from "./coding-types.ts";
 export const codingQueue = "approved-coding";
@@ -38,6 +39,9 @@ export async function initializeCoding(boss: PgBoss) {
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repository_index integer NOT NULL DEFAULT 0;
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS repository_index integer NOT NULL DEFAULT 0;
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS input_commits jsonb;
+ ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS continuation jsonb;
+ ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS job_retry_count integer NOT NULL DEFAULT 0;
+ ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS recovery_step_id uuid;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_checked_at timestamptz;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_error text;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS merged_at timestamptz;
@@ -111,23 +115,36 @@ export async function currentCoding(
   }
   if (step) {
     const { rows } = await db.executeSql(
-      "SELECT 1 FROM code_assist.coding_step WHERE id=$1 AND job_id=$2 AND status IN ('queued','running')",
-      [step.id, step.job_id],
+      "SELECT 1 FROM code_assist.coding_step WHERE id=$1 AND job_id=$2 AND job_retry_count=$3 AND status IN ('queued','running')",
+      [step.id, step.job_id, step.job_retry_count ?? 0],
     );
     return current.current_step_id === step.id && rows.length > 0;
   }
   return true;
 }
-async function enqueue(boss: PgBoss, db: Db, run: CodingRun, kind: CodingKind) {
+async function enqueue(
+  boss: PgBoss,
+  db: Db,
+  run: CodingRun,
+  kind: CodingKind,
+  continuation?: CodingContinuation | null,
+  recoveryStepId?: string | null,
+) {
   const id = randomUUID(),
     job = await boss.send(
       codingQueue,
       { stepId: id },
-      { db, expireInSeconds: 60 * 60 },
+      {
+        db,
+        expireInSeconds: 60 * 60,
+        ...(kind === "checkpoint" || kind === "collect"
+          ? { retryLimit: 2, retryDelay: 10 }
+          : {}),
+      },
     );
   if (!job) throw new Error("Could not queue coding.");
   await db.executeSql(
-    "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status,repository_index,input_commits) VALUES($1,$2,$3,$4,$5,'queued',$6,$7)",
+    "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status,repository_index,input_commits,continuation,recovery_step_id) VALUES($1,$2,$3,$4,$5,'queued',$6,$7,$8,$9)",
     [
       id,
       run.id,
@@ -136,6 +153,8 @@ async function enqueue(boss: PgBoss, db: Db, run: CodingRun, kind: CodingKind) {
       run.commit,
       repositoryIndex(run),
       run.repositories ? JSON.stringify(commitSet(run)) : null,
+      continuation ? JSON.stringify(continuation) : null,
+      recoveryStepId ?? null,
     ],
   );
   await db.executeSql(
@@ -247,7 +266,12 @@ export async function syncApprovedCoding(boss: PgBoss) {
   for (const row of rows)
     await codingTransaction(boss, (db) => syncCoding(boss, db, row.issue_id));
 }
-export async function startCoding(boss: PgBoss, id: string, jobId: string) {
+export async function startCoding(
+  boss: PgBoss,
+  id: string,
+  jobId: string,
+  retryCount = 0,
+) {
   return codingTransaction(boss, async (db) => {
     const { rows } = await db.executeSql(
       "SELECT * FROM code_assist.coding_step WHERE id=$1",
@@ -262,9 +286,11 @@ export async function startCoding(boss: PgBoss, id: string, jobId: string) {
       (await boss.getJobById(codingQueue, jobId, { db }))?.state !== "active"
     )
       return null;
+    const claimed = await boss.getJobById(codingQueue, jobId, { db });
+    if (claimed?.retryCount !== retryCount) return null;
     await db.executeSql(
-      "UPDATE code_assist.coding_step SET status='running',worker_pid=$2 WHERE id=$1",
-      [id, process.pid],
+      "UPDATE code_assist.coding_step SET status='running',worker_pid=$2,job_retry_count=$3,error=NULL WHERE id=$1",
+      [id, process.pid, retryCount],
     );
     await recordIntakeEvent(boss, db, run.issue_id, "coding_started", {
       codingId: run.id,
@@ -273,7 +299,12 @@ export async function startCoding(boss: PgBoss, id: string, jobId: string) {
     });
     return {
       run,
-      step: { ...step, status: "running" as const, worker_pid: process.pid },
+      step: {
+        ...step,
+        status: "running" as const,
+        worker_pid: process.pid,
+        job_retry_count: retryCount,
+      },
     };
   });
 }
@@ -290,11 +321,16 @@ export async function finishCoding(
     repositories: NonNullable<CodingRun["repositories"]>;
     index: number;
   },
+  continuation?: CodingContinuation,
 ) {
   return codingTransaction(boss, async (db) => {
     if (!(await currentCoding(db, run, step, true))) return false;
     const job = await boss.getJobById(codingQueue, step.job_id, { db });
-    if (job?.state !== "active") return false;
+    if (
+      job?.state !== "active" ||
+      job.retryCount !== (step.job_retry_count ?? 0)
+    )
+      return false;
     await boss.complete(
       codingQueue,
       { id: step.job_id, retryCount: job.retryCount },
@@ -340,7 +376,8 @@ export async function finishCoding(
         { codingId: run.id, stepId: step.id },
         true,
       );
-    else await enqueue(boss, db, await codingRun(db, run.id), next);
+    else
+      await enqueue(boss, db, await codingRun(db, run.id), next, continuation);
     return true;
   });
 }
@@ -352,6 +389,7 @@ export async function failCoding(
 ) {
   return codingTransaction(boss, async (db) => {
     if (!(await currentCoding(db, run, step, true))) {
+      if (await currentCoding(db, run)) return;
       await db.executeSql(
         "UPDATE code_assist.coding_run SET status='superseded' WHERE id=$1 AND current_step_id=$2",
         [run.id, step.id],
@@ -397,7 +435,15 @@ export async function retryCoding(
       "SELECT * FROM code_assist.coding_step WHERE id=$1",
       [stepId],
     );
-    return enqueue(boss, db, run, rows[0].kind);
+    const previous = rows[0] as CodingStep;
+    return enqueue(
+      boss,
+      db,
+      run,
+      previous.kind,
+      previous.continuation,
+      previous.recovery_step_id ?? previous.id,
+    );
   });
 }
 export async function readCoding(
@@ -483,10 +529,18 @@ export async function changeCodingBranch(
         branch,
       });
       const { rows } = await db.executeSql(
-        "SELECT kind FROM code_assist.coding_step WHERE id=$1",
+        "SELECT * FROM code_assist.coding_step WHERE id=$1",
         [stepId],
       );
-      return enqueue(boss, db, { ...run, branch }, rows[0].kind);
+      const previous = rows[0] as CodingStep;
+      return enqueue(
+        boss,
+        db,
+        { ...run, branch },
+        previous.kind,
+        previous.continuation,
+        previous.recovery_step_id ?? previous.id,
+      );
     });
   }
   throw new CodingConflict(

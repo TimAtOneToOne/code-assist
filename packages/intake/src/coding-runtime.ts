@@ -1,6 +1,12 @@
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import {
+  readReceipt,
+  writeReceipt,
+  parseReceipt,
+  type AgentReceipt,
+} from "./coding-receipt.ts";
+import { mkdir, writeFile, rm, rename } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Readable } from "node:stream";
@@ -39,6 +45,7 @@ export async function executeCoding(
       }),
       file = outputFile ? createWriteStream(outputFile, { mode: 0o600 }) : null;
     let stdout = "",
+      stderr = "",
       failure: unknown;
     for (const [name, stream] of [
       ["stdout", child.stdout],
@@ -65,6 +72,7 @@ export async function executeCoding(
       };
       stream.on("data", (text: string) => {
         if (name === "stdout" && !onLine) stdout += text;
+        if (name === "stderr") stderr += text;
         buffer += text;
         let i;
         while ((i = buffer.indexOf("\n")) !== -1) {
@@ -91,11 +99,17 @@ export async function executeCoding(
       if (file && !file.closed)
         await new Promise<void>((r) => file.on("close", r));
       if (failure) reject(failure);
-      else if (code !== 0)
+      else if (code !== 0) {
+        log.payload(
+          "coding.command_failed",
+          "Command failed",
+          { executable, args, exitCode: code, stderr },
+          "error",
+        );
         reject(
           new Error(`${executable} exited ${code}; inspect this step's logs.`),
         );
-      else resolve(stdout.trim());
+      } else resolve(stdout.trim());
     });
     if (typeof input === "string" || !input) child.stdin.end(input);
     else {
@@ -370,31 +384,81 @@ export async function checkpoint(
     log,
     activeSnapshot(run).name,
   );
-  await git("add", "-A");
-  await git(
-    "commit",
-    "--allow-empty",
-    "-m",
-    `feat(${run.identifier.toLowerCase()}): implement approved plan v${run.version}`,
+  const origin =
+    step.continuation?.agentStepId ?? step.recovery_step_id ?? step.id;
+  const ref = "refs/checkpoints/" + origin;
+  const bare = join(repositoryDirectory(directory, run), "repository.git");
+  const existing = await executeCoding(
+    "/usr/bin/git",
+    ["--git-dir", bare, "for-each-ref", "--format=%(objectname)", ref],
+    signal,
+    log,
   );
-  const commit = await git("rev-parse", "HEAD");
-  const bundle = join(codingDirectory(directory, run.id), `${step.id}.bundle`);
-  await git("bundle", "create", "/work/checkpoint.bundle", "HEAD");
+  if (existing) return existing;
+  let commit = await git("for-each-ref", "--format=%(objectname)", ref);
+  if (!commit) {
+    await git("add", "-A");
+    // A crash after commit but before update-ref leaves a clean HEAD to adopt.
+    if (await git("status", "--porcelain")) {
+      await git(
+        "commit",
+        "-m",
+        `feat(${run.identifier.toLowerCase()}): implement approved plan v${run.version}`,
+      );
+    }
+    commit = await git("rev-parse", "HEAD");
+    await git("update-ref", ref, commit);
+  }
+  const bundle = join(codingDirectory(directory, run.id), `${origin}.bundle`);
+  await git("bundle", "create", "/work/checkpoint.bundle", ref);
   await guest(["cat", "/work/checkpoint.bundle"], undefined, undefined, bundle);
   await executeCoding(
     "/usr/bin/git",
-    [
-      "--git-dir",
-      join(repositoryDirectory(directory, run), "repository.git"),
-      "fetch",
-      bundle,
-      `HEAD:refs/checkpoints/${step.id}`,
-    ],
+    ["--git-dir", bare, "fetch", bundle, `${ref}:${ref}`],
     signal,
     log,
   );
   await rm(bundle);
   return commit;
+}
+export function agentReceiptPath(
+  directory: string,
+  runId: string,
+  stepId: string,
+) {
+  if (!/^[a-f0-9-]{36}$/.test(stepId)) throw new Error("Invalid agent step ID");
+  return join(codingDirectory(directory, runId), stepId + "-result.json");
+}
+export async function recoverAgentResult(
+  directory: string,
+  run: CodingRun,
+  step: CodingStep,
+  workspace: Workspace,
+  signal: AbortSignal,
+  log: Log,
+): Promise<AgentReceipt | null> {
+  const origin = step.recovery_step_id ?? step.id;
+  const path = agentReceiptPath(directory, run.id, origin);
+  const saved = readReceipt(path);
+  if (saved) return saved;
+  let text = "";
+  await guestCommands(workspace, signal, log).guest(
+    [
+      "bash",
+      "-c",
+      'if test -f "$1"; then cat "$1"; fi',
+      "receipt",
+      "/work/results/" + origin + ".json",
+    ],
+    undefined,
+    (line) => {
+      text += line;
+    },
+  );
+  if (!text) return null;
+  const receipt = parseReceipt(text);
+  writeReceipt(path, receipt);
+  return receipt;
 }
 export async function preserveEvidence(
   directory: string,
@@ -404,24 +468,58 @@ export async function preserveEvidence(
   signal: AbortSignal,
   log: Log,
 ) {
+  const origin = step.continuation!.agentStepId;
   const { guest } = guestCommands(
     workspace,
     signal,
     log,
     activeSnapshot(run).name,
   );
+  // The agent unit has exited. Freeze the evidence and log mirror once, outside those source trees.
+  await guest([
+    "node",
+    "/opt/code-assist/packages/intake/src/coding-evidence.ts",
+    "freeze",
+    origin,
+  ]);
   const path = join(
     codingDirectory(directory, run.id),
-    `${step.id}-evidence.tar.gz`,
+    origin + "-evidence.tar.gz",
   );
   await guest(
-    ["tar", "-czf", "-", "-C", "/work", "evidence", "logs"],
+    ["tar", "-czf", "-", "-C", "/work/receipts/" + origin, "evidence", "logs"],
     undefined,
     undefined,
-    path,
+    path + ".tmp",
   );
+  await executeCoding(
+    "/usr/bin/tar",
+    ["-tzf", path + ".tmp"],
+    signal,
+    log,
+    undefined,
+    () => {},
+  );
+  await rename(path + ".tmp", path);
   return path;
 }
+export async function verifyBrowserEvidence(
+  workspace: Workspace,
+  step: CodingStep,
+  paths: string[],
+  signal: AbortSignal,
+  log: Log,
+) {
+  const origin = step.continuation!.agentStepId;
+  await guestCommands(workspace, signal, log).guest([
+    "node",
+    "/opt/code-assist/packages/intake/src/coding-evidence.ts",
+    "verify",
+    origin,
+    JSON.stringify(paths),
+  ]);
+}
+
 export async function codingPrompt(
   directory: string,
   run: CodingRun,
@@ -462,6 +560,7 @@ export async function runGuestAgent(
   signal: AbortSignal,
   log: Log,
   onEvent: () => void,
+  receiptPath: string,
 ) {
   let result: unknown;
   const browserCalls: string[] = [];
@@ -496,7 +595,13 @@ export async function runGuestAgent(
           `${input.provider} ${message.type}`,
           message.value,
         );
-        if (message.type === "result") result = message.value;
+        if (message.type === "result") {
+          result = message.value;
+          writeReceipt(receiptPath, {
+            result: result as Record<string, unknown>,
+            browserCalls: [...browserCalls],
+          });
+        }
         const event = message.value as {
           type?: string;
           item?: {
@@ -519,7 +624,7 @@ export async function runGuestAgent(
       },
     );
     if (!result) throw new Error("Agent finished without a saved result.");
-    return { result, browserCalls };
+    return { result: result as Record<string, unknown>, browserCalls };
   } finally {
     if (signal.aborted) await stopCodingUnit(workspace, step.id, log);
   }

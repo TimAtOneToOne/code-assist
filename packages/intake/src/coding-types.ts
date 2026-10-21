@@ -2,7 +2,13 @@ import type { MainWorkflows } from "./github-workflows.ts";
 import type { WorkspaceInput } from "./workspace.ts";
 import type { PlanDocument, PlanReview } from "./planning-types.ts";
 export type CodingKind =
-  "prepare" | "implement" | "validate" | "review" | "publish";
+  | "prepare"
+  | "implement"
+  | "checkpoint"
+  | "collect"
+  | "validate"
+  | "review"
+  | "publish";
 export type CodingRepository = {
   name: string;
   commit: string | null;
@@ -59,7 +65,16 @@ export type CodingRun = {
   } | null;
   created_at: Date;
 };
+export type CodingContinuation = {
+  agentStepId: string;
+  kind: "implement" | "review";
+  result: Record<string, unknown>;
+  browserCalls: string[];
+};
 export type CodingStep = {
+  job_retry_count?: number;
+  continuation?: CodingContinuation | null;
+  recovery_step_id?: string | null;
   repository_index?: number;
   input_commits?: Record<string, string | null> | null;
   id: string;

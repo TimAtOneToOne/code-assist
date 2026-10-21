@@ -25,6 +25,8 @@ export function workflowBadgeVariant(status: WorkflowStatus, current = true) {
 		case 'revising':
 		case 'prepare':
 		case 'implement':
+		case 'checkpoint':
+		case 'collect':
 		case 'validate':
 		case 'review':
 		case 'publish':

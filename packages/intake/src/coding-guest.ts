@@ -1,3 +1,4 @@
+import { writeReceipt } from "./coding-receipt.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 // Executed only inside the attempt's OrbStack guest, under an owned systemd unit.
 import { readFileSync, mkdirSync } from "node:fs";
@@ -12,6 +13,7 @@ const chunks: Buffer[] = [];
 for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
 const input = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
   id: string;
+  receiptId?: string;
   repository?: string;
   repositories?: string[];
   environments?: boolean;
@@ -22,6 +24,8 @@ const input = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
   schema: Record<string, unknown>;
   anthropicWorkspaceId?: string;
 };
+if (!/^[a-f0-9-]{36}$/.test(input.receiptId ?? input.id))
+  throw new Error("Invalid receipt ID");
 const repository = input.repository ?? "internal-chat-ui";
 if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(repository))
   throw new Error("Invalid repository");
@@ -69,11 +73,26 @@ const log = createLogger(
   },
   { attempt_id: input.id },
 );
+const browserCalls: string[] = [];
 const emit = (type: string, value: unknown) => {
   const reference = log.payload(`coding.${type}`, type, value);
   const safe = JSON.parse(
     readFileSync(artifactPath(artifacts, reference.artifact_id), "utf8"),
   );
+  if (
+    type === "event" &&
+    safe.type === "item.completed" &&
+    safe.item?.type === "mcp_tool_call" &&
+    safe.item.server === "playwright" &&
+    safe.item.status === "completed" &&
+    safe.item.tool
+  )
+    browserCalls.push(safe.item.tool);
+  if (type === "result")
+    writeReceipt("/work/results/" + (input.receiptId ?? input.id) + ".json", {
+      result: safe,
+      browserCalls,
+    });
   process.stdout.write(JSON.stringify({ type, value: safe }) + "\n");
 };
 const abort = new AbortController();
