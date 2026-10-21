@@ -37,6 +37,17 @@
 	</div>
 </Card.Root>
 <Card.Root class="panel">
+	<Card.Title>Repository Setup</Card.Title>
+	<Card.Description
+		>Configure installation, local services, validation, and browser checks.</Card.Description
+	>
+	<div>
+		<Button href={resolve('/configuration/repositories')} variant="outline"
+			>Configure Repositories →</Button
+		>
+	</div>
+</Card.Root>
+<Card.Root class="panel">
 	<Card.Title>Secrets & Environment</Card.Title>
 	<Card.Description
 		>Manage shared keys and map them to repository-specific environment variables.</Card.Description

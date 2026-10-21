@@ -12,6 +12,7 @@ Run `make verify` before pushing. Mia checks published `main` once a minute, bui
 - [Mac mini deployment](docs/deployment.md): installation, updates, service logs and recovery.
 - [Central logging](docs/logging.md): attempt timelines, complete payloads, agent retrieval and storage configuration.
 - [Browser testing](docs/browser-testing.md): Playwright MCP for coding agents on Mia, client setup and live verification.
+- [Repository Setup](docs/repository-setup.md): editable runtime profiles and disposable OrbStack setup tests.
 - [Secrets and environments](docs/secrets.md): shared keys, Reveal/Hide and repository-specific environment-variable mappings.
 - [Linear intake](docs/intake.md): scheduled Plan-ticket discovery, repository suggestions, human selection and attention notifications.
 - [Initial discovery](docs/discovery.md): Codex investigations and confirmed answers.

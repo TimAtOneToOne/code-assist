@@ -1,3 +1,7 @@
+import {
+  registerSetupTestWorker,
+  setupTestQueue,
+} from "@code-assist/intake/repository-setup-tests";
 import { codingQueue } from "@code-assist/intake/coding";
 import { registerCodingWorker } from "@code-assist/intake/coding-worker";
 import { githubQueue, registerGitHubWorker } from "@code-assist/intake/github";
@@ -36,6 +40,7 @@ try {
   await initializeIntake(boss);
   const dataDirectory = process.env.CODE_ASSIST_DATA_DIR;
   if (!dataDirectory) throw new Error("CODE_ASSIST_DATA_DIR is required");
+  await registerSetupTestWorker(boss, dataDirectory, stopping.signal);
   await registerProbeWorker(boss, release);
   await registerIntakeWorker(boss, dataDirectory);
   await registerDiscoveryWorker(boss, dataDirectory, stopping.signal);
@@ -45,6 +50,7 @@ try {
   logger.event("info", "worker.ready", "Worker ready");
   const signal = await shutdown;
   logger.event("info", "worker.draining", "Worker draining", { signal });
+  await boss.offWork(setupTestQueue);
   await boss.offWork(codingQueue);
   await boss.offWork(githubQueue);
   await boss.offWork(planningQueue);

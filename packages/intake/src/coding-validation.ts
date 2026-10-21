@@ -1,14 +1,18 @@
 import { repositoryProfile } from "./repository-profiles.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createLogger } from "@code-assist/observability";
 import { artifactPath } from "@code-assist/observability/artifacts";
 const id = process.argv[2];
 if (!/^[a-f0-9-]{36}$/.test(id))
   throw new Error("A coding step ID is required.");
 const repository = process.argv[3] ?? "internal-chat-ui";
-const profile = repositoryProfile(repository);
+const profile = existsSync("/etc/code-assist/profiles.json")
+  ? (JSON.parse(readFileSync("/etc/code-assist/profiles.json", "utf8"))[
+      repository
+    ] as ReturnType<typeof repositoryProfile>)
+  : repositoryProfile(repository);
 const scoped = process.argv.includes("--environments");
 const environment = JSON.parse(
   readFileSync(

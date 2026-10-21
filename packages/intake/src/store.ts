@@ -1,3 +1,4 @@
+import { initializeSetupTests } from "./repository-setup-tests.ts";
 import { initializeCoding, readCoding, type CodingRun } from "./coding.ts";
 import { initializeGitHub } from "./github.ts";
 import {
@@ -107,6 +108,7 @@ export async function initializeIntake(boss: PgBoss) {
   await initializeDiscovery(boss);
   await initializeCoding(boss);
   await initializeGitHub(boss);
+  await initializeSetupTests(boss);
 }
 
 export async function requestScan(boss: PgBoss) {

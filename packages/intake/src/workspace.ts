@@ -13,9 +13,10 @@ import { bootstrap, environmentLauncher } from "./workspace-bootstrap.ts";
 
 import { snapshots } from "./coding-repositories.ts";
 import {
-  repositoryProfile,
-  repositoryEnvironment,
-} from "./repository-profiles.ts";
+  loadRepositoryProfile,
+  profileEnvironment,
+  type RuntimeProfile,
+} from "./repository-settings.ts";
 
 export class WorkspaceApprovalError extends Error {}
 export type WorkspaceInput = {
@@ -27,10 +28,15 @@ export type WorkspaceInput = {
   snapshot: RepositorySnapshot;
   snapshots?: RepositorySnapshot[];
 };
-export type Workspace = {
+export type WorkspaceSources = {
+  snapshot: RepositorySnapshot;
+  snapshots?: RepositorySnapshot[];
+};
+export type Workspace<T extends WorkspaceSources = WorkspaceInput> = {
   id: string;
   machine: string;
-  input: WorkspaceInput;
+  input: T;
+  profiles?: Record<string, RuntimeProfile>;
   source?: RepositorySnapshot;
   sources?: RepositorySnapshot[];
   environments?: boolean;
@@ -39,6 +45,7 @@ export type Workspace = {
   createdAt: string;
   updatedAt: string;
   variables: string[];
+  checks?: { name: string; status: "running" | "passed" | "failed" }[];
 };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 function folder(directory: string, id: string) {
@@ -56,7 +63,7 @@ export async function readWorkspace(
     throw new Error("Invalid workspace record.");
   return result;
 }
-async function save(directory: string, workspace: Workspace) {
+async function save(directory: string, workspace: Workspace<WorkspaceSources>) {
   workspace.updatedAt = new Date().toISOString();
   const path = folder(directory, workspace.id);
   await mkdir(path, { recursive: true, mode: 0o700 });
@@ -116,7 +123,7 @@ export async function approvedWorkspaceInput(
   };
 }
 
-async function command(
+async function workspaceCommand(
   executable: string,
   args: string[],
   signal: AbortSignal,
@@ -179,12 +186,54 @@ export async function prepareWorkspace(
       ? sourceOverride
       : [sourceOverride]
     : snapshots(input);
+  return provisionWorkspace(directory, input, sources, signal, {
+    onCreated,
+    issueId,
+    assertCurrent: async () => {
+      const current = await approvedWorkspaceInput(db, issueId);
+      if (JSON.stringify(current) !== JSON.stringify(input))
+        throw new Error(
+          "Approved inputs changed during workspace preparation.",
+        );
+    },
+  });
+}
+
+export async function provisionWorkspace<T extends WorkspaceSources>(
+  directory: string,
+  input: T,
+  sources: RepositorySnapshot[],
+  signal: AbortSignal,
+  options: {
+    onCreated?: (workspace: Workspace<T>) => Promise<void>;
+    assertCurrent?: () => Promise<void>;
+    issueId?: string;
+    profiles?: Record<string, RuntimeProfile>;
+    testSetup?: boolean;
+  } = {},
+) {
+  const {
+    onCreated,
+    assertCurrent,
+    issueId,
+    profiles: frozenProfiles,
+    testSetup = false,
+  } = options;
+  const repositories = input.snapshots ?? [input.snapshot];
+  const profiles =
+    frozenProfiles ??
+    Object.fromEntries(
+      repositories.map((s) => [
+        s.name,
+        loadRepositoryProfile(directory, s.source),
+      ]),
+    );
   const source = sources[0];
   const environments = Object.fromEntries(
-    snapshots(input).map((s) => [
+    repositories.map((s) => [
       s.name,
-      repositoryEnvironment(
-        s.name,
+      profileEnvironment(
+        profiles[s.name],
         resolveRepositoryEnvironment(directory, s.source),
       ),
     ]),
@@ -195,7 +244,8 @@ export async function prepareWorkspace(
     ),
   );
   const id = randomUUID();
-  const workspace: Workspace = {
+  const workspace: Workspace<T> = {
+    profiles,
     id,
     machine: `ca-${id}`,
     input,
@@ -224,7 +274,7 @@ export async function prepareWorkspace(
   const output = (line: string) =>
     log.payload("workspace.output", workspace.stage, { output: line });
   const orb = (args: string[], content?: string | Readable) =>
-    command("/usr/local/bin/orb", args, signal, output, content);
+    workspaceCommand("/usr/local/bin/orb", args, signal, output, content);
   const guest = (args: string[], content?: string | Readable) =>
     orb(["-m", workspace.machine, "-u", "root", ...args], content);
   async function stage(name: string) {
@@ -237,7 +287,7 @@ export async function prepareWorkspace(
     log.event(
       "info",
       "workspace.created",
-      "Preparing approved source in an OrbStack machine",
+      "Preparing repository source in an OrbStack machine",
     );
     await orb([
       "create",
@@ -248,9 +298,9 @@ export async function prepareWorkspace(
     ]);
     await stage("installing toolchain and private container engine");
     await guest(["bash", "-c", bootstrap]);
-    await stage("copying approved source");
+    await stage("copying repository source");
     for (const source of sources) {
-      await command(
+      await workspaceCommand(
         "/usr/bin/git",
         [
           "-C",
@@ -291,10 +341,13 @@ export async function prepareWorkspace(
     await guest(
       ["bash", "-c", "cat > /work/repositories.json"],
       JSON.stringify(
-        Object.fromEntries(
-          snapshots(input).map((s) => [s.name, repositoryProfile(s.name).cwd]),
-        ),
+        Object.fromEntries(sources.map((s) => [s.name, profiles[s.name].cwd])),
       ),
+    );
+    await guest(["mkdir", "-p", "/etc/code-assist"]);
+    await guest(
+      ["bash", "-c", "umask 022; cat > /etc/code-assist/profiles.json"],
+      JSON.stringify(profiles),
     );
     await guest(
       ["bash", "-c", "umask 077; cat > /work/run.mjs"],
@@ -302,7 +355,7 @@ export async function prepareWorkspace(
     );
     await guest(["chown", "-R", "workspace:workspace", "/work"]);
     for (const source of sources) {
-      const profile = repositoryProfile(source.name);
+      const profile = profiles[source.name];
       const run = (args: string[]) =>
         orb([
           "-m",
@@ -315,9 +368,22 @@ export async function prepareWorkspace(
           source.name,
           ...args,
         ]);
+      if (profile.configuration.systemSetupScript) {
+        await stage("installing system dependencies for " + source.name);
+        await guest([
+          "node",
+          "/work/run.mjs",
+          "--repo",
+          source.name,
+          "bash",
+          "-euc",
+          profile.configuration.systemSetupScript,
+        ]);
+      }
       await stage("preparing " + source.name);
       for (const args of profile.setup) await run(args);
       if (profile.browserDirectory) {
+        await stage("installing browser for " + source.name);
         await guest([
           "bash",
           "-c",
@@ -327,13 +393,61 @@ export async function prepareWorkspace(
         ]);
         await run(profile.browserInstall);
       }
+      if (testSetup) {
+        workspace.checks ??= [];
+        async function check(name: string, action: () => Promise<void>) {
+          const result = {
+            name,
+            status: "running" as "running" | "passed" | "failed",
+          };
+          workspace.checks!.push(result);
+          await stage(name);
+          try {
+            await action();
+            result.status = "passed";
+          } catch (error) {
+            result.status = "failed";
+            throw error;
+          } finally {
+            await save(directory, workspace);
+          }
+        }
+        await check("validation", async () => {
+          for (const args of profile.validation) await run(args);
+        });
+        const config = profile.configuration;
+        if (config.startScript) {
+          await check("app startup", () =>
+            guest([
+              "systemd-run",
+              "--quiet",
+              "--collect",
+              "--unit=ca-setup-app",
+              "--uid=workspace",
+              "--property=KillMode=control-group",
+              "node",
+              "/work/run.mjs",
+              "--repo",
+              source.name,
+              "bash",
+              "-euc",
+              config.startScript,
+            ]),
+          );
+          await check("app readiness", () =>
+            run(["bash", "-euc", config.readyScript]),
+          );
+        }
+        if (config.smokeScript)
+          await check("browser/authentication smoke test", () =>
+            run(["bash", "-euc", config.smokeScript]),
+          );
+      }
     }
-    const current = await approvedWorkspaceInput(db, issueId);
-    if (JSON.stringify(current) !== JSON.stringify(input))
-      throw new Error("Approved inputs changed during workspace preparation.");
+    await assertCurrent?.();
     workspace.state = "ready";
     await stage("ready");
-    log.event("info", "workspace.ready", "Coding workspace ready", {
+    log.event("info", "workspace.ready", "Repository workspace ready", {
       machine: workspace.machine,
     });
     return workspace;
@@ -351,6 +465,17 @@ export async function prepareWorkspace(
       { cause: error },
     );
   } finally {
+    if (
+      testSetup &&
+      !signal.aborted &&
+      sources.some((s) => profiles[s.name].configuration.startScript)
+    ) {
+      try {
+        await guest(["journalctl", "--unit=ca-setup-app", "--no-pager"]);
+      } catch {
+        /* The machine or app unit may not have been created. */
+      }
+    }
     await rm(archive, { force: true });
   }
 }
@@ -362,7 +487,7 @@ export async function destroyWorkspace(
 ) {
   const workspace = await readWorkspace(directory, id);
   if (workspace.state === "destroyed") return workspace;
-  await command(
+  await workspaceCommand(
     "/usr/local/bin/orb",
     ["delete", "--force", workspace.machine],
     signal,

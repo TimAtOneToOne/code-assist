@@ -4,7 +4,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Readable } from "node:stream";
-import type { Workspace } from "./workspace.ts";
+import { readWorkspace, type Workspace } from "./workspace.ts";
 import type { CodingRun, CodingStep } from "./coding-types.ts";
 import { composeInstructions } from "./prompt-defaults.ts";
 import { readPromptSettings } from "./prompt-settings.ts";
@@ -428,6 +428,9 @@ export async function codingPrompt(
   step: CodingStep,
   history: unknown,
 ) {
+  const profiles = run.workspace_id
+    ? (await readWorkspace(directory, run.workspace_id)).profiles
+    : undefined;
   return `You are ${step.kind === "review" ? "Claude independently reviewing" : "Codex implementing"} Code Assist ticket ${run.identifier}: ${run.title}.
 Tim approved the exact plan below. Implement only that scope. Follow repository AGENTS.md and existing patterns. Do not upgrade Drizzle, add unrelated optimizations, change Linear, access production, push Git, open/merge PRs, or deploy infrastructure. The controller owns commits and publication. Do not create commits or change branches. If a material product decision, missing credential/service, or changed scope blocks progress, return needs_direction with the exact question. Do not invent success or silently skip acceptance criteria.
 Repository: /work/${activeSnapshot(run).name}. Approved base: ${activeSnapshot(run).commit}. Diff base: ${run.repair?.baseCommit ?? activeSnapshot(run).commit}. Current checkpoint: ${step.input_commit ?? run.repair?.baseCommit ?? activeSnapshot(run).commit}.
@@ -436,7 +439,12 @@ This is an isolated OrbStack Linux guest with a private container engine. Reposi
 Candidate checkouts and exact checkpoints: ${JSON.stringify(snapshots(run.input).map((s, i) => ({ repository: s.name, path: "/work/" + s.name, approvedBase: s.commit, diffBase: repositories(run)[i].baseCommit ?? s.commit, checkpoint: repositories(run)[i].commit })))}.
 ${step.kind === "review" ? "Review ALL candidate repositories together, including integration between them. Every candidate must remain unchanged during review." : "Implement ONLY " + activeSnapshot(run).name + ". Other candidate checkouts are available for reading and paired tests; do not edit them. The controller works through repositories sequentially, then reviews the whole set. Intermediate repositories may defer paired browser acceptance until the final repository is implemented; report what remains honestly. On revision, fix findings affecting this repository; leave already-correct work intact."}
 ${snapshots(run.input)
-  .map((s) => s.name + ": " + repositoryProfile(s.name).instructions)
+  .map(
+    (s) =>
+      s.name +
+      ": " +
+      (profiles?.[s.name] ?? repositoryProfile(s.name)).instructions,
+  )
   .join("\n")}
 Playwright MCP is registered as playwright in this guest. Exercise the approved UI behavior using real local/synthetic fixtures, inspect rendering and browser errors. Save screenshots and full evidence to /work/evidence. The final implementation must include browser evidence for the combined feature. Controller validation runs each repository's established checks; also implement and run all acceptance tests required by the plan, including paired tests. Explain unavailable external integration tests honestly.
 Central logging: every SDK event and tool result is captured. Your workspace's redacted log mirror is /work/logs/structured/coding.jsonl with full JSON payloads in /work/logs/artifacts; use normal read/search tools to investigate previous failures. The same events are indexed in the main Logs UI under this coding step. Test/app output may be saved under /work/evidence for diagnosis.
