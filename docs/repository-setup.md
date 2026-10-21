@@ -51,6 +51,10 @@ ICU seeds `code-assist@example.invalid` in its private development database with
 
 Microsoft credentials configure OAuth but do not provide a signed-in user. Sign-in-page checks do **not** establish authenticated UI readiness. Workplace Agents requires an interactive Microsoft session/test identity for that acceptance. Windmill Work's local browser suites use synthetic responses; hosted Windmill fork/Git Sync acceptance remains distinct and follows the approved feature's scope.
 
+### Windmill Validation — October 20, 2026
+
+The saved profile initializes Git metadata inside the disposable checkout so actionlint can discover workflows from the exported source archive. On synced commit `fb82b52baf51bd1668262e578b79c371e433ce9f`, lint, 24 Python tests, bootstrap/staging/production Terraform validation, and 21 mocked Terraform tests pass. Native Terraform module downloads resolve through the controller-fetched GitOps snapshots without guest GitHub credentials. No infrastructure was applied. See [the passing setup-test logs](http://100.91.0.83:3000/logs?attempt=81547254-a375-4f26-9903-cab824408e35).
+
 ### Medusa Baseline Findings — October 20, 2026
 
 On synced commit `eb8b6fbe5906b837dca8a6d303121423c640019d`, the isolated setup completes installation and migrations, and Ruff formatting/lint plus mypy pass. The full suite has **1,623 passing tests and two failing Linear credential tests**: `test_scope_mismatch_triggers_remint` and `test_near_expiry_triggers_remint` in `tests/app/api/v2/linear/test_credentials_db.py`. Both expect a second token mint but observe only one. These failures remain visible; the profile does not skip them. See [the final setup-test logs](http://100.91.0.83:3000/logs?attempt=83cf3a10-668a-4b73-b87a-58562b368f63).
