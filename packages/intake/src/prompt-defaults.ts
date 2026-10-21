@@ -13,7 +13,7 @@ export const promptDefinitions = {
   coding: {
     title: "Coding",
     description: "Shared by implementation and adversarial code review.",
-    text: "",
+    text: "Keep ad hoc scripts, fixture builds, screenshots, and saved test evidence in the repository's task-specific .tmp directory (or the controller's designated evidence directory). Leave browser runtime temporary directories under the platform/tool defaults: do not redirect TMPDIR, TMP, or TEMP into the checkout just to keep artifacts together. Chromium creates Unix sockets there, and deep CI checkout paths can exceed the socket path limit even when local runs pass. This runtime requirement is an exception to repository-local temporary-artifact guidance. When adding or changing browser test harnesses, verify them from a checkout path at least as long as the repository's CI path, and preserve the actual browser and permission assertions. Reviewers should check that local filesystem assumptions also hold in CI.",
   },
   discovery: {
     title: "Initial Discovery",
