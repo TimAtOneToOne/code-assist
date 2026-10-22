@@ -55,13 +55,14 @@
 <div class="ticket-header mb-6">
 	<div class="flex items-baseline justify-between gap-4">
 		<div class="eyebrow">{data.item.ticket.identifier}</div>
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Linear URLs are external. -->
+		<!-- eslint-disable svelte/no-navigation-without-resolve -- Linear URLs are external. -->
 		<a
 			href={data.item.ticket.url}
 			target="_blank"
 			rel="noreferrer"
 			class="shrink-0 text-sm text-muted-foreground underline underline-offset-4">Open in Linear</a
 		>
+		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 	</div>
 	<h1>{data.item.ticket.title}</h1>
 	{#if data.item.removed_at || labels.length}
