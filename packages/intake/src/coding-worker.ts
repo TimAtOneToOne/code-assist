@@ -681,7 +681,9 @@ export async function registerCodingWorker(
             run,
             step,
             {
-              summary: "Pull request opened for Tim to review.",
+              summary: run.change_requests?.length
+                ? "Requested changes validated, reviewed, and pushed to the existing pull request."
+                : "Pull request opened for Tim to review.",
               url,
               commit: run.commit,
             },

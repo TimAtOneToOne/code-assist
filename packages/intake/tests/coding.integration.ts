@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
+import { exerciseCodeChanges } from "./coding-revision-fixture.ts";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -386,6 +387,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
         .coding_status,
       "pr_open",
     );
+    await exerciseCodeChanges(boss, ticket.id, next);
     const published = (await readCoding(boss.getDb(), ticket.id))[0];
     const pr: PullRequestState = {
       url: published.pr_url!,
@@ -760,7 +762,9 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     const completed = (await readCoding(boss.getDb(), ticket.id))[0];
     assert.equal(completed.commit, "b".repeat(40));
     assert.equal(
-      completed.steps.filter((s) => s.status === "completed").length,
+      completed.steps.filter(
+        (s) => s.status === "completed" && !s.change_request_id,
+      ).length,
       7,
     );
   } finally {

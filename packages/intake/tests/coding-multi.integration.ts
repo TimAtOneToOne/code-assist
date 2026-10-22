@@ -7,6 +7,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
+import { exerciseCodeChanges } from "./coding-revision-fixture.ts";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -292,6 +293,7 @@ test("multi-repository coding persists sequential checkpoints, combined review, 
       urls[0],
       { repositories: states, index: 1 },
     );
+    await exerciseCodeChanges(boss, ticket.id, next);
     const published = (await readCoding(boss.getDb(), ticket.id))[0];
     const observed = (index: number) => ({
       ...repositoryRun(published, index),

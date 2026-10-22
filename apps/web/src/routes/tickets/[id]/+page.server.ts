@@ -1,4 +1,9 @@
-import { retryCoding, changeCodingBranch, CodingConflict } from '@code-assist/intake/coding';
+import {
+	retryCoding,
+	changeCodingBranch,
+	requestCodingChanges,
+	CodingConflict
+} from '@code-assist/intake/coding';
 import { requestGitHubRefresh } from '@code-assist/intake/github';
 import { reconcileCodingFailures } from '@code-assist/intake/coding-worker';
 import {
@@ -97,6 +102,27 @@ export const actions = {
 		const approver = await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const id = issueId(event.params.id);
+		if (form.get('intent') === 'coding-changes') {
+			try {
+				await withController((boss) =>
+					requestCodingChanges(
+						boss,
+						id,
+						issueId(String(form.get('codingId'))),
+						issueId(String(form.get('stepId'))),
+						String(form.get('changes') ?? ''),
+						approver
+					)
+				);
+				return {
+					message:
+						'Code changes queued. Codex will revise, then validation and Claude review will run before updating the existing PR.'
+				};
+			} catch (cause) {
+				if (cause instanceof CodingConflict) return fail(409, { error: cause.message });
+				throw cause;
+			}
+		}
 		if (form.get('intent') === 'github-refresh') {
 			try {
 				await withController((boss) =>

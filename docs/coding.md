@@ -62,7 +62,19 @@ The new run provisions its own isolated OrbStack workspace from the failed merge
 
 A justified code fix follows the same implementation → lint/type checks/tests/build → Claude review loop. It opens a fresh `feature/<ticket>-main-fix-<run-id>` branch and corrective PR, preserving the merged PR and never reusing its branch. Tim merges; agents do not dispatch deployment workflows or deploy. The corrective PR must merge and its own main workflows must succeed before the current ticket shows Done. Old failures remain visible as history. Removed or superseded approvals still permit observation, but do not authorize automatic repair.
 
-For multi-repository runs, repair targets one failed repository at a time while retaining the other candidate checkouts and their PR outcomes. Combined review still covers the pair. A new corrective PR replaces only the failed repository’s completion requirement; every other repository must also complete. Workspaces and evidence remain on disk for deliberate operator cleanup. PR feedback handling and automatic rebase/revalidation remain unimplemented.
+For multi-repository runs, repair targets one failed repository at a time while retaining the other candidate checkouts and their PR outcomes. Combined review still covers the pair. A new corrective PR replaces only the failed repository’s completion requirement; every other repository must also complete. Workspaces and evidence remain on disk for deliberate operator cleanup. Automatic ingestion of GitHub review comments and automatic rebase/revalidation remain unimplemented.
+
+## Requested Code Changes
+
+At the bottom of a ticket with current open PRs, **Requested Code Changes** lets Tim submit refinements to the implementation. Submission saves the request, owner, time, original PR URLs and published commits with the next pg-boss implementation step in one transaction. Duplicate or stale submissions cannot start a second revision. Earlier requests, plans, steps and evidence remain available.
+
+Codex resumes the saved workspace and branch. The usual checkpoint, evidence collection, validation and Claude review loop runs again, sequentially across repositories where applicable. Every step carries the request ID: old validation and reviews cannot authorize a new revision even if its commit is unchanged. Material scope changes still require a revised approved plan. Closed or merged PRs cannot be revised through this action.
+
+Before coding and publication, the controller checks that the PR is still open, belongs to this coding run, and has the recorded branch head. Publication requires the new commit to descend from that head, then pushes with an explicit expected-head lease. A per-request publication intent allows a retry to recognize a successful push whose response was lost. The existing PR URL is retained, its summary records the request and updated candidate commits, and no second PR is opened. GitHub polling cannot overwrite a running revision with a stale PR observation.
+
+Verification covers two successive requests, duplicate submission, worker restart, revision retry, Claude-driven revision loops, fresh evidence binding, and single/multiple repositories using PostgreSQL fixtures. Local Git publication tests cover actual guarded pushes, lost-response recovery, changed remote heads, and closed/merged/unowned PR rejection; GitHub API responses are fixtures. No paid agent run or live feature-branch update is initiated by those tests.
+
+Optional optimizations and controls: none. Request binding, PR ownership and expected-head checks preserve approval and publication integrity.
 
 GitHub fields use [gh pr view](https://cli.github.com/manual/gh_pr_view), [workflow runs](https://docs.github.com/en/rest/actions/workflow-runs), and [workflow jobs](https://docs.github.com/en/rest/actions/workflow-jobs).
 

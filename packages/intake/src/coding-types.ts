@@ -23,6 +23,7 @@ export type CodingRepository = {
   main_workflows?: MainWorkflows | null;
 };
 export type CodingRun = {
+  change_requests?: CodingChangeRequest[];
   workspace_cleaned_at?: Date | null;
   workspace_cleanup_error?: string | null;
   repositories?: CodingRepository[] | null;
@@ -67,6 +68,14 @@ export type CodingRun = {
   } | null;
   created_at: Date;
 };
+export type CodingChangeRequest = {
+  id: string;
+  text: string;
+  requestedBy: string;
+  createdAt: string;
+  baseCommits: Record<string, string>;
+  pullRequests: Record<string, string>;
+};
 export type CodingContinuation = {
   agentStepId: string;
   kind: "implement" | "review";
@@ -74,6 +83,7 @@ export type CodingContinuation = {
   browserCalls: string[];
 };
 export type CodingStep = {
+  change_request_id?: string | null;
   job_retry_count?: number;
   continuation?: CodingContinuation | null;
   recovery_step_id?: string | null;

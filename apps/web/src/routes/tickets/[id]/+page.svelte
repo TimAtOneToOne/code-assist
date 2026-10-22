@@ -8,6 +8,7 @@
 	import Markdown from '#lib/components/markdown.svelte';
 	import PageJump from '#lib/components/page-jump.svelte';
 	import CodingPanel from '#lib/components/coding-panel.svelte';
+	import CodingChanges from '#lib/components/coding-changes.svelte';
 	import PlanningPanel from '#lib/components/planning-panel.svelte';
 	import DiscoveryPanel from '#lib/components/discovery-panel.svelte';
 	import type { PageProps } from './$types';
@@ -34,6 +35,7 @@
 		details: { repositories?: string[]; repository?: string };
 	}) {
 		const labels: Record<string, string> = {
+			coding_changes_requested: 'You requested code changes on the existing PR',
 			repository_needed: 'Waiting for repository selection',
 			issue_removed: 'Removed: Plan label removed in Linear',
 			issue_restored: 'Restored: Plan label added in Linear',
@@ -166,5 +168,16 @@
 			{new Date(event.created_at).toLocaleString()} · {eventText(event)}
 		</p>{/each}
 </Card.Root>
+
+{#each data.item.coding as run (run.id)}
+	<CodingChanges
+		{run}
+		editable={data.item.eligible &&
+			!data.item.removed_at &&
+			run.planning_id === planning?.id &&
+			run.version === planning?.current_version &&
+			planning?.status === 'approved'}
+	/>
+{/each}
 
 <PageJump />

@@ -51,6 +51,11 @@ export function repositoryRun(run: CodingRun, index: number): CodingRun {
   return { ...run, repository_index: index, commit: state.commit };
 }
 export function publicationReady(run: CodingRun, steps: CodingStep[]) {
+  steps = steps.filter(
+    (step) =>
+      (step.change_request_id ?? null) ===
+      (run.change_requests?.at(-1)?.id ?? null),
+  );
   const review = steps.findLast(
     (s) => s.kind === "review" && s.status === "completed",
   );

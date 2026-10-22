@@ -113,6 +113,20 @@ export async function recordGitHubObservation(
       [run.id],
     );
     const current = rows[0] as CodingRun | undefined;
+    // A PR observation fetched before a revision must not replace its active coding state.
+    if (
+      current &&
+      (current.current_step_id !== run.current_step_id ||
+        ![
+          "pr_open",
+          "pr_closed",
+          "awaiting_main",
+          "main_running",
+          "main_failed",
+          "done",
+        ].includes(current.status))
+    )
+      return false;
     if (current?.repositories)
       return recordRepositoryObservation(
         boss,
@@ -331,7 +345,6 @@ export async function refreshGitHub(
   let failures = 0;
   for (const parent of rows as CodingRun[]) {
     if (
-      parent.repositories &&
       ![
         "pr_open",
         "pr_closed",

@@ -4,6 +4,7 @@ import {
   repositoryIndex,
   commitSet,
   repositoryDirectory,
+  codingIndexes,
 } from "./coding-repositories.ts";
 import { mainFailureKey } from "./github-workflows.ts";
 import { execFile } from "node:child_process";
@@ -44,6 +45,8 @@ export async function initializeCoding(boss: PgBoss) {
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS continuation jsonb;
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS job_retry_count integer NOT NULL DEFAULT 0;
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS recovery_step_id uuid;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS change_requests jsonb NOT NULL DEFAULT '[]';
+ ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS change_request_id uuid;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_checked_at timestamptz;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_error text;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS merged_at timestamptz;
@@ -147,7 +150,7 @@ async function enqueue(
     );
   if (!job) throw new Error("Could not queue coding.");
   await db.executeSql(
-    "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status,repository_index,input_commits,continuation,recovery_step_id) VALUES($1,$2,$3,$4,$5,'queued',$6,$7,$8,$9)",
+    "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status,repository_index,input_commits,continuation,recovery_step_id,change_request_id) VALUES($1,$2,$3,$4,$5,'queued',$6,$7,$8,$9,$10)",
     [
       id,
       run.id,
@@ -158,6 +161,7 @@ async function enqueue(
       run.repositories ? JSON.stringify(commitSet(run)) : null,
       continuation ? JSON.stringify(continuation) : null,
       recoveryStepId ?? null,
+      run.change_requests?.at(-1)?.id ?? null,
     ],
   );
   await db.executeSql(
@@ -468,6 +472,72 @@ export async function readCoding(
       ).rows as CodingStep[],
     })),
   );
+}
+
+export async function requestCodingChanges(
+  boss: PgBoss,
+  issueId: string,
+  runId: string,
+  stepId: string,
+  text: string,
+  requestedBy: string,
+) {
+  if (!text.trim())
+    throw new CodingConflict("Describe the code changes you want.");
+  return codingTransaction(boss, async (db) => {
+    await db.executeSql(
+      "SELECT id FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE",
+      [issueId],
+    );
+    const run = await codingRun(db, runId);
+    const states = repositories(run);
+    const indexes = codingIndexes(run);
+    if (
+      run.issue_id !== issueId ||
+      !(await currentCoding(db, run)) ||
+      run.status !== "pr_open" ||
+      run.current_step_id !== stepId ||
+      !run.workspace_id ||
+      run.workspace_cleaned_at ||
+      indexes.some(
+        (index) =>
+          !states[index].pr_url ||
+          !states[index].commit ||
+          states[index].merged_at ||
+          states[index].pr_closed_at ||
+          states[index].status !== "pr_open",
+      )
+    )
+      throw new CodingConflict(
+        "Code changes require the current open, unmerged PR and its saved workspace. Refresh the ticket before trying again.",
+      );
+    const request = {
+      id: randomUUID(),
+      text: text.trim(),
+      requestedBy,
+      createdAt: new Date().toISOString(),
+      baseCommits: Object.fromEntries(
+        indexes.map((i) => [states[i].name, states[i].commit!]),
+      ),
+      pullRequests: Object.fromEntries(
+        indexes.map((i) => [states[i].name, states[i].pr_url!]),
+      ),
+    };
+    await db.executeSql(
+      "UPDATE code_assist.coding_run SET change_requests=change_requests || $2::jsonb,repository_index=$3,commit=$4 WHERE id=$1",
+      [
+        run.id,
+        JSON.stringify([request]),
+        indexes[0],
+        states[indexes[0]].commit,
+      ],
+    );
+    await recordIntakeEvent(boss, db, issueId, "coding_changes_requested", {
+      codingId: run.id,
+      request,
+    });
+    return enqueue(boss, db, await codingRun(db, run.id), "implement");
+  });
 }
 
 export async function changeCodingBranch(

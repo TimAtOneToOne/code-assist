@@ -13,8 +13,9 @@ export async function checkCodingBranch(
   run: CodingRun,
   signal: AbortSignal,
   log: ReturnType<typeof createLogger>,
+  execute = executeCoding,
 ) {
-  const remote = await executeCoding(
+  const remote = await execute(
     "/usr/bin/git",
     ["-C", activeSnapshot(run).source, "remote", "get-url", "origin"],
     signal,
@@ -28,7 +29,7 @@ export async function checkCodingBranch(
       "Expected a GitHub repository without embedded credentials.",
     );
   const prs = JSON.parse(
-    await executeCoding(
+    await execute(
       "/opt/homebrew/bin/gh",
       [
         "pr",
@@ -40,22 +41,63 @@ export async function checkCodingBranch(
         "--head",
         run.branch,
         "--json",
-        "number,state",
+        "number,state,headRefOid,baseRefName,url,body",
       ],
       signal,
       log,
     ),
-  ) as unknown[];
-  const branch = await executeCoding(
+  ) as PublishedPr[];
+  const branch = await execute(
     "/usr/bin/git",
     ["ls-remote", "--heads", remote, `refs/heads/${run.branch}`],
     signal,
     log,
   );
+  const request = run.change_requests?.at(-1);
+  if (request) {
+    verifyRevisionPr(
+      run,
+      prs,
+      branch.split(/\s+/)[0],
+      request.baseCommits[activeSnapshot(run).name],
+    );
+    return;
+  }
   if (prs.length || branch)
     throw new CodingBranchConflict(
       "The requested branch already exists or has PR history. Choose a fresh branch in the coding panel.",
     );
+}
+
+type PublishedPr = {
+  state: string;
+  headRefOid: string;
+  baseRefName: string;
+  url: string;
+  body: string;
+};
+
+function verifyRevisionPr(
+  run: CodingRun,
+  prs: PublishedPr[],
+  remoteHead: string,
+  expectedHead: string,
+) {
+  const request = run.change_requests?.at(-1);
+  if (
+    !request ||
+    !expectedHead ||
+    prs.length !== 1 ||
+    prs[0].state !== "OPEN" ||
+    prs[0].url !== request.pullRequests[activeSnapshot(run).name] ||
+    !prs[0].body.includes(`<!-- code-assist:${run.id} -->`) ||
+    prs[0].headRefOid !== expectedHead ||
+    remoteHead !== expectedHead
+  ) {
+    throw new CodingBranchConflict(
+      "The PR was merged, closed, or its branch changed since this code request. Saved work is preserved; reconcile the PR before continuing.",
+    );
+  }
 }
 export async function publishCoding(
   directory: string,
@@ -63,15 +105,16 @@ export async function publishCoding(
   signal: AbortSignal,
   log: ReturnType<typeof createLogger>,
   assertCurrent: () => Promise<void>,
+  execute = executeCoding,
 ) {
   if (!run.commit || !/^[a-f0-9]{40}$/.test(run.commit))
     throw new Error("No validated commit to publish.");
   const local = repositoryDirectory(directory, run),
     bare = join(local, "repository.git");
   const git = (args: string[]) =>
-    executeCoding("/usr/bin/git", ["--git-dir", bare, ...args], signal, log);
+    execute("/usr/bin/git", ["--git-dir", bare, ...args], signal, log);
   const remote = (
-    await executeCoding(
+    await execute(
       "/usr/bin/git",
       ["-C", activeSnapshot(run).source, "remote", "get-url", "origin"],
       signal,
@@ -87,7 +130,7 @@ export async function publishCoding(
     );
   const repository = match[1];
   const gh = (args: string[]) =>
-    executeCoding("/opt/homebrew/bin/gh", args, signal, log);
+    execute("/opt/homebrew/bin/gh", args, signal, log);
   const metadata = JSON.parse(
     await gh(["repo", "view", repository, "--json", "defaultBranchRef"]),
   );
@@ -105,13 +148,98 @@ export async function publishCoding(
       "--json",
       "number,state,headRefOid,baseRefName,url,body",
     ]),
-  ) as {
-    state: string;
-    headRefOid: string;
-    baseRefName: string;
-    url: string;
-    body: string;
-  }[];
+  ) as PublishedPr[];
+  const request = run.change_requests?.at(-1);
+  if (request) {
+    const expectedHead = request.baseCommits[activeSnapshot(run).name];
+    const intentFile = join(local, `publication-${request.id}.json`);
+    const intent = {
+      commit: run.commit,
+      base,
+      expectedHead,
+      url: request.pullRequests[activeSnapshot(run).name],
+    };
+    let saved: typeof intent | undefined;
+    try {
+      saved = JSON.parse(await readFile(intentFile, "utf8"));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    if (
+      saved &&
+      (saved.commit !== intent.commit ||
+        saved.base !== base ||
+        saved.expectedHead !== expectedHead ||
+        saved.url !== intent.url)
+    )
+      throw new Error(
+        "Revision publication intent no longer matches this candidate.",
+      );
+    const remoteHead = (
+      await git(["ls-remote", "--heads", remote, `refs/heads/${run.branch}`])
+    ).split(/\s+/)[0];
+    // A saved intent permits reconciliation after a successful push whose response was lost.
+    const alreadyPushed = !!saved && remoteHead === run.commit;
+    verifyRevisionPr(
+      run,
+      prs,
+      remoteHead,
+      alreadyPushed ? run.commit : expectedHead,
+    );
+    if (prs[0].baseRefName !== base)
+      throw new CodingBranchConflict(
+        "The PR base changed. Reconcile it before updating the branch.",
+      );
+    await git(["merge-base", "--is-ancestor", expectedHead, run.commit]);
+    if (!alreadyPushed) {
+      await git(["fetch", remote, `refs/heads/${base}`]);
+      await git(["merge-tree", "--write-tree", "FETCH_HEAD", run.commit]);
+      await assertCurrent();
+      if (!saved)
+        await writeFile(intentFile, JSON.stringify(intent), {
+          mode: 0o600,
+          flag: "wx",
+        });
+      // Recheck PR state after validation/fetch work, immediately before the guarded push.
+      const currentPr = JSON.parse(
+        await gh([
+          "pr",
+          "view",
+          intent.url,
+          "--json",
+          "state,headRefOid,baseRefName,url,body",
+        ]),
+      ) as PublishedPr;
+      verifyRevisionPr(run, [currentPr], remoteHead, expectedHead);
+      if (currentPr.baseRefName !== base)
+        throw new CodingBranchConflict(
+          "The PR base changed. Reconcile it before updating the branch.",
+        );
+      await assertCurrent();
+      await git([
+        "push",
+        `--force-with-lease=refs/heads/${run.branch}:${expectedHead}`,
+        remote,
+        `${run.commit}:refs/heads/${run.branch}`,
+      ]);
+    }
+    await assertCurrent();
+    const revisionMarker = `<!-- code-assist-change:${request.id} -->`;
+    if (!prs[0].body.includes(revisionMarker)) {
+      let body = prs[0].body;
+      for (const [name, commit] of Object.entries(commitSet(run)))
+        if (request.baseCommits[name])
+          body = body.replace(
+            `- ${name}: ${request.baseCommits[name]}`,
+            `- ${name}: ${commit}`,
+          );
+      body += `\n\n**Requested Changes:**\n\n${request.text}\n\nUpdated after fresh validation and Claude review. [Revision evidence](http://100.91.0.83:3000/tickets/${run.issue_id}).\n\n${revisionMarker}\n`;
+      const bodyFile = join(local, `pull-request-${request.id}.md`);
+      await writeFile(bodyFile, body, { mode: 0o600 });
+      await gh(["pr", "edit", intent.url, "--body-file", bodyFile]);
+    }
+    return intent.url;
+  }
   const marker = `<!-- code-assist:${run.id} -->`,
     intentFile = join(local, "publication.json");
   let intent: { commit: string; base: string } | undefined;
