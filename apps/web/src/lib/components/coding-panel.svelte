@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { CodingDetail } from '@code-assist/intake/coding';
 	import { missingBrowserEvidence } from '@code-assist/intake/coding-types';
@@ -10,6 +10,7 @@
 	import { workflowBadgeVariant } from '#lib/workflow-status.js';
 	import TicketSection from './ticket-section.svelte';
 	import CodingChanges from './coding-changes.svelte';
+	import CodingActions from './coding-actions.svelte';
 	import CodingReply from './coding-reply.svelte';
 	let { run, editable }: { run: CodingDetail; editable: boolean } = $props();
 	const titles = {
@@ -42,6 +43,36 @@
 	const directionQuestion = $derived(
 		typeof latest?.result?.directionQuestion === 'string' ? latest.result.directionQuestion : ''
 	);
+	let changesOpen = $state(false);
+	const retryLabel = $derived(
+		needsBrowserChecks
+			? 'Run Browser Checks'
+			: latest?.kind === 'collect'
+				? 'Retry Evidence Collection'
+				: latest?.kind === 'checkpoint'
+					? 'Retry Saving Checkpoint'
+					: 'Retry Coding Step'
+	);
+	async function reveal(
+		target: 'changes' | 'activity' | 'reply' | 'repositories',
+		expand: () => void
+	) {
+		expand();
+		if (target === 'changes') changesOpen = true;
+		await tick();
+		const id =
+			target === 'changes'
+				? 'changes-'
+				: target === 'reply'
+					? 'coding-reply-'
+					: target === 'repositories'
+						? 'coding-repositories-'
+						: 'coding-activity-';
+		const element = document.getElementById(id + run.id);
+		if (target === 'activity' && element?.parentElement instanceof HTMLDetailsElement)
+			element.parentElement.open = true;
+		element?.focus();
+	}
 </script>
 
 <TicketSection
@@ -49,19 +80,14 @@
 	title={run.repair ? 'Main Workflow Repair' : 'Coding'}
 	collapsed={run.status === 'done' || run.status === 'superseded' || !editable}
 >
-	{#snippet actions()}
-		<Badge variant={workflowBadgeVariant(run.status, editable)}
-			>{editable
-				? needsBrowserChecks
-					? 'Browser Checks Needed'
-					: run.status === 'failed' && latest?.kind === 'collect'
-						? 'Evidence Collection Failed'
-						: run.status === 'failed' && latest?.kind === 'checkpoint'
-							? 'Checkpoint Save Failed'
-							: titles[run.status]
-				: 'Previous Approved Scope'}</Badge
-		>
-		<Button variant="ghost" size="sm" onclick={() => invalidateAll()}>Refresh View</Button>
+	{#snippet actions(expand: () => void)}
+		<CodingActions
+			{run}
+			{editable}
+			statusLabel={editable ? titles[run.status] : 'View Previous Run'}
+			{retryLabel}
+			onreveal={(target) => reveal(target, expand)}
+		/>
 	{/snippet}
 	{#if run.status === 'needs_direction'}
 		<section
@@ -77,20 +103,15 @@
 			{#if editable}<CodingReply {run} />{/if}
 		</section>
 	{/if}
-	<div class="flex flex-wrap gap-x-6 gap-y-2 border-b pb-5 text-sm">
-		<span><span class="text-muted-foreground">Plan</span> v{run.version}</span>
-		<span class="min-w-0 break-all"
-			><span class="text-muted-foreground">Branch</span>
-			<span class="font-mono text-xs">{run.branch}</span></span
-		>
-		{#if run.commit}<span
-				><span class="text-muted-foreground">Commit</span>
-				<span class="font-mono text-xs">{run.commit.slice(0, 7)}</span></span
-			>{/if}
-	</div>
+	<p class="text-sm text-muted-foreground">
+		Plan v{run.version} · <span class="break-all">{run.branch}</span>{#if run.commit}
+			· {run.commit.slice(0, 7)}{/if}
+	</p>
 	{#if run.repositories}
 		<div class="space-y-2 text-sm">
-			<h3 class="font-medium">Repository Progress</h3>
+			<h3 id={'coding-repositories-' + run.id} tabindex="-1" class="font-medium">
+				Repository Progress
+			</h3>
 			<p class="text-muted-foreground">
 				Repositories run one at a time. Claude reviews the combined implementation before PR
 				publication. Done requires every repository’s main workflow to succeed.
@@ -177,39 +198,11 @@
 			checkpoint without running the agent again.
 		</p>{/if}
 	{#if run.pr_url}
-		<div class="space-y-4 rounded-lg bg-muted/40 p-4 sm:p-5">
-			<div class="flex flex-wrap items-center justify-between gap-4">
-				<div class="space-y-1">
-					<h3 class="font-medium">
-						{run.status === 'pr_open' && editable ? 'Ready for Your Review' : 'Pull Request'}
-					</h3>
-					{#if run.status === 'pr_open'}<p class="text-sm">
-							Review the implementation in GitHub{editable ? ' or request changes below.' : '.'}
-						</p>{/if}
-				</div>
-				{#if !run.repositories}
-					<Button href={run.pr_url} target="_blank" rel="noreferrer"
-						>{run.merged_at
-							? 'View Merged Pull Request →'
-							: run.status === 'pr_closed'
-								? 'View Closed Pull Request →'
-								: 'Review Pull Request →'}</Button
-					>
-				{/if}
-			</div>
-			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t pt-3">
-				<p class="text-xs text-muted-foreground">
-					{#if run.github_checked_at}GitHub checked {new Date(
-							run.github_checked_at
-						).toLocaleString()}.{:else}Waiting for the first GitHub check.{/if}
-				</p>
-				<form method="POST" use:enhance>
-					<input type="hidden" name="intent" value="github-refresh" />
-					<input type="hidden" name="codingId" value={run.id} />
-					<Button type="submit" variant="ghost" size="sm">Check GitHub</Button>
-				</form>
-			</div>
-		</div>
+		<p class="text-xs text-muted-foreground">
+			{#if run.github_checked_at}GitHub checked {new Date(
+					run.github_checked_at
+				).toLocaleString()}.{:else}Waiting for the first GitHub check.{/if}
+		</p>
 		{#if run.github_error}<p role="alert">{run.github_error}</p>{/if}
 		{#if run.merged_at && run.merge_commit}
 			<p class="text-sm">
@@ -263,21 +256,7 @@
 			workflow evidence are preserved. Any code fix goes through validation, Claude review, and a
 			new PR.
 		</p>{/if}
-	{#if run.status === 'failed' && editable && latest}<form method="POST" use:enhance>
-			<input type="hidden" name="intent" value="coding-retry" /><input
-				type="hidden"
-				name="codingId"
-				value={run.id}
-			/><input type="hidden" name="stepId" value={latest.id} /><Button type="submit"
-				>{needsBrowserChecks
-					? 'Run Browser Checks'
-					: latest.kind === 'collect'
-						? 'Retry Evidence Collection'
-						: latest.kind === 'checkpoint'
-							? 'Retry Saving Checkpoint'
-							: 'Retry Coding Step'}</Button
-			>
-		</form>{/if}
+
 	{#if run.status === 'failed' && editable && latest && !run.pr_url}
 		<details>
 			<summary class="cursor-pointer text-sm">Choose a Different Branch</summary>
@@ -303,16 +282,21 @@
 			</form>
 		</details>
 	{/if}
-	<CodingChanges {run} {editable} />
-	<section aria-labelledby={'coding-history-' + run.id} class="space-y-3 border-t pt-5">
-		<h3 id={'coding-history-' + run.id} class="text-sm font-medium text-muted-foreground">
-			Activity and History
-		</h3>
+	{#if changesOpen && editable && run.status === 'pr_open'}
+		<CodingChanges
+			{run}
+			onclose={async () => {
+				changesOpen = false;
+				await tick();
+				document.getElementById('coding-actions-' + run.id)?.focus();
+			}}
+		/>
+	{/if}
+	<div class="space-y-4">
 		<details
-			class="rounded-lg border px-4 py-3"
 			open={latest?.status === 'running' || latest?.status === 'queued' || run.status === 'failed'}
 		>
-			<summary class="cursor-pointer text-sm font-medium"
+			<summary id={'coding-activity-' + run.id} class="cursor-pointer text-sm font-medium"
 				>Coding Activity ({run.steps.length} {run.steps.length === 1 ? 'Step' : 'Steps'})</summary
 			>
 			<div class="mt-3 space-y-3">
@@ -364,7 +348,7 @@
 			</div>
 		</details>
 		{#if run.direction_responses?.length}
-			<details class="rounded-lg border px-4 py-3">
+			<details>
 				<summary class="cursor-pointer text-sm font-medium"
 					>Previous Replies ({run.direction_responses.length})</summary
 				>
@@ -382,7 +366,7 @@
 			</details>
 		{/if}
 		{#if run.change_requests?.length}
-			<details class="rounded-lg border px-4 py-3">
+			<details>
 				<summary class="cursor-pointer text-sm font-medium"
 					>Previous Code Requests ({run.change_requests.length})</summary
 				>
@@ -398,5 +382,5 @@
 				</div>
 			</details>
 		{/if}
-	</section>
+	</div>
 </TicketSection>
