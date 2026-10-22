@@ -45,6 +45,25 @@ export const load: PageServerLoad = async (event) => {
 	if (!item) error(404, 'Ticket not found.');
 	return {
 		item,
+		codingHtml: Object.fromEntries(
+			item.coding.flatMap((run) =>
+				run.steps.flatMap((step) => {
+					const result = step.result;
+					return [
+						...['summary', 'directionQuestion'].map((field) => [
+							`${step.id}:${field}`,
+							renderMarkdown(typeof result?.[field] === 'string' ? result[field] : '')
+						]),
+						...(Array.isArray(result?.findings) ? result.findings : []).flatMap((finding, index) =>
+							['detail', 'recommendation'].map((field) => [
+								`${step.id}:finding:${index}:${field}`,
+								renderMarkdown(typeof finding[field] === 'string' ? finding[field] : '')
+							])
+						)
+					];
+				})
+			)
+		),
 		planChanges: Object.fromEntries(
 			item.planning.flatMap((run) =>
 				run.versions.flatMap((version, index) =>

@@ -84,6 +84,7 @@
 	</p>{/if}
 {#each data.item.coding as run (run.id)}<CodingPanel
 		{run}
+		html={data.codingHtml}
 		editable={data.item.eligible &&
 			!data.item.removed_at &&
 			run.planning_id === planning?.id &&

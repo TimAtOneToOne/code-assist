@@ -12,7 +12,12 @@
 	import CodingChanges from './coding-changes.svelte';
 	import CodingActions from './coding-actions.svelte';
 	import CodingReply from './coding-reply.svelte';
-	let { run, editable }: { run: CodingDetail; editable: boolean } = $props();
+	import Markdown from './markdown.svelte';
+	let {
+		run,
+		editable,
+		html
+	}: { run: CodingDetail; editable: boolean; html: Record<string, string> } = $props();
 	const titles = {
 		prepare: 'Preparing Workspace',
 		implement: 'Codex Implementing',
@@ -95,10 +100,13 @@
 			class="space-y-2 rounded-md border border-yellow-300 bg-yellow-50 p-4"
 		>
 			<h3 id={'coding-question-' + run.id} class="text-base font-medium">Agent Question</h3>
-			<p class="break-words whitespace-pre-wrap text-foreground!">
-				{directionQuestion ||
-					'The agent stopped without a question. Review its latest result in Coding Activity below.'}
-			</p>
+			{#if directionQuestion}
+				<Markdown html={html[`${run.current_step_id}:directionQuestion`] ?? ''} />
+			{:else}
+				<p>
+					The agent stopped without a question. Review its latest result in Coding Activity below.
+				</p>
+			{/if}
 			<p class="text-sm">Coding is paused. The saved code and evidence are preserved.</p>
 			{#if editable}<CodingReply {run} />{/if}
 		</section>
@@ -321,25 +329,23 @@
 								</p>{/if}
 							{#if step.error}<p>{step.error}</p>{/if}
 							{#if step.result}
-								{#if typeof step.result.summary === 'string'}<p class="whitespace-pre-wrap">
-										{step.result.summary}
-									</p>{/if}
-								{#if typeof step.result.directionQuestion === 'string' && step.result.directionQuestion}<p
-										class="font-medium"
-									>
-										{step.result.directionQuestion}
-									</p>{/if}
+								{#if typeof step.result.summary === 'string'}
+									<Markdown html={html[`${step.id}:summary`] ?? ''} />
+								{/if}
+								{#if typeof step.result.directionQuestion === 'string' && step.result.directionQuestion}
+									<Markdown html={html[`${step.id}:directionQuestion`] ?? ''} />
+								{/if}
 								{#if step.result.commands && typeof step.result.commands === 'object'}<ul>
 										{#each Object.entries(step.result.commands) as [command, code] (command)}<li>
 												{command}: {code === 0 ? 'Passed' : 'Failed'}
 											</li>{/each}
 									</ul>{/if}
-								{#if Array.isArray(step.result.findings)}{#each step.result.findings as finding (finding.id)}<div
+								{#if Array.isArray(step.result.findings)}{#each step.result.findings as finding, index (finding.id)}<div
 											class="rounded-md border p-3"
 										>
 											<p class="font-medium">{finding.severity} · {finding.title}</p>
-											<p>{finding.detail}</p>
-											<p>{finding.recommendation}</p>
+											<Markdown html={html[`${step.id}:finding:${index}:detail`] ?? ''} />
+											<Markdown html={html[`${step.id}:finding:${index}:recommendation`] ?? ''} />
 										</div>{/each}{/if}
 							{/if}
 						</div>
