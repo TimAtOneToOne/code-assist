@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
 import { exerciseCodeChanges } from "./coding-revision-fixture.ts";
+import { exerciseValidationLoop } from "./coding-validation-fixture.ts";
+import { finishValidation } from "../src/coding-validation-outcome.ts";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -181,8 +183,9 @@ test("multi-repository coding persists sequential checkpoints, combined review, 
         { repositories: states, index: 0 },
       ),
     );
+    const directed = await exerciseValidationLoop(boss, await next(), next);
     for (const index of [0, 1]) {
-      const implement = await next();
+      const implement = index === 0 ? directed : await next();
       assert.equal(implement.step.kind, "implement");
       assert.equal(implement.step.repository_index, index);
       assert.equal(implement.step.input_commit, states[index].commit);
@@ -204,17 +207,11 @@ test("multi-repository coding persists sequential checkpoints, combined review, 
       const validation = await next();
       assert.equal(validation.step.kind, "validate");
       assert.equal(validation.step.input_commit, states[index].commit);
-      await finishCoding(
-        boss,
-        validation.run,
-        validation.step,
-        { passed: true },
-        index ? "review" : "implement",
-        undefined,
-        undefined,
-        undefined,
-        { repositories: states, index: 1 },
-      );
+      await finishValidation(boss, validation.run, validation.step, {
+        commit: validation.run.commit!,
+        commands: { test: 0 },
+        passed: true,
+      });
     }
     const review = await next();
     assert.equal(review.step.kind, "review");

@@ -8,6 +8,7 @@ import {
   publicationReady,
 } from "./coding-repositories.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
+import { finishValidation } from "./coding-validation-outcome.ts";
 import { isWindmill, readWindmillIntent } from "./windmill-publication.ts";
 import { supplyMain } from "./coding-main.ts";
 import {
@@ -630,29 +631,7 @@ export async function registerCodingWorker(
           );
           await assertCurrent();
           await unchanged();
-          const indexes = codingIndexes(run);
-          const following = indexes[indexes.indexOf(repositoryIndex(run)) + 1];
-          await finishCoding(
-            boss,
-            run,
-            step,
-            result,
-            result.passed
-              ? following === undefined
-                ? "review"
-                : "implement"
-              : "implement",
-            undefined,
-            undefined,
-            undefined,
-            progress(
-              result.passed
-                ? (following ?? repositoryIndex(run))
-                : repositoryIndex(run),
-              undefined,
-              result.passed ? "review" : "implement",
-            ),
-          );
+          await finishValidation(boss, run, step, result);
         } else {
           const history = (await readCoding(boss.getDb(), run.issue_id)).find(
             (r) => r.id === run.id,

@@ -4,6 +4,8 @@ import { join } from "node:path";
 import assert from "node:assert/strict";
 import { exerciseCodeChanges } from "./coding-revision-fixture.ts";
 import { exerciseCodingDirection } from "./coding-direction-fixture.ts";
+import { exerciseValidationLoop } from "./coding-validation-fixture.ts";
+import { finishValidation } from "../src/coding-validation-outcome.ts";
 import { exerciseMissingBrowserEvidence } from "./coding-browser-evidence-fixture.ts";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
@@ -174,7 +176,11 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     );
     const b = await exerciseMissingBrowserEvidence(
       boss,
-      await exerciseCodingDirection(boss, await next(), next),
+      await exerciseValidationLoop(
+        boss,
+        await exerciseCodingDirection(boss, await next(), next),
+        next,
+      ),
       next,
     );
     assert.equal(b.step.input_commit, "a".repeat(40));
@@ -350,13 +356,11 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     const validation = await next();
     assert.equal(validation.step.input_commit, "b".repeat(40));
     assert(
-      await finishCoding(
-        boss,
-        validation.run,
-        validation.step,
-        { passed: true },
-        "review",
-      ),
+      await finishValidation(boss, validation.run, validation.step, {
+        commit: validation.run.commit!,
+        commands: { test: 0 },
+        passed: true,
+      }),
     );
     const review = await next();
     await finishCoding(
@@ -771,7 +775,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       completed.steps.filter(
         (s) => s.status === "completed" && !s.change_request_id,
       ).length,
-      10,
+      22,
     );
   } finally {
     await boss.stop();

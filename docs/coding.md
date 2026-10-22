@@ -8,6 +8,16 @@ Each run is bound to the approved plan version, plan hash, requirements hash and
 
 The ticket page shows these steps, summaries, findings, validation results and log links. Failed steps have a Retry action and a deliberate Use Branch and Retry form when a fresh branch is needed. A publication already in flight must be reconciled before its branch can change. A changed ticket, removed Plan label, changed repository selection or revised plan prevents obsolete attempts from advancing. A revised approved plan starts a separate run; previously used branches are not silently reused.
 
+### Repeated Validation Failures
+
+A first failed validation returns to implementation. If a completed implementation attempt leaves the candidate commits unchanged and validation again returns the same command/exit-code results, the controller pauses in **Your Direction Needed** instead of repeating. It preserves both validation results, identifies the previous step, and uses the existing **Reply and Continue** flow. This compares command outcomes, not individual test identities or log text; inspect the logs to diagnose the actual failure.
+
+The comparison uses the latest completed validation for the same repository, coding run, change request and human reply. Changed candidate commits, different command outcomes or a new reply allow another attempt. Passing validation follows the normal next-repository/review path. The pause never marks failed validation as passed or authorizes publication.
+
+Verification on October 22, 2026: `make verify` passed (70 tests, lint/format, types and build), and `make test-intake` passed eight PostgreSQL integration tests; the opt-in OrbStack setup test was skipped. Regression coverage exercises an actual failed-validation/implementation/failed-validation cycle, no queued continuation after the pause, preserved work, stale-result rejection, reply/restart/resumption, and the normal passing path for single and multiple repositories. These are local fixtures; check live ticket history for deployment and incident recovery evidence.
+
+Optional optimizations and controls: Tim approved this stopping condition on October 22, 2026 after ONE-5005 completed 58 failed validations of the same commit. It applies to all coding runs; an unchanged repeated command failure now requires human direction even if its underlying cause is transient. There is no added round cap, retry, test suppression or validation waiver.
+
 Linear's `updatedAt` timestamp alone does not change discovery inputs. PR integrations can update that timestamp without changing the ticket's content. Intake compares saved ticket content and repository selections, including for runs created before this correction; existing approval hashes remain unchanged.
 
 ## Execution and Evidence
@@ -100,7 +110,7 @@ Optional optimizations and controls: none. Pinning and ancestry checks preserve 
 
 GitHub fields use [gh pr view](https://cli.github.com/manual/gh_pr_view), [workflow runs](https://docs.github.com/en/rest/actions/workflow-runs), and [workflow jobs](https://docs.github.com/en/rest/actions/workflow-jobs).
 
-Optional optimizations and controls: none. Approval fencing, commit-bound validation/review, process ownership and expected-head publication are required workflow integrity checks.
+Optional optimizations and controls: the approved repeated-validation pause described above. Approval fencing, commit-bound validation/review, process ownership and expected-head publication are required workflow integrity checks.
 
 ## Verification — October 20, 2026
 

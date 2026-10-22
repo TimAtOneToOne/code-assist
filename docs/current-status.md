@@ -1,6 +1,6 @@
 # Current Status
 
-Updated October 22, 2026 against source commit `f21c951` and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
+Updated October 22, 2026 against the source tree, including the repeated-validation pause added after `ff4a8d4`, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
 
 ## Product and Runtime
 
@@ -16,7 +16,7 @@ Discovery and planning use recorded source snapshots and read-only agent access.
 | Discovery | Codex reads pinned snapshots; findings, questions, answers, explicit scope confirmation, retries, and stale-attempt rejection | [Discovery](discovery.md) |
 | Planning | Codex drafts/revises; Claude reviews; immutable plan versions; feedback, direction, plan comparisons, and exact-version approval with explicit acceptance of remaining medium findings | [Planning](planning.md) |
 | Repository Setup | Editable runtime profiles, secret mappings, pinned local Git dependencies, and disposable setup/validation/browser tests; three built-in defaults plus saved profiles | [Repository Setup](repository-setup.md), [Secrets](secrets.md) |
-| Coding | Sequential multi-repository implementation; saved checkpoints and evidence; repository validation; combined Claude review; critical/high/medium findings return to implementation | [Coding](coding.md) |
+| Coding | Sequential multi-repository implementation; saved checkpoints and evidence; repository validation; unchanged repeated validation failures pause for direction; combined Claude review; critical/high/medium findings return to implementation | [Coding](coding.md) |
 | Human Follow-Up | Replies to coding questions, requested changes to owned open PRs, explicit Bring In Main, fresh evidence for revisions, and Run Browser Checks recovery | [Coding](coding.md) |
 | Publication | Exact-commit validation/review checks, durable publication intents, remote-head checks and retry reconciliation, separate PRs for selected repositories | [Coding](coding.md) |
 | Windmill Work | Controller-owned native production-workspace fork creation, ticket fork branches, exact-commit Git Sync evidence, and native PR adoption; latest addition in `f21c951` | [Windmill Publication](coding.md#windmill-production-fork-publication) |
@@ -44,6 +44,7 @@ Exact-version approval authorizes implementation and publication for the confirm
 - ONE-5239's manual fork recovery and successful small-file hosted upload are historical evidence, not proof that the new controller path ran. See [the run findings](one-5239-run-findings.md); the deferred 25 MB test and full non-admin acceptance are separate limitations.
 - Corrective coding after failed main workflows has fixture-based coverage; the documentation does not claim a deliberately induced live deployment failure tested the full repair path.
 - Repository setup results are dated evidence. Saved profiles on Mia and each run's pinned profile are authoritative. Browser sign-in-page checks do not prove an authenticated Microsoft session or full application acceptance. The recorded Medusa baseline includes two failing credential tests; inspect a fresh result before treating that as current.
+- On October 22, ONE-5005 completed 58 failed validations of unchanged commit `39607d7`; every failure returned to implementation without reaching review. The run was stopped with its workspace intact. Saved logs show the Linear `test_near_expiry_triggers_remint` failure on the candidate and in a focused approved-base run, while a baseline full-suite run passed. Treat that as evidence of an intermittent baseline failure, not passing candidate validation. The controller now has an approved pause for unchanged repeated command failures; see [Coding](coding.md#repeated-validation-failures). Check live state for the incident's current disposition.
 - Full-machine/FileVault reboot recovery, backup/restore, and external-drive migration remain unproven in the operational record. OpenObserve native MCP and application trace instrumentation are separate from the implemented SDK event/artifact logging.
 - Per-ticket guests isolate working files and services, but native loopback publishing defaults are not an enforced hostile-code network boundary: explicit all-interface binds can override them. Read the [follow-up isolation proof](loopback-isolation-proof.md) alongside the original concurrent test.
 
@@ -55,4 +56,4 @@ Publishing Code Assist `main` triggers Mia's updater even for documentation-only
 
 Keep this page and the affected workflow guide current when behavior changes. Date live evidence and name its commit/run; preserve original plans and historical findings rather than rewriting their outcomes. The [initial brief](initial/standalone-brief.md) records product requirements; the [original plan](plans/plan_v1.md) and [prototype](initial/index.html) are historical design references.
 
-Optional optimizations and controls introduced by this documentation update: none.
+Optional optimizations and controls: Tim approved the repeated-validation pause on October 22, 2026. It applies to all coding runs and requires a reply when another implementation attempt leaves the same candidates and failing command outcomes; validation and review remain required. See [Coding](coding.md#repeated-validation-failures) for its comparison scope and transient-failure tradeoff.
