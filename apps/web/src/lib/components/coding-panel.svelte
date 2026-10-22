@@ -8,7 +8,6 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { workflowBadgeVariant } from '#lib/workflow-status.js';
-	import { tick } from 'svelte';
 	import TicketSection from './ticket-section.svelte';
 	import CodingChanges from './coding-changes.svelte';
 	import CodingReply from './coding-reply.svelte';
@@ -43,12 +42,6 @@
 	const directionQuestion = $derived(
 		typeof latest?.result?.directionQuestion === 'string' ? latest.result.directionQuestion : ''
 	);
-	async function requestChange(expand: () => void) {
-		expand();
-		await tick();
-		document.getElementById('code-changes-' + run.id)?.scrollIntoView({ block: 'start' });
-		document.getElementById('changes-' + run.id)?.focus({ preventScroll: true });
-	}
 </script>
 
 <TicketSection
@@ -56,7 +49,7 @@
 	title={run.repair ? 'Main Workflow Repair' : 'Coding'}
 	collapsed={run.status === 'done' || run.status === 'superseded' || !editable}
 >
-	{#snippet actions(expand: () => void)}
+	{#snippet actions()}
 		<Badge variant={workflowBadgeVariant(run.status, editable)}
 			>{editable
 				? needsBrowserChecks
@@ -68,14 +61,7 @@
 							: titles[run.status]
 				: 'Previous Approved Scope'}</Badge
 		>
-		<div class="flex items-center gap-2">
-			<Button variant="outline" size="sm" onclick={() => invalidateAll()}>Refresh</Button>
-			{#if editable && run.status === 'pr_open'}
-				<Button variant="outline" size="sm" onclick={() => requestChange(expand)}
-					>Request Change</Button
-				>
-			{/if}
-		</div>
+		<Button variant="ghost" size="sm" onclick={() => invalidateAll()}>Refresh View</Button>
 	{/snippet}
 	{#if run.status === 'needs_direction'}
 		<section
@@ -91,10 +77,17 @@
 			{#if editable}<CodingReply {run} />{/if}
 		</section>
 	{/if}
-	<p class="text-sm text-muted-foreground">
-		Plan v{run.version} · {run.branch}{#if run.commit}
-			· {run.commit.slice(0, 7)}{/if}
-	</p>
+	<div class="flex flex-wrap gap-x-6 gap-y-2 border-b pb-5 text-sm">
+		<span><span class="text-muted-foreground">Plan</span> v{run.version}</span>
+		<span class="min-w-0 break-all"
+			><span class="text-muted-foreground">Branch</span>
+			<span class="font-mono text-xs">{run.branch}</span></span
+		>
+		{#if run.commit}<span
+				><span class="text-muted-foreground">Commit</span>
+				<span class="font-mono text-xs">{run.commit.slice(0, 7)}</span></span
+			>{/if}
+	</div>
 	{#if run.repositories}
 		<div class="space-y-2 text-sm">
 			<h3 class="font-medium">Repository Progress</h3>
@@ -184,29 +177,38 @@
 			checkpoint without running the agent again.
 		</p>{/if}
 	{#if run.pr_url}
-		<div class="space-y-2">
-			<div class="flex flex-wrap items-center gap-3">
+		<div class="space-y-4 rounded-lg bg-muted/40 p-4 sm:p-5">
+			<div class="flex flex-wrap items-center justify-between gap-4">
+				<div class="space-y-1">
+					<h3 class="font-medium">
+						{run.status === 'pr_open' && editable ? 'Ready for Your Review' : 'Pull Request'}
+					</h3>
+					{#if run.status === 'pr_open'}<p class="text-sm">
+							Review the implementation in GitHub{editable ? ' or request changes below.' : '.'}
+						</p>{/if}
+				</div>
 				{#if !run.repositories}
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub URL from the publication controller. -->
-					<a class="font-medium underline" href={run.pr_url} target="_blank" rel="noreferrer"
+					<Button href={run.pr_url} target="_blank" rel="noreferrer"
 						>{run.merged_at
 							? 'View Merged Pull Request →'
 							: run.status === 'pr_closed'
 								? 'View Closed Pull Request →'
-								: 'Review Pull Request →'}</a
+								: 'Review Pull Request →'}</Button
 					>
 				{/if}
+			</div>
+			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t pt-3">
+				<p class="text-xs text-muted-foreground">
+					{#if run.github_checked_at}GitHub checked {new Date(
+							run.github_checked_at
+						).toLocaleString()}.{:else}Waiting for the first GitHub check.{/if}
+				</p>
 				<form method="POST" use:enhance>
 					<input type="hidden" name="intent" value="github-refresh" />
 					<input type="hidden" name="codingId" value={run.id} />
-					<Button type="submit" variant="outline" size="sm">Refresh GitHub</Button>
+					<Button type="submit" variant="ghost" size="sm">Check GitHub</Button>
 				</form>
 			</div>
-			<p class="text-sm text-muted-foreground">
-				{#if run.github_checked_at}Last checked {new Date(
-						run.github_checked_at
-					).toLocaleString()}.{:else}Waiting for the first GitHub check.{/if}
-			</p>
 		</div>
 		{#if run.github_error}<p role="alert">{run.github_error}</p>{/if}
 		{#if run.merged_at && run.merge_commit}
@@ -301,75 +303,100 @@
 			</form>
 		</details>
 	{/if}
-	<details
-		open={latest?.status === 'running' || latest?.status === 'queued' || run.status === 'failed'}
-	>
-		<summary class="cursor-pointer text-sm font-medium"
-			>Coding Activity ({run.steps.length} {run.steps.length === 1 ? 'Step' : 'Steps'})</summary
+	<CodingChanges {run} {editable} />
+	<section aria-labelledby={'coding-history-' + run.id} class="space-y-3 border-t pt-5">
+		<h3 id={'coding-history-' + run.id} class="text-sm font-medium text-muted-foreground">
+			Activity and History
+		</h3>
+		<details
+			class="rounded-lg border px-4 py-3"
+			open={latest?.status === 'running' || latest?.status === 'queued' || run.status === 'failed'}
 		>
-		<div class="mt-3 space-y-3">
-			{#each run.steps as step (step.id)}
-				<details
-					open={step.id === run.current_step_id && step.status !== 'completed'}
-					class="rounded-md border p-3"
-				>
-					<summary class="cursor-pointer text-sm font-medium"
-						>{titles[step.kind]}{run.repositories
-							? ` · ${run.repositories[step.repository_index ?? 0].name}`
-							: ''} · {workflowLabel(step.status)} · {new Date(
-							step.created_at
-						).toLocaleString()}</summary
-					>
-					<div class="mt-3 space-y-3 text-sm">
-						<a class="underline" href={resolve(`/logs?attempt=${step.id}`)}
-							>Agent Activity and Logs →</a
-						>
-						{#if step.input_commit}<p class="text-muted-foreground">
-								Input Commit: {step.input_commit.slice(0, 7)}
-							</p>{/if}
-						{#if step.error}<p>{step.error}</p>{/if}
-						{#if step.result}
-							{#if typeof step.result.summary === 'string'}<p class="whitespace-pre-wrap">
-									{step.result.summary}
-								</p>{/if}
-							{#if typeof step.result.directionQuestion === 'string' && step.result.directionQuestion}<p
-									class="font-medium"
-								>
-									{step.result.directionQuestion}
-								</p>{/if}
-							{#if step.result.commands && typeof step.result.commands === 'object'}<ul>
-									{#each Object.entries(step.result.commands) as [command, code] (command)}<li>
-											{command}: {code === 0 ? 'Passed' : 'Failed'}
-										</li>{/each}
-								</ul>{/if}
-							{#if Array.isArray(step.result.findings)}{#each step.result.findings as finding (finding.id)}<div
-										class="rounded-md border p-3"
-									>
-										<p class="font-medium">{finding.severity} · {finding.title}</p>
-										<p>{finding.detail}</p>
-										<p>{finding.recommendation}</p>
-									</div>{/each}{/if}
-						{/if}
-					</div>
-				</details>
-			{/each}
-		</div>
-	</details>
-	{#if run.direction_responses?.length}
-		<details>
 			<summary class="cursor-pointer text-sm font-medium"
-				>Previous Replies ({run.direction_responses.length})</summary
+				>Coding Activity ({run.steps.length} {run.steps.length === 1 ? 'Step' : 'Steps'})</summary
 			>
-			<div class="mt-3 space-y-4">
-				{#each run.direction_responses as reply (reply.id)}
-					<div class="space-y-2 text-sm">
-						<p>{new Date(reply.createdAt).toLocaleString()}</p>
-						{#if reply.question}<p class="break-words whitespace-pre-wrap">{reply.question}</p>{/if}
-						<p class="break-words whitespace-pre-wrap text-foreground!">{reply.text}</p>
-					</div>
+			<div class="mt-3 space-y-3">
+				{#each run.steps as step (step.id)}
+					<details
+						open={step.id === run.current_step_id && step.status !== 'completed'}
+						class="rounded-md border p-3"
+					>
+						<summary class="cursor-pointer text-sm font-medium"
+							>{titles[step.kind]}{run.repositories
+								? ` · ${run.repositories[step.repository_index ?? 0].name}`
+								: ''} · {workflowLabel(step.status)} · {new Date(
+								step.created_at
+							).toLocaleString()}</summary
+						>
+						<div class="mt-3 space-y-3 text-sm">
+							<a class="underline" href={resolve(`/logs?attempt=${step.id}`)}
+								>Agent Activity and Logs →</a
+							>
+							{#if step.input_commit}<p class="text-muted-foreground">
+									Input Commit: {step.input_commit.slice(0, 7)}
+								</p>{/if}
+							{#if step.error}<p>{step.error}</p>{/if}
+							{#if step.result}
+								{#if typeof step.result.summary === 'string'}<p class="whitespace-pre-wrap">
+										{step.result.summary}
+									</p>{/if}
+								{#if typeof step.result.directionQuestion === 'string' && step.result.directionQuestion}<p
+										class="font-medium"
+									>
+										{step.result.directionQuestion}
+									</p>{/if}
+								{#if step.result.commands && typeof step.result.commands === 'object'}<ul>
+										{#each Object.entries(step.result.commands) as [command, code] (command)}<li>
+												{command}: {code === 0 ? 'Passed' : 'Failed'}
+											</li>{/each}
+									</ul>{/if}
+								{#if Array.isArray(step.result.findings)}{#each step.result.findings as finding (finding.id)}<div
+											class="rounded-md border p-3"
+										>
+											<p class="font-medium">{finding.severity} · {finding.title}</p>
+											<p>{finding.detail}</p>
+											<p>{finding.recommendation}</p>
+										</div>{/each}{/if}
+							{/if}
+						</div>
+					</details>
 				{/each}
 			</div>
 		</details>
-	{/if}
-	<CodingChanges {run} {editable} />
+		{#if run.direction_responses?.length}
+			<details class="rounded-lg border px-4 py-3">
+				<summary class="cursor-pointer text-sm font-medium"
+					>Previous Replies ({run.direction_responses.length})</summary
+				>
+				<div class="mt-3 space-y-4">
+					{#each run.direction_responses as reply (reply.id)}
+						<div class="space-y-2 text-sm">
+							<p>{new Date(reply.createdAt).toLocaleString()}</p>
+							{#if reply.question}<p class="break-words whitespace-pre-wrap">
+									{reply.question}
+								</p>{/if}
+							<p class="break-words whitespace-pre-wrap text-foreground!">{reply.text}</p>
+						</div>
+					{/each}
+				</div>
+			</details>
+		{/if}
+		{#if run.change_requests?.length}
+			<details class="rounded-lg border px-4 py-3">
+				<summary class="cursor-pointer text-sm font-medium"
+					>Previous Code Requests ({run.change_requests.length})</summary
+				>
+				<div class="mt-3 space-y-4">
+					{#each run.change_requests as request, index (request.id)}
+						<div>
+							<p class="text-sm text-muted-foreground">
+								Revision {index + 1} · {new Date(request.createdAt).toLocaleString()}
+							</p>
+							<p class="text-sm whitespace-pre-wrap">{request.text}</p>
+						</div>
+					{/each}
+				</div>
+			</details>
+		{/if}
+	</section>
 </TicketSection>

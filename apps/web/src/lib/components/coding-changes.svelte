@@ -32,26 +32,13 @@
 	};
 </script>
 
-{#if (editable && run.status === 'pr_open') || canBringMain || run.change_requests?.length}
+{#if (editable && run.status === 'pr_open') || canBringMain}
 	<section
 		id={'code-changes-' + run.id}
 		aria-labelledby={'code-changes-title-' + run.id}
-		class="scroll-mt-6 space-y-4 border-t pt-5"
+		class="space-y-4"
 	>
-		<h3 id={'code-changes-title-' + run.id} class="text-base font-medium">
-			Requested Code Changes
-		</h3>
-		{#if canBringMain}
-			<form method="POST" use:enhance={submit} class="flex flex-wrap items-center gap-3">
-				<input type="hidden" name="intent" value="coding-main" />
-				<input type="hidden" name="codingId" value={run.id} />
-				<input type="hidden" name="stepId" value={run.current_step_id} />
-				<Button type="submit" variant="outline" disabled={submitting}>Bring In Main</Button>
-				<p class="text-sm text-muted-foreground">
-					Merge main, resolve conflicts, and rerun checks and review.
-				</p>
-			</form>
-		{/if}
+		<h3 id={'code-changes-title-' + run.id} class="text-base font-medium">Request Changes</h3>
 		{#if editable && run.status === 'pr_open'}
 			<form method="POST" use:enhance={submit} class="space-y-3">
 				<input type="hidden" name="intent" value="coding-changes" />
@@ -61,35 +48,39 @@
 				<Textarea
 					id={`changes-${run.id}`}
 					name="changes"
+					aria-describedby={'changes-help-' + run.id}
 					rows={4}
 					required
 					placeholder="Describe the changes you want in the implementation…"
 				/>
-				<p class="text-sm text-muted-foreground">
-					Codex will revise {run.branch}, rerun checks, and get Claude’s review before updating the
-					existing PR.
-				</p>
-				<Button type="submit" disabled={submitting}
-					>{submitting ? 'Queuing…' : 'Request Code Changes'}</Button
-				>
+				<div class="flex flex-wrap items-center justify-between gap-3">
+					<p id={'changes-help-' + run.id} class="max-w-lg text-xs text-muted-foreground">
+						Codex will make the changes, rerun checks, and get Claude’s review before updating the
+						PR.
+					</p>
+					<Button type="submit" variant="outline" disabled={submitting}
+						>{submitting ? 'Queuing…' : 'Request Code Changes'}</Button
+					>
+				</div>
 			</form>
 		{/if}
-		{#if run.change_requests?.length}
-			<details>
-				<summary class="cursor-pointer text-sm font-medium"
-					>Previous Code Requests ({run.change_requests.length})</summary
-				>
-				<div class="mt-3 space-y-4">
-					{#each run.change_requests as request, index (request.id)}
-						<div>
-							<p class="text-sm text-muted-foreground">
-								Revision {index + 1} · {new Date(request.createdAt).toLocaleString()}
-							</p>
-							<p class="text-sm whitespace-pre-wrap">{request.text}</p>
-						</div>
-					{/each}
+		{#if canBringMain}
+			<form
+				method="POST"
+				use:enhance={submit}
+				class="flex flex-wrap items-center justify-between gap-3 border-t pt-4"
+			>
+				<input type="hidden" name="intent" value="coding-main" />
+				<input type="hidden" name="codingId" value={run.id} />
+				<input type="hidden" name="stepId" value={run.current_step_id} />
+				<div class="space-y-1">
+					<p class="text-sm font-medium text-foreground!">Update From Main</p>
+					<p class="text-xs text-muted-foreground">
+						Merge main, resolve conflicts, and rerun checks and review.
+					</p>
 				</div>
-			</details>
+				<Button type="submit" variant="outline" disabled={submitting}>Bring In Main</Button>
+			</form>
 		{/if}
 	</section>
 {/if}
