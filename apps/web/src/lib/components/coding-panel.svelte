@@ -10,6 +10,7 @@
 	import { tick } from 'svelte';
 	import TicketSection from './ticket-section.svelte';
 	import CodingChanges from './coding-changes.svelte';
+	import CodingReply from './coding-reply.svelte';
 	let { run, editable }: { run: CodingDetail; editable: boolean } = $props();
 	const titles = {
 		prepare: 'Preparing Workspace',
@@ -81,6 +82,7 @@
 					'The agent stopped without a question. Review its latest result in Coding Activity below.'}
 			</p>
 			<p class="text-sm">Coding is paused. The saved code and evidence are preserved.</p>
+			{#if editable}<CodingReply {run} />{/if}
 		</section>
 	{/if}
 	<p class="text-sm text-muted-foreground">
@@ -340,5 +342,21 @@
 			{/each}
 		</div>
 	</details>
+	{#if run.direction_responses?.length}
+		<details>
+			<summary class="cursor-pointer text-sm font-medium"
+				>Previous Replies ({run.direction_responses.length})</summary
+			>
+			<div class="mt-3 space-y-4">
+				{#each run.direction_responses as reply (reply.id)}
+					<div class="space-y-2 text-sm">
+						<p>{new Date(reply.createdAt).toLocaleString()}</p>
+						{#if reply.question}<p class="break-words whitespace-pre-wrap">{reply.question}</p>{/if}
+						<p class="break-words whitespace-pre-wrap text-foreground!">{reply.text}</p>
+					</div>
+				{/each}
+			</div>
+		</details>
+	{/if}
 	<CodingChanges {run} {editable} />
 </TicketSection>

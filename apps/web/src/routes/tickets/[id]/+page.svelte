@@ -24,6 +24,7 @@
 		details: { repositories?: string[]; repository?: string };
 	}) {
 		const labels: Record<string, string> = {
+			coding_direction_answered: 'You replied to the coding agent and continued the work',
 			coding_changes_requested: 'You requested code changes on the existing PR',
 			repository_needed: 'Waiting for repository selection',
 			issue_removed: 'Removed: Plan label removed in Linear',

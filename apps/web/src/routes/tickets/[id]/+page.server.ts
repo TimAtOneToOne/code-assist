@@ -2,6 +2,7 @@ import {
 	retryCoding,
 	changeCodingBranch,
 	requestCodingChanges,
+	answerCodingDirection,
 	CodingConflict
 } from '@code-assist/intake/coding';
 import { requestGitHubRefresh } from '@code-assist/intake/github';
@@ -102,6 +103,24 @@ export const actions = {
 		const approver = await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const id = issueId(event.params.id);
+		if (form.get('intent') === 'coding-direction') {
+			try {
+				await withController((boss) =>
+					answerCodingDirection(
+						boss,
+						id,
+						issueId(String(form.get('codingId'))),
+						issueId(String(form.get('stepId'))),
+						String(form.get('reply') ?? ''),
+						approver
+					)
+				);
+				return { codingDirectionSaved: true };
+			} catch (cause) {
+				if (cause instanceof CodingConflict) return fail(409, { error: cause.message });
+				throw cause;
+			}
+		}
 		if (form.get('intent') === 'coding-changes' || form.get('intent') === 'coding-main') {
 			const bringMain = form.get('intent') === 'coding-main';
 			try {

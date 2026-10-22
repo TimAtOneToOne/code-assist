@@ -46,6 +46,8 @@ export async function initializeCoding(boss: PgBoss) {
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS job_retry_count integer NOT NULL DEFAULT 0;
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS recovery_step_id uuid;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS change_requests jsonb NOT NULL DEFAULT '[]';
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS direction_responses jsonb NOT NULL DEFAULT '[]';
+ ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS direction_response_id uuid;
  ALTER TABLE code_assist.coding_step ADD COLUMN IF NOT EXISTS change_request_id uuid;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_checked_at timestamptz;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS github_error text;
@@ -150,7 +152,7 @@ async function enqueue(
     );
   if (!job) throw new Error("Could not queue coding.");
   await db.executeSql(
-    "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status,repository_index,input_commits,continuation,recovery_step_id,change_request_id) VALUES($1,$2,$3,$4,$5,'queued',$6,$7,$8,$9,$10)",
+    "INSERT INTO code_assist.coding_step(id,run_id,job_id,kind,input_commit,status,repository_index,input_commits,continuation,recovery_step_id,change_request_id,direction_response_id) VALUES($1,$2,$3,$4,$5,'queued',$6,$7,$8,$9,$10,$11)",
     [
       id,
       run.id,
@@ -162,6 +164,7 @@ async function enqueue(
       continuation ? JSON.stringify(continuation) : null,
       recoveryStepId ?? null,
       run.change_requests?.at(-1)?.id ?? null,
+      run.direction_responses?.at(-1)?.id ?? null,
     ],
   );
   await db.executeSql(
@@ -548,6 +551,74 @@ export async function requestCodingChanges(
       request,
     });
     return enqueue(boss, db, await codingRun(db, run.id), "implement");
+  });
+}
+
+export async function answerCodingDirection(
+  boss: PgBoss,
+  issueId: string,
+  runId: string,
+  stepId: string,
+  text: string,
+  requestedBy: string,
+) {
+  if (!text.trim())
+    throw new CodingConflict("Enter your reply before continuing.");
+  return codingTransaction(boss, async (db) => {
+    await db.executeSql(
+      "SELECT id FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE",
+      [issueId],
+    );
+    const run = await codingRun(db, runId);
+    const states = repositories(run);
+    const indexes = codingIndexes(run);
+    if (
+      run.issue_id !== issueId ||
+      !(await currentCoding(db, run)) ||
+      run.status !== "needs_direction" ||
+      run.current_step_id !== stepId ||
+      !run.workspace_id ||
+      run.workspace_cleaned_at ||
+      indexes.some(
+        (index) => states[index].merged_at || states[index].pr_closed_at,
+      )
+    )
+      throw new CodingConflict(
+        "This coding question is no longer current or its workspace is unavailable. Refresh the ticket before replying.",
+      );
+    const { rows } = await db.executeSql(
+      "SELECT result FROM code_assist.coding_step WHERE id=$1 AND run_id=$2 AND status='completed'",
+      [stepId, runId],
+    );
+    if (!rows.length)
+      throw new CodingConflict(
+        "Wait for the agent's result to be saved before replying.",
+      );
+    const response = {
+      id: randomUUID(),
+      stepId,
+      question:
+        typeof rows[0].result?.directionQuestion === "string"
+          ? rows[0].result.directionQuestion
+          : "",
+      text: text.trim(),
+      requestedBy,
+      createdAt: new Date().toISOString(),
+    };
+    await db.executeSql(
+      "UPDATE code_assist.coding_run SET direction_responses=direction_responses || $2::jsonb,repository_index=$3,commit=$4 WHERE id=$1",
+      [
+        runId,
+        JSON.stringify([response]),
+        indexes[0],
+        states[indexes[0]].commit,
+      ],
+    );
+    await recordIntakeEvent(boss, db, issueId, "coding_direction_answered", {
+      codingId: runId,
+      response,
+    });
+    return enqueue(boss, db, await codingRun(db, runId), "implement");
   });
 }
 

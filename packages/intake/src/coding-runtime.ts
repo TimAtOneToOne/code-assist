@@ -568,7 +568,14 @@ Apply the latest request to the existing implementation, preserving earlier acce
     : ""
 }
 Previous Coding Steps (complete results):
-${JSON.stringify(history)}`;
+${JSON.stringify(history)}
+${
+  run.direction_responses?.length
+    ? `Tim's Replies to Coding Questions (chronological):
+${JSON.stringify(run.direction_responses)}
+Apply these replies to the saved work. A later reply may clarify or withdraw an earlier code change request. Respect an explicitly accepted operational tradeoff; do not repeatedly block on that same accepted concern. These replies do not authorize unrelated scope, deployment, merging, or skipping validation and review. Both Codex and Claude must assess the implementation against the clarified requirements. If material scope expands beyond the approved feature, request a revised plan.`
+    : ""
+}`;
 }
 export async function runGuestAgent(
   workspace: Workspace,

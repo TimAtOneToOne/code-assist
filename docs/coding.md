@@ -76,6 +76,12 @@ Verification covers two successive requests, duplicate submission, worker restar
 
 Optional optimizations and controls: none. Request binding, PR ownership and expected-head checks preserve approval and publication integrity.
 
+## Replies to Coding Questions
+
+When coding is paused in **Your Direction Needed**, **Your Reply** and **Reply and Continue** appear beneath the agent's question. Tim can answer, paste reference examples, clarify requirements, or withdraw an earlier request. The question, reply, actor and timestamp are saved transactionally with the next pg-boss step and remain in **Previous Replies**. This works before publication and during revisions to an open PR.
+
+The agent continues from the existing workspace and checkpoints. Multiple repositories proceed sequentially again so each gets the clarified requirements. Both Codex and Claude receive the replies; explicitly accepted operational tradeoffs must not repeatedly block the same work. Publication requires fresh validation and review tied to the latest reply, even when the commits are unchanged. Existing plan approval, stale-submission, workspace and closed/merged PR checks remain in effect. Replies do not merge PRs or deploy code.
+
 ## Bring In Main
 
 **Bring In Main**, under Requested Code Changes, starts a normal code revision for open PRs. It can also resume a blocked code revision that already has an open PR. Existing checkpoints and feedback remain intact; a blocked revision retains its recorded published head separately from any newer unpublished checkpoint.

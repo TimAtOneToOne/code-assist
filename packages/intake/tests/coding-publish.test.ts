@@ -8,6 +8,38 @@ import { createLogger } from "@code-assist/observability";
 import { checkCodingBranch, publishCoding } from "../src/coding-publish.ts";
 import { executeCoding, codingPrompt } from "../src/coding-runtime.ts";
 import { cleanupFixture } from "./fixtures/cleanup.ts";
+import { publicationReady } from "../src/coding-repositories.ts";
+
+test("reply requires fresh validation and review even when the code is unchanged", async () => {
+  const { directory, run, steps } = await cleanupFixture();
+  try {
+    assert(publicationReady(run, steps));
+    const reply = {
+      id: randomUUID(),
+      stepId: randomUUID(),
+      question: "Accept deployment interruption?",
+      text: "Yes.",
+      requestedBy: "owner",
+      createdAt: new Date().toISOString(),
+    };
+    const resumed = { ...run, direction_responses: [reply] };
+    assert.equal(publicationReady(resumed, steps), false);
+    const checked = steps.map((step) =>
+      step.kind === "validate"
+        ? { ...step, direction_response_id: reply.id }
+        : step,
+    );
+    assert.equal(publicationReady(resumed, checked), false);
+    assert(
+      publicationReady(
+        resumed,
+        checked.map((step) => ({ ...step, direction_response_id: reply.id })),
+      ),
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("code revisions fast-forward the owned PR, recover a lost push response, and preserve its description", async () => {
   const fixture = await cleanupFixture();
@@ -230,6 +262,16 @@ test("code revisions fast-forward the owned PR, recover a lost push response, an
 
     const promptRun = {
       ...run,
+      direction_responses: [
+        {
+          id: "reply",
+          stepId: "step",
+          question: "Migration ordering?",
+          text: "Accept the deployment gap and withdraw the ordering change.",
+          requestedBy: "owner",
+          createdAt: new Date().toISOString(),
+        },
+      ],
       workspace_id: null,
       input: {
         ...run.input,
@@ -247,6 +289,12 @@ test("code revisions fast-forward the owned PR, recover a lost push response, an
       assert(prompt.includes(request.text));
       assert(prompt.includes("material scope change"));
       assert(prompt.includes("fresh validation evidence"));
+      assert(prompt.includes(promptRun.direction_responses[0].text));
+      assert(
+        prompt.includes(
+          "do not repeatedly block on that same accepted concern",
+        ),
+      );
     }
   } finally {
     await rm(directory, { recursive: true, force: true });

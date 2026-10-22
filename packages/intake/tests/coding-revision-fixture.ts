@@ -17,6 +17,7 @@ import {
   repositoryRun,
 } from "../src/coding-repositories.ts";
 import { recordGitHubObservation } from "../src/github.ts";
+import { exerciseCodingDirection } from "./coding-direction-fixture.ts";
 
 export async function exerciseCodeChanges(
   boss: PgBoss,
@@ -221,6 +222,7 @@ export async function exerciseCodeChanges(
           await retryCoding(boss, issueId, work.run.id, work.step.id);
           work = (await next())!;
           assert.equal(work.step.change_request_id, request.id);
+          work = await exerciseCodingDirection(boss, work, next);
         }
         const progress = (target: number) =>
           work.run.repositories

@@ -23,6 +23,7 @@ export type CodingRepository = {
   main_workflows?: MainWorkflows | null;
 };
 export type CodingRun = {
+  direction_responses?: CodingDirectionResponse[];
   change_requests?: CodingChangeRequest[];
   workspace_cleaned_at?: Date | null;
   workspace_cleanup_error?: string | null;
@@ -68,6 +69,14 @@ export type CodingRun = {
   } | null;
   created_at: Date;
 };
+export type CodingDirectionResponse = {
+  id: string;
+  stepId: string;
+  question: string;
+  text: string;
+  requestedBy: string;
+  createdAt: string;
+};
 export type CodingChangeRequest = {
   kind?: "bring_in_main";
   id: string;
@@ -84,6 +93,7 @@ export type CodingContinuation = {
   browserCalls: string[];
 };
 export type CodingStep = {
+  direction_response_id?: string | null;
   change_request_id?: string | null;
   job_retry_count?: number;
   continuation?: CodingContinuation | null;
