@@ -76,6 +76,10 @@ Verification covers two successive requests, duplicate submission, worker restar
 
 Optional optimizations and controls: none. Request binding, PR ownership and expected-head checks preserve approval and publication integrity.
 
+## Missing Browser Evidence
+
+Missing browser evidence is reported as **Browser Checks Needed**. **Run Browser Checks** starts a fresh Codex attempt from the saved checkpoint; it does not replay the incomplete result. Even a no-code-change attempt must perform its browser checks. Evidence transfer failures with a valid browser receipt still retry collection without rerunning the agent.
+
 ## Replies to Coding Questions
 
 When coding is paused in **Your Direction Needed**, **Your Reply** and **Reply and Continue** appear beneath the agent's question. Tim can answer, paste reference examples, clarify requirements, or withdraw an earlier request. The question, reply, actor and timestamp are saved transactionally with the next pg-boss step and remain in **Previous Replies**. This works before publication and during revisions to an open PR.

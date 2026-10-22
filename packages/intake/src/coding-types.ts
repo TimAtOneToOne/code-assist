@@ -113,6 +113,42 @@ export type CodingStep = {
   finished_at: Date | null;
 };
 export type CodingDetail = CodingRun & { steps: CodingStep[] };
+export const browserEvidenceRequiredMessage =
+  "This agent attempt did not run the required browser checks. Saved code and evidence are preserved. Run Browser Checks to continue from this checkpoint.";
+export function hasBrowserEvidence(paths: string[], completedTools: string[]) {
+  return (
+    paths.length > 0 &&
+    completedTools.some((tool) =>
+      [
+        "browser_navigate",
+        "browser_run_code",
+        "browser_run_code_unsafe",
+      ].includes(tool),
+    )
+  );
+}
+export function missingBrowserEvidence(run: CodingRun, step?: CodingStep) {
+  const saved = step?.continuation;
+  const snapshots = run.input.snapshots ?? [run.input.snapshot];
+  const finalIndex = run.repair?.repository
+    ? snapshots.findIndex(
+        (snapshot) => snapshot.name === run.repair!.repository,
+      )
+    : snapshots.length - 1;
+  return (
+    step?.kind === "collect" &&
+    step.error === browserEvidenceRequiredMessage &&
+    saved?.kind === "implement" &&
+    saved.result.disposition === "implemented" &&
+    (run.repository_index ?? 0) === finalIndex &&
+    !hasBrowserEvidence(
+      Array.isArray(saved.result.browserEvidence)
+        ? saved.result.browserEvidence
+        : [],
+      saved.browserCalls,
+    )
+  );
+}
 export type Implementation = {
   summary: string;
   disposition: "implemented" | "needs_direction";

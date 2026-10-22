@@ -23,6 +23,7 @@ import type {
   CodingDetail,
   CodingContinuation,
 } from "./coding-types.ts";
+import { missingBrowserEvidence } from "./coding-types.ts";
 export * from "./coding-types.ts";
 export const codingQueue = "approved-coding";
 export class CodingConflict extends Error {}
@@ -446,6 +447,8 @@ export async function retryCoding(
       [stepId],
     );
     const previous = rows[0] as CodingStep;
+    if (missingBrowserEvidence(run, previous))
+      return enqueue(boss, db, run, "implement");
     return enqueue(
       boss,
       db,

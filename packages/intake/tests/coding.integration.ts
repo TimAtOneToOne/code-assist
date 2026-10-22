@@ -4,6 +4,7 @@ import { join } from "node:path";
 import assert from "node:assert/strict";
 import { exerciseCodeChanges } from "./coding-revision-fixture.ts";
 import { exerciseCodingDirection } from "./coding-direction-fixture.ts";
+import { exerciseMissingBrowserEvidence } from "./coding-browser-evidence-fixture.ts";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -171,7 +172,11 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       await finishCoding(boss, a.run, a.step, { ready: true }, "implement"),
       false,
     );
-    const b = await exerciseCodingDirection(boss, await next(), next);
+    const b = await exerciseMissingBrowserEvidence(
+      boss,
+      await exerciseCodingDirection(boss, await next(), next),
+      next,
+    );
     assert.equal(b.step.input_commit, "a".repeat(40));
     await failCoding(boss, b.run, b.step, "Fixture failure");
     await assert.rejects(
@@ -766,7 +771,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       completed.steps.filter(
         (s) => s.status === "completed" && !s.change_request_id,
       ).length,
-      8,
+      10,
     );
   } finally {
     await boss.stop();

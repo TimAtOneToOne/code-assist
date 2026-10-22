@@ -10,25 +10,19 @@ import {
 } from "node:fs";
 import { join, resolve, relative, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  hasBrowserEvidence,
+  browserEvidenceRequiredMessage,
+} from "./coding-types.ts";
+
+export class BrowserEvidenceRequiredError extends Error {}
 
 export function requireBrowserEvidence(
   paths: string[],
   completedTools: string[],
 ) {
-  // Current Playwright names the code runner "unsafe"; saved receipts can use the older name.
-  if (
-    !paths.length ||
-    !completedTools.some((tool) =>
-      [
-        "browser_navigate",
-        "browser_run_code",
-        "browser_run_code_unsafe",
-      ].includes(tool),
-    )
-  )
-    throw new Error(
-      "The implementation did not supply successful browser evidence. Its code checkpoint is saved.",
-    );
+  if (!hasBrowserEvidence(paths, completedTools))
+    throw new BrowserEvidenceRequiredError(browserEvidenceRequiredMessage);
 }
 
 function evidenceDirectory(work: string, origin: string) {

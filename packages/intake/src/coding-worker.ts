@@ -9,7 +9,10 @@ import {
 } from "./coding-repositories.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { supplyMain } from "./coding-main.ts";
-import { requireBrowserEvidence } from "./coding-evidence.ts";
+import {
+  requireBrowserEvidence,
+  BrowserEvidenceRequiredError,
+} from "./coding-evidence.ts";
 import { readFile } from "node:fs/promises";
 import { readReceipt } from "./coding-receipt.ts";
 import type { PgBoss } from "pg-boss";
@@ -703,7 +706,8 @@ export async function registerCodingWorker(
           !cancelled.signal.aborted &&
           performance.now() - startedAt >= job.expireInSeconds * 1000;
         const message =
-          error instanceof CodingBranchConflict
+          error instanceof CodingBranchConflict ||
+          error instanceof BrowserEvidenceRequiredError
             ? error.message
             : shutdown.aborted
               ? "Coding was interrupted by a worker update. The completed checkpoint is saved; retry to continue."
@@ -719,6 +723,7 @@ export async function registerCodingWorker(
         log.payload("coding.failure", message, { error }, "error");
         if (
           (step.kind === "checkpoint" || step.kind === "collect") &&
+          !(error instanceof BrowserEvidenceRequiredError) &&
           job.retryCount < job.retryLimit &&
           !cancelled.signal.aborted
         ) {

@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { CodingDetail } from '@code-assist/intake/coding';
+	import { missingBrowserEvidence } from '@code-assist/intake/coding-types';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -36,6 +37,9 @@
 			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(' ');
 	const latest = $derived(run.steps.find((s) => s.id === run.current_step_id));
+	const needsBrowserChecks = $derived(
+		run.status === 'failed' && missingBrowserEvidence(run, latest)
+	);
 	const directionQuestion = $derived(
 		typeof latest?.result?.directionQuestion === 'string' ? latest.result.directionQuestion : ''
 	);
@@ -55,11 +59,13 @@
 	{#snippet actions(expand: () => void)}
 		<Badge variant={workflowBadgeVariant(run.status, editable)}
 			>{editable
-				? run.status === 'failed' && latest?.kind === 'collect'
-					? 'Evidence Collection Failed'
-					: run.status === 'failed' && latest?.kind === 'checkpoint'
-						? 'Checkpoint Save Failed'
-						: titles[run.status]
+				? needsBrowserChecks
+					? 'Browser Checks Needed'
+					: run.status === 'failed' && latest?.kind === 'collect'
+						? 'Evidence Collection Failed'
+						: run.status === 'failed' && latest?.kind === 'checkpoint'
+							? 'Checkpoint Save Failed'
+							: titles[run.status]
 				: 'Previous Approved Scope'}</Badge
 		>
 		<div class="flex items-center gap-2">
@@ -165,8 +171,13 @@
 			verified.
 		</p>
 	{/if}
-	{#if run.error}<p role="alert">{run.error}</p>{/if}
-	{#if latest?.kind === 'collect' && (run.status === 'collect' || run.status === 'failed')}<p
+	{#if needsBrowserChecks}
+		<p role="alert">
+			The code and evidence are saved, but this attempt did not run the required browser checks. Run
+			Browser Checks to have Codex complete them from the saved checkpoint.
+		</p>
+	{:else if run.error}<p role="alert">{run.error}</p>{/if}
+	{#if !needsBrowserChecks && latest?.kind === 'collect' && (run.status === 'collect' || run.status === 'failed')}<p
 			class="text-sm text-muted-foreground"
 		>
 			The agent result and code checkpoint are saved. Evidence collection resumes from that
@@ -256,11 +267,13 @@
 				name="codingId"
 				value={run.id}
 			/><input type="hidden" name="stepId" value={latest.id} /><Button type="submit"
-				>{latest.kind === 'collect'
-					? 'Retry Evidence Collection'
-					: latest.kind === 'checkpoint'
-						? 'Retry Saving Checkpoint'
-						: 'Retry Coding Step'}</Button
+				>{needsBrowserChecks
+					? 'Run Browser Checks'
+					: latest.kind === 'collect'
+						? 'Retry Evidence Collection'
+						: latest.kind === 'checkpoint'
+							? 'Retry Saving Checkpoint'
+							: 'Retry Coding Step'}</Button
 			>
 		</form>{/if}
 	{#if run.status === 'failed' && editable && latest && !run.pr_url}
