@@ -7,18 +7,20 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { workflowBadgeVariant } from '#lib/workflow-status.js';
-	import * as Card from '#lib/components/ui/card/index.js';
+	import TicketSection from './ticket-section.svelte';
 	import Markdown from './markdown.svelte';
 	let {
 		run,
 		html,
 		changes,
-		editable
+		editable,
+		title = 'Adversarial Planning'
 	}: {
 		run: PlanningDetail;
 		html: Record<string, string>;
 		changes: Record<string, PlanChanges & { previousVersion: number }>;
 		editable: boolean;
+		title?: string;
 	} = $props();
 	let showChanges = $state(true);
 	let selected = $state<number | null>(null);
@@ -39,17 +41,14 @@
 	};
 </script>
 
-<Card.Root class="panel">
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		<Card.Title>Adversarial Planning</Card.Title>
-		<div class="flex items-center gap-2">
-			<Badge variant={workflowBadgeVariant(run.status, editable)}>{label[run.status]}</Badge><Button
-				variant="outline"
-				size="sm"
-				onclick={() => invalidateAll()}>Refresh</Button
-			>
-		</div>
-	</div>
+<TicketSection
+	{title}
+	collapsed={run.status === 'approved' || run.status === 'superseded' || !editable}
+>
+	{#snippet actions()}
+		<Badge variant={workflowBadgeVariant(run.status, editable)}>{label[run.status]}</Badge>
+		<Button variant="outline" size="sm" onclick={() => invalidateAll()}>Refresh</Button>
+	{/snippet}
 	{#if run.status === 'drafting'}<p>
 			Codex is reading the confirmed answers and repository snapshots to draft plan v1.
 		</p>{/if}
@@ -270,4 +269,4 @@
 					>{/if}
 			</div>{/each}
 	</details>
-</Card.Root>
+</TicketSection>

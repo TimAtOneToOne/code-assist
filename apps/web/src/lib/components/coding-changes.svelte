@@ -4,7 +4,6 @@
 	import type { CodingDetail } from '@code-assist/intake/coding';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import * as Card from '#lib/components/ui/card/index.js';
 	let { run, editable }: { run: CodingDetail; editable: boolean } = $props();
 	let submitting = $state(false);
 	let canBringMain = $derived(
@@ -34,8 +33,14 @@
 </script>
 
 {#if (editable && run.status === 'pr_open') || canBringMain || run.change_requests?.length}
-	<Card.Root class="panel">
-		<Card.Title>Requested Code Changes</Card.Title>
+	<section
+		id={'code-changes-' + run.id}
+		aria-labelledby={'code-changes-title-' + run.id}
+		class="scroll-mt-6 space-y-4 border-t pt-5"
+	>
+		<h3 id={'code-changes-title-' + run.id} class="text-base font-medium">
+			Requested Code Changes
+		</h3>
 		{#if canBringMain}
 			<form method="POST" use:enhance={submit} class="flex flex-wrap items-center gap-3">
 				<input type="hidden" name="intent" value="coding-main" />
@@ -86,5 +91,5 @@
 				</div>
 			</details>
 		{/if}
-	</Card.Root>
+	</section>
 {/if}

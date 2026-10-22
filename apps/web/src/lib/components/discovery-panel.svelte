@@ -6,54 +6,39 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { workflowBadgeVariant } from '#lib/workflow-status.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import * as Card from '#lib/components/ui/card/index.js';
+	import TicketSection from './ticket-section.svelte';
 	import Markdown from '#lib/components/markdown.svelte';
 	import type { DiscoveryRun } from '@code-assist/intake/discovery';
 	let {
 		run,
 		summaryHtml,
-		editable = true
-	}: { run: DiscoveryRun; summaryHtml: string; editable?: boolean } = $props();
+		editable = true,
+		title = 'Initial Discovery'
+	}: { run: DiscoveryRun; summaryHtml: string; editable?: boolean; title?: string } = $props();
 	let answers = $derived(
 		run.answers ? [...run.answers] : (run.result?.questions.map(() => '') ?? [])
 	);
 	const badgeVariant = $derived(workflowBadgeVariant(run.status, editable));
 </script>
 
-<Card.Root class="panel">
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		<div>
-			<div class="mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-				Codex · Initial Discovery
-			</div>
-			<Card.Title
-				>{run.status === 'queued'
-					? 'Waiting for Codex'
-					: run.status === 'running'
-						? 'Reading the Ticket and Repositories'
-						: run.status === 'failed'
-							? 'Discovery Needs Attention'
-							: run.answers
-								? 'Scope and Answers Saved'
-								: 'Confirm Scope and Answer Open Questions'}</Card.Title
-			>
-		</div>
+<TicketSection
+	{title}
+	collapsed={run.status === 'ready' || run.status === 'superseded' || !editable}
+>
+	{#snippet actions()}
 		<Badge variant={badgeVariant}
-			>{badgeVariant === 'attention'
-				? 'Needs Your Attention'
-				: badgeVariant === 'active'
-					? 'Working'
-					: run.status === 'ready'
-						? 'Answers Saved'
+			>{run.status === 'ready'
+				? 'Answers Saved'
+				: badgeVariant === 'attention'
+					? 'Needs Your Attention'
+					: badgeVariant === 'active'
+						? 'Working'
 						: 'Previous Discovery'}</Badge
 		>
-		{#if ['queued', 'running'].includes(run.status)}<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				onclick={() => invalidateAll()}>Refresh activity</Button
-			>{/if}
-	</div>
+		<Button type="button" variant="outline" size="sm" onclick={() => invalidateAll()}
+			>Refresh</Button
+		>
+	{/snippet}
 	{#if ['queued', 'running'].includes(run.status)}
 		<p>
 			Codex will inspect the selected repositories and return findings and any questions needed
@@ -74,7 +59,7 @@
 		<Markdown html={summaryHtml} />
 		{#if run.result.findings.length}<details>
 				<summary class="cursor-pointer text-sm font-medium"
-					>Supporting findings · {run.result.findings.length}</summary
+					>Supporting Findings · {run.result.findings.length}</summary
 				>
 				<ul class="mt-3 space-y-3">
 					{#each run.result.findings as finding, index (index)}<li class="text-sm">
@@ -92,7 +77,7 @@
 					<h3 class="font-medium">Additional Direction</h3>
 					<p class="whitespace-pre-wrap">{run.notes}</p>
 				</div>{/if}
-			<p>These answers are saved as the planning baseline. Full planning has not started.</p>
+			<p>These answers form the saved planning baseline.</p>
 		{:else if run.status === 'questions' && editable}
 			<form method="POST" use:enhance class="space-y-6">
 				<input type="hidden" name="intent" value="answers" /><input
@@ -169,4 +154,4 @@
 			<a class="underline" href={resolve(`/logs?attempt=${run.id}`)}>View Codex activity</a>
 		</div>
 	</details>
-</Card.Root>
+</TicketSection>

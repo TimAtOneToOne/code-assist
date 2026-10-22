@@ -7,7 +7,9 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { workflowBadgeVariant } from '#lib/workflow-status.js';
-	import * as Card from '#lib/components/ui/card/index.js';
+	import { tick } from 'svelte';
+	import TicketSection from './ticket-section.svelte';
+	import CodingChanges from './coding-changes.svelte';
 	let { run, editable }: { run: CodingDetail; editable: boolean } = $props();
 	const titles = {
 		prepare: 'Preparing Workspace',
@@ -33,23 +35,38 @@
 			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(' ');
 	const latest = $derived(run.steps.find((s) => s.id === run.current_step_id));
+	async function requestChange(expand: () => void) {
+		expand();
+		await tick();
+		document.getElementById('code-changes-' + run.id)?.scrollIntoView({ block: 'start' });
+		document.getElementById('changes-' + run.id)?.focus({ preventScroll: true });
+	}
 </script>
 
-<Card.Root class="panel">
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		<Card.Title>{run.repair ? 'Main Workflow Repair' : 'Coding'}</Card.Title>
+<TicketSection
+	id={'coding-' + run.id}
+	title={run.repair ? 'Main Workflow Repair' : 'Coding'}
+	collapsed={run.status === 'done' || run.status === 'superseded' || !editable}
+>
+	{#snippet actions(expand: () => void)}
+		<Badge variant={workflowBadgeVariant(run.status, editable)}
+			>{editable
+				? run.status === 'failed' && latest?.kind === 'collect'
+					? 'Evidence Collection Failed'
+					: run.status === 'failed' && latest?.kind === 'checkpoint'
+						? 'Checkpoint Save Failed'
+						: titles[run.status]
+				: 'Previous Approved Scope'}</Badge
+		>
 		<div class="flex items-center gap-2">
-			<Badge variant={workflowBadgeVariant(run.status, editable)}
-				>{editable
-					? run.status === 'failed' && latest?.kind === 'collect'
-						? 'Evidence Collection Failed'
-						: run.status === 'failed' && latest?.kind === 'checkpoint'
-							? 'Checkpoint Save Failed'
-							: titles[run.status]
-					: 'Previous Approved Scope'}</Badge
-			><Button variant="outline" size="sm" onclick={() => invalidateAll()}>Refresh</Button>
+			<Button variant="outline" size="sm" onclick={() => invalidateAll()}>Refresh</Button>
+			{#if editable && run.status === 'pr_open'}
+				<Button variant="outline" size="sm" onclick={() => requestChange(expand)}
+					>Request Change</Button
+				>
+			{/if}
 		</div>
-	</div>
+	{/snippet}
 	<p class="text-sm text-muted-foreground">
 		Plan v{run.version} · {run.branch}{#if run.commit}
 			· {run.commit.slice(0, 7)}{/if}
@@ -257,7 +274,10 @@
 	{/if}
 	<div class="space-y-3">
 		{#each run.steps as step (step.id)}
-			<details open={step.id === run.current_step_id} class="rounded-md border p-3">
+			<details
+				open={step.id === run.current_step_id && step.status !== 'completed'}
+				class="rounded-md border p-3"
+			>
 				<summary class="cursor-pointer text-sm font-medium"
 					>{titles[step.kind]}{run.repositories
 						? ` · ${run.repositories[step.repository_index ?? 0].name}`
@@ -299,4 +319,5 @@
 			</details>
 		{/each}
 	</div>
-</Card.Root>
+	<CodingChanges {run} {editable} />
+</TicketSection>

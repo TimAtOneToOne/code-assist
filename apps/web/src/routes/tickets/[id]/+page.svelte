@@ -3,12 +3,11 @@
 	import { resolve } from '$app/paths';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
-	import * as Card from '#lib/components/ui/card/index.js';
+	import TicketSection from '#lib/components/ticket-section.svelte';
 	import RepositoryPicker from '#lib/components/repository-picker.svelte';
 	import Markdown from '#lib/components/markdown.svelte';
 	import PageJump from '#lib/components/page-jump.svelte';
 	import CodingPanel from '#lib/components/coding-panel.svelte';
-	import CodingChanges from '#lib/components/coding-changes.svelte';
 	import PlanningPanel from '#lib/components/planning-panel.svelte';
 	import DiscoveryPanel from '#lib/components/discovery-panel.svelte';
 	import type { PageProps } from './$types';
@@ -19,17 +18,6 @@
 	let planning = $derived(
 		data.item.planning.find((run) => run.discovery_id === data.item.current_discovery_id)
 	);
-	const phase = {
-		queued: ['Codex discovery is queued', 'Codex inspects the ticket and repository scope'],
-		running: ['Codex is investigating', 'You review the findings and answer open questions'],
-		questions: ['Your scope confirmation is needed', 'Your answers become the planning baseline'],
-		ready: ['Scope and answers are saved', 'Codex drafts, Claude reviews, then you approve'],
-		failed: ['Initial discovery needs attention', 'Review the failure and retry'],
-		superseded: [
-			'Previous discovery is no longer current',
-			'Eligible tickets resume with their current scope'
-		]
-	};
 	function eventText(event: {
 		type: string;
 		details: { repositories?: string[]; repository?: string };
@@ -98,86 +86,58 @@
 		changes={data.planChanges}
 		editable={data.item.eligible}
 	/>{/if}
-{#each data.item.planning.filter((run) => run.id !== planning?.id || data.item.removed_at) as previous (previous.id)}<details
-		class="mb-5"
-	>
-		<summary class="cursor-pointer text-sm text-muted-foreground"
-			>Earlier planning · {new Date(previous.created_at).toLocaleString()} · {previous.status}</summary
-		><PlanningPanel
-			run={previous}
-			html={data.planHtml}
-			changes={data.planChanges}
-			editable={false}
-		/>
-	</details>{/each}
-{#if discovery && !data.item.removed_at}
-	<details open={!planning} class="mb-5">
-		<summary class="mb-3 cursor-pointer text-sm font-medium"
-			>Initial discovery and confirmed answers</summary
-		>
-		<div class="mb-5 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-			<div><span class="mr-2 font-semibold">Now</span>{phase[discovery.status][0]}</div>
-			<div><span class="mr-2 font-semibold">Next</span>{phase[discovery.status][1]}</div>
-		</div>
-		<DiscoveryPanel
-			run={discovery}
-			summaryHtml={data.discoverySummaries[discovery.id] ?? ''}
-			editable={data.item.eligible}
-		/>
-	</details>
-{/if}
-{#if !data.item.removed_at}<Card.Root class="panel">
-		<details open={!data.item.selected_repositories.length}>
-			<summary class="cursor-pointer font-medium"
-				>{data.item.selected_repositories.length
-					? `Repository scope · ${data.item.selected_repositories.map((path) => path.split('/').at(-1)).join(', ')}`
-					: 'Choose repositories'}</summary
-			>
-			<form method="POST" use:enhance class="space-y-4">
-				<input type="hidden" name="updatedAt" value={data.item.ticket.updatedAt} />
-				<RepositoryPicker repositories={data.repositories} bind:value={selected} />
-				<Button type="submit" disabled={!selected.length}>Confirm repositories</Button>
-			</form>
-		</details>
-	</Card.Root>{/if}
-{#each data.item.discoveries.filter((run) => run.id !== discovery?.id || data.item.removed_at) as previous (previous.id)}
-	<details class="mb-5">
-		<summary class="cursor-pointer text-sm text-muted-foreground"
-			>Earlier discovery · {new Date(previous.created_at).toLocaleString()} · {previous.status}</summary
-		>
-		<DiscoveryPanel
-			run={previous}
-			summaryHtml={data.discoverySummaries[previous.id] ?? ''}
-			editable={false}
-		/>
-	</details>
+{#each data.item.planning.filter((run) => run.id !== planning?.id || data.item.removed_at) as previous (previous.id)}
+	<PlanningPanel
+		run={previous}
+		html={data.planHtml}
+		changes={data.planChanges}
+		editable={false}
+		title={'Earlier Planning · ' + new Date(previous.created_at).toLocaleString()}
+	/>
 {/each}
-<Card.Root class="panel"
-	><Card.Title>Ticket Description</Card.Title>
+{#if discovery && !data.item.removed_at}
+	<DiscoveryPanel
+		run={discovery}
+		summaryHtml={data.discoverySummaries[discovery.id] ?? ''}
+		editable={data.item.eligible}
+	/>
+{/if}
+{#if !data.item.removed_at}<TicketSection
+		collapsed={!!data.item.selected_repositories.length}
+		title={data.item.selected_repositories.length
+			? 'Repository Scope · ' +
+				data.item.selected_repositories.map((path) => path.split('/').at(-1)).join(', ')
+			: 'Choose Repositories'}
+	>
+		<form method="POST" use:enhance class="space-y-4">
+			<input type="hidden" name="updatedAt" value={data.item.ticket.updatedAt} />
+			<RepositoryPicker repositories={data.repositories} bind:value={selected} />
+			<Button type="submit" disabled={!selected.length}>Confirm Repositories</Button>
+		</form>
+	</TicketSection>{/if}
+{#each data.item.discoveries.filter((run) => run.id !== discovery?.id || data.item.removed_at) as previous (previous.id)}
+	<DiscoveryPanel
+		run={previous}
+		summaryHtml={data.discoverySummaries[previous.id] ?? ''}
+		editable={false}
+		title={'Earlier Discovery · ' + new Date(previous.created_at).toLocaleString()}
+	/>
+{/each}
+<TicketSection title="Ticket Description" collapsed={!!discovery}>
 	{#if data.descriptionHtml}<Markdown html={data.descriptionHtml} />{:else}<p>
 			No description.
-		</p>{/if}</Card.Root
+		</p>{/if}</TicketSection
 >
-{#each data.comments as comment (comment.id)}<Card.Root class="panel"
-		><Card.Title>Linear Comment</Card.Title>
-		<Markdown html={comment.html} /></Card.Root
+{#each data.comments as comment (comment.id)}<TicketSection
+		title="Linear Comment"
+		collapsed={!!discovery}
+	>
+		<Markdown html={comment.html} /></TicketSection
 	>{/each}
-<Card.Root class="panel"
-	><Card.Title>History</Card.Title>
+<TicketSection title="History" collapsed>
 	{#each data.item.events as event, index (index)}<p class="text-sm">
 			{new Date(event.created_at).toLocaleString()} · {eventText(event)}
 		</p>{/each}
-</Card.Root>
-
-{#each data.item.coding as run (run.id)}
-	<CodingChanges
-		{run}
-		editable={data.item.eligible &&
-			!data.item.removed_at &&
-			run.planning_id === planning?.id &&
-			run.version === planning?.current_version &&
-			planning?.status === 'approved'}
-	/>
-{/each}
+</TicketSection>
 
 <PageJump />
