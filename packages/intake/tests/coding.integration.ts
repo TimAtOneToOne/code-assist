@@ -760,7 +760,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       "Legacy merge-only Done must be rechecked",
     );
     const completed = (await readCoding(boss.getDb(), ticket.id))[0];
-    assert.equal(completed.commit, "b".repeat(40));
+    assert.equal(completed.commit, published.commit);
     assert.equal(
       completed.steps.filter(
         (s) => s.status === "completed" && !s.change_request_id,

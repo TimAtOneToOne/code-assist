@@ -76,6 +76,18 @@ Verification covers two successive requests, duplicate submission, worker restar
 
 Optional optimizations and controls: none. Request binding, PR ownership and expected-head checks preserve approval and publication integrity.
 
+## Bring In Main
+
+**Bring In Main**, under Requested Code Changes, starts a normal code revision for open PRs. It can also resume a blocked code revision that already has an open PR. Existing checkpoints and feedback remain intact; a blocked revision retains its recorded published head separately from any newer unpublished checkpoint.
+
+The controller fetches `main` into a request-specific Git ref in each host bare repository and supplies a bundle to the guest. No GitHub credentials enter the guest. Each repository's main commit is pinned when its implementation starts and reused on retry. Codex merges that local ref using `--no-commit --no-ff`, resolves conflicts while preserving upstream changes, and runs checks. The controller saves the merge commit, including both parents even when the merge has no tree changes. Unresolved conflicts are preserved and cannot be checkpointed as resolved code.
+
+Validation and Claude review run again for the exact revision. Reviews compare the feature against the supplied main commit. Publication requires both the previous published head and the pinned main commit to be ancestors of the candidate, then updates the same PR with the existing expected-head check. This is an explicit action; subsequent changes to main do not trigger automatic synchronization. It does not rewrite branch history or merge the PR.
+
+Verification includes real local Git merges/conflicts, interrupted bundle delivery, pinned-commit replay, merge ancestry, empty-tree merges, unchanged-main handling, and checkpoint replay. PostgreSQL fixtures exercise single/multiple repositories, duplicate submissions, blocked-revision resumption with unpublished work, and fresh validation/review binding.
+
+Optional optimizations and controls: none. Pinning and ancestry checks preserve the requested merge and its reviewed history.
+
 GitHub fields use [gh pr view](https://cli.github.com/manual/gh_pr_view), [workflow runs](https://docs.github.com/en/rest/actions/workflow-runs), and [workflow jobs](https://docs.github.com/en/rest/actions/workflow-jobs).
 
 Optional optimizations and controls: none. Approval fencing, commit-bound validation/review, process ownership and expected-head publication are required workflow integrity checks.

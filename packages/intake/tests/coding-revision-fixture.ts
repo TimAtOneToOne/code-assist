@@ -85,7 +85,31 @@ export async function exerciseCodeChanges(
   for (const note of [
     "Clarify the button label.",
     "Keep that label and improve the confirmation.",
+    "Bring in main.",
+    "Resume blocked main request.",
   ]) {
+    const kind = note.includes("main") ? "bring_in_main" : undefined;
+    const resume = note.startsWith("Resume");
+    if (resume) {
+      const saved = (await readCoding(boss.getDb(), issueId))[0];
+      const changed = "d".repeat(40);
+      await boss
+        .getDb()
+        .executeSql(
+          "UPDATE code_assist.coding_run SET status='needs_direction',commit=$2,repositories=$3 WHERE id=$1",
+          [
+            saved.id,
+            changed,
+            saved.repositories
+              ? JSON.stringify(
+                  saved.repositories.map((r, i) =>
+                    i ? r : { ...r, commit: changed },
+                  ),
+                )
+              : null,
+          ],
+        );
+    }
     const before = (await readCoding(boss.getDb(), issueId))[0];
     await assert.rejects(
       requestCodingChanges(
@@ -105,6 +129,7 @@ export async function exerciseCodeChanges(
         randomUUID(),
         note,
         "owner",
+        kind,
       ),
     );
     const results = await Promise.allSettled([
@@ -115,6 +140,7 @@ export async function exerciseCodeChanges(
         before.current_step_id,
         note,
         "owner",
+        kind,
       ),
       requestCodingChanges(
         boss,
@@ -123,6 +149,7 @@ export async function exerciseCodeChanges(
         before.current_step_id,
         note,
         "owner",
+        kind,
       ),
     ]);
     assert.equal(
@@ -133,12 +160,17 @@ export async function exerciseCodeChanges(
     const request = queued.change_requests!.at(-1)!;
     assert.equal(request.text, note);
     assert.equal(request.requestedBy, "owner");
+    assert.equal(request.kind, kind);
     assert.deepEqual(
       request.baseCommits,
       Object.fromEntries(
         indexes.map((i) => [
           repositories(before)[i].name,
-          repositories(before)[i].commit,
+          resume
+            ? before.change_requests!.at(-1)!.baseCommits[
+                repositories(before)[i].name
+              ]
+            : repositories(before)[i].commit,
         ]),
       ),
     );

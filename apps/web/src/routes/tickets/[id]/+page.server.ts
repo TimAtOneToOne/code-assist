@@ -102,7 +102,8 @@ export const actions = {
 		const approver = await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const id = issueId(event.params.id);
-		if (form.get('intent') === 'coding-changes') {
+		if (form.get('intent') === 'coding-changes' || form.get('intent') === 'coding-main') {
+			const bringMain = form.get('intent') === 'coding-main';
 			try {
 				await withController((boss) =>
 					requestCodingChanges(
@@ -110,13 +111,17 @@ export const actions = {
 						id,
 						issueId(String(form.get('codingId'))),
 						issueId(String(form.get('stepId'))),
-						String(form.get('changes') ?? ''),
-						approver
+						bringMain
+							? 'Bring in the latest main changes. Preserve upstream changes and the approved feature, resolve conflicts, and rerun validation and review.'
+							: String(form.get('changes') ?? ''),
+						approver,
+						bringMain ? 'bring_in_main' : undefined
 					)
 				);
 				return {
-					message:
-						'Code changes queued. Codex will revise, then validation and Claude review will run before updating the existing PR.'
+					message: bringMain
+						? 'Bring In Main queued. Codex will merge main and resolve conflicts, then validation and Claude review will run before updating the existing PR.'
+						: 'Code changes queued. Codex will revise, then validation and Claude review will run before updating the existing PR.'
 				};
 			} catch (cause) {
 				if (cause instanceof CodingConflict) return fail(409, { error: cause.message });

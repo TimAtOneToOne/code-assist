@@ -8,6 +8,7 @@ import {
   commitSet,
 } from "./coding-repositories.ts";
 import { executeCoding } from "./coding-runtime.ts";
+import { requireMainAncestor } from "./coding-main.ts";
 export class CodingBranchConflict extends Error {}
 export async function checkCodingBranch(
   run: CodingRun,
@@ -191,6 +192,7 @@ export async function publishCoding(
         "The PR base changed. Reconcile it before updating the branch.",
       );
     await git(["merge-base", "--is-ancestor", expectedHead, run.commit]);
+    await requireMainAncestor(directory, run, signal, log, execute);
     if (!alreadyPushed) {
       await git(["fetch", remote, `refs/heads/${base}`]);
       await git(["merge-tree", "--write-tree", "FETCH_HEAD", run.commit]);

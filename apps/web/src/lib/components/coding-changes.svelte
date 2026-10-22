@@ -7,6 +7,12 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	let { run, editable }: { run: CodingDetail; editable: boolean } = $props();
 	let submitting = $state(false);
+	let canBringMain = $derived(
+		editable &&
+			!!run.pr_url &&
+			(run.status === 'pr_open' ||
+				(run.status === 'needs_direction' && !!run.change_requests?.length))
+	);
 	const submit: SubmitFunction = () => {
 		submitting = true;
 		return async ({ result, update }) => {
@@ -27,9 +33,20 @@
 	};
 </script>
 
-{#if (editable && run.status === 'pr_open') || run.change_requests?.length}
+{#if (editable && run.status === 'pr_open') || canBringMain || run.change_requests?.length}
 	<Card.Root class="panel">
 		<Card.Title>Requested Code Changes</Card.Title>
+		{#if canBringMain}
+			<form method="POST" use:enhance={submit} class="flex flex-wrap items-center gap-3">
+				<input type="hidden" name="intent" value="coding-main" />
+				<input type="hidden" name="codingId" value={run.id} />
+				<input type="hidden" name="stepId" value={run.current_step_id} />
+				<Button type="submit" variant="outline" disabled={submitting}>Bring In Main</Button>
+				<p class="text-sm text-muted-foreground">
+					Merge main, resolve conflicts, and rerun checks and review.
+				</p>
+			</form>
+		{/if}
 		{#if editable && run.status === 'pr_open'}
 			<form method="POST" use:enhance={submit} class="space-y-3">
 				<input type="hidden" name="intent" value="coding-changes" />

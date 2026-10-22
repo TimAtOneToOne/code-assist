@@ -213,8 +213,9 @@
 			new PR.
 		</p>{/if}
 	{#if run.status === 'needs_direction'}<p>
-			The agent needs your direction. Read its question below, then use Requested Changes on the
-			approved plan to revise the scope.
+			The agent needs your direction. Read its question below. If it needs upstream changes, use
+			Bring In Main under Requested Code Changes. For scope changes, request a revision to the
+			approved plan.
 		</p>{/if}
 	{#if run.status === 'failed' && editable && latest}<form method="POST" use:enhance>
 			<input type="hidden" name="intent" value="coding-retry" /><input

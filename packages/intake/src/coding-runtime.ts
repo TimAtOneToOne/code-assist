@@ -23,6 +23,7 @@ import {
 } from "./coding-repositories.ts";
 import { environmentLauncher } from "./workspace-bootstrap.ts";
 import { repositoryProfile } from "./repository-profiles.ts";
+import { mainRef, mainRequest, pinnedMainBases } from "./coding-main.ts";
 export function codingDirectory(directory: string, id: string) {
   if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error("Invalid coding ID");
   return join(directory, "coding", id);
@@ -377,13 +378,9 @@ export async function checkpoint(
   workspace: Workspace,
   signal: AbortSignal,
   log: Log,
+  commands = guestCommands(workspace, signal, log, activeSnapshot(run).name),
 ) {
-  const { guest, git } = guestCommands(
-    workspace,
-    signal,
-    log,
-    activeSnapshot(run).name,
-  );
+  const { guest, git } = commands;
   const origin =
     step.continuation?.agentStepId ?? step.recovery_step_id ?? step.id;
   const ref = "refs/checkpoints/" + origin;
@@ -397,9 +394,20 @@ export async function checkpoint(
   if (existing) return existing;
   let commit = await git("for-each-ref", "--format=%(objectname)", ref);
   if (!commit) {
+    if (await git("ls-files", "--unmerged"))
+      throw new Error(
+        "Merge conflicts remain unresolved; working tree preserved.",
+      );
+    const merging = await guest([
+      "bash",
+      "-c",
+      'test ! -f "$1/.git/MERGE_HEAD" || printf merging',
+      "merge-state",
+      `/work/${activeSnapshot(run).name}`,
+    ]);
     await git("add", "-A");
     // A crash after commit but before update-ref leaves a clean HEAD to adopt.
-    if (await git("status", "--porcelain")) {
+    if (merging || (await git("status", "--porcelain"))) {
       await git(
         "commit",
         "-m",
@@ -529,12 +537,14 @@ export async function codingPrompt(
   const profiles = run.workspace_id
     ? (await readWorkspace(directory, run.workspace_id)).profiles
     : undefined;
+  const mainBases = await pinnedMainBases(directory, run);
   return `You are ${step.kind === "review" ? "Claude independently reviewing" : "Codex implementing"} Code Assist ticket ${run.identifier}: ${run.title}.
 Tim approved the exact plan below. Implement only that scope. Follow repository AGENTS.md and existing patterns. Do not upgrade Drizzle, add unrelated optimizations, change Linear, access production, push Git, open/merge PRs, or deploy infrastructure. The controller owns commits and publication. Do not create commits or change branches. If a material product decision, missing credential/service, or changed scope blocks progress, return needs_direction with the exact question. Do not invent success or silently skip acceptance criteria.
-Repository: /work/${activeSnapshot(run).name}. Approved base: ${activeSnapshot(run).commit}. Diff base: ${run.repair?.baseCommit ?? activeSnapshot(run).commit}. Current checkpoint: ${step.input_commit ?? run.repair?.baseCommit ?? activeSnapshot(run).commit}.
+Repository: /work/${activeSnapshot(run).name}. Approved base: ${activeSnapshot(run).commit}. Diff base: ${mainBases[activeSnapshot(run).name] ?? run.repair?.baseCommit ?? activeSnapshot(run).commit}. Current checkpoint: ${step.input_commit ?? run.repair?.baseCommit ?? activeSnapshot(run).commit}.
+${mainRequest(run) ? `Bring In Main: the controller supplied pinned main commits ${JSON.stringify(mainBases)} at local ref ${mainRef(run)} in each prepared repository. Preserve ALL upstream changes and the existing feature. The following merge instructions apply ONLY to Codex implementation; Claude must inspect ancestry and resolutions without modifying anything. Do not rebase or rewrite published history. If this ref is not yet an ancestor of HEAD, merge it with git merge --no-commit --no-ff ${mainRef(run)}. If a merge is already in progress, continue resolving it; do not restart or abort it. Resolve conflicts using both main's current behavior and the approved feature; git add resolved files. The controller will create the merge commit after you finish. Never commit yourself. Re-run checks against the combined result. Review the feature diff against each pinned main commit, especially conflict resolutions; unrelated changes arriving from main are not new feature scope. If main is already an ancestor, preserve it and continue requested changes/validation. No network fetch or GitHub credentials are needed inside the guest.` : ""}
 ${run.repair ? `This is a corrective run after the approved feature merged. Read the COMPLETE main workflow failure evidence in /work/evidence/main-workflow-failure.json. The base is the failed merge commit, with the feature already implemented. Diagnose the cause, reproduce it where feasible, and fix only defects within the approved feature and this repository. Do not reimplement the feature or change shared CI, credentials, IAM, Terraform deployment controls, or unrelated scope to make a pipeline pass. Environmental/transient failures with no justified repository fix require needs_direction with a concrete diagnosis. Do not rerun GitHub workflows or deploy. Validate that the fix addresses the failure and preserves the feature. Review the corrective diff against the Diff base, not the original pre-feature approved base. The controller will publish a fresh corrective PR for Tim to merge. Failed runs: ${JSON.stringify(run.repair.workflows.runs)}.` : ""}
 This is an isolated OrbStack Linux guest with a private container engine. Repository commands must use node /work/run.mjs --repo <repository-name> <command> [args]; this loads that repository's mapped variables and selects its working directory. No host/controller/GitHub credentials are available. Do not inspect or print environment JSON files or provider secrets. Local fixture credentials are allowed. Use .tmp/ for ad hoc scripts; do not commit temporary evidence, credentials, or patient data.
-Candidate checkouts and exact checkpoints: ${JSON.stringify(snapshots(run.input).map((s, i) => ({ repository: s.name, path: "/work/" + s.name, approvedBase: s.commit, diffBase: repositories(run)[i].baseCommit ?? s.commit, checkpoint: repositories(run)[i].commit })))}.
+Candidate checkouts and exact checkpoints: ${JSON.stringify(snapshots(run.input).map((s, i) => ({ repository: s.name, path: "/work/" + s.name, approvedBase: s.commit, diffBase: mainBases[s.name] ?? repositories(run)[i].baseCommit ?? s.commit, checkpoint: repositories(run)[i].commit })))}.
 ${step.kind === "review" ? "Review ALL candidate repositories together, including integration between them. Every candidate must remain unchanged during review." : "Implement ONLY " + activeSnapshot(run).name + ". Other candidate checkouts are available for reading and paired tests; do not edit them. The controller works through repositories sequentially, then reviews the whole set. Intermediate repositories may defer paired browser acceptance until the final repository is implemented; report what remains honestly. On revision, fix findings affecting this repository; leave already-correct work intact."}
 ${snapshots(run.input)
   .map(

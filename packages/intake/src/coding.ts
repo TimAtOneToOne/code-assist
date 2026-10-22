@@ -481,6 +481,7 @@ export async function requestCodingChanges(
   stepId: string,
   text: string,
   requestedBy: string,
+  kind?: "bring_in_main",
 ) {
   if (!text.trim())
     throw new CodingConflict("Describe the code changes you want.");
@@ -492,10 +493,14 @@ export async function requestCodingChanges(
     const run = await codingRun(db, runId);
     const states = repositories(run);
     const indexes = codingIndexes(run);
+    const resuming =
+      kind === "bring_in_main" &&
+      run.status === "needs_direction" &&
+      !!run.change_requests?.length;
     if (
       run.issue_id !== issueId ||
       !(await currentCoding(db, run)) ||
-      run.status !== "pr_open" ||
+      (run.status !== "pr_open" && !resuming) ||
       run.current_step_id !== stepId ||
       !run.workspace_id ||
       run.workspace_cleaned_at ||
@@ -505,19 +510,25 @@ export async function requestCodingChanges(
           !states[index].commit ||
           states[index].merged_at ||
           states[index].pr_closed_at ||
-          states[index].status !== "pr_open",
+          (!resuming && states[index].status !== "pr_open"),
       )
     )
       throw new CodingConflict(
         "Code changes require the current open, unmerged PR and its saved workspace. Refresh the ticket before trying again.",
       );
     const request = {
+      ...(kind ? { kind } : {}),
       id: randomUUID(),
       text: text.trim(),
       requestedBy,
       createdAt: new Date().toISOString(),
       baseCommits: Object.fromEntries(
-        indexes.map((i) => [states[i].name, states[i].commit!]),
+        indexes.map((i) => [
+          states[i].name,
+          resuming
+            ? run.change_requests!.at(-1)!.baseCommits[states[i].name]
+            : states[i].commit!,
+        ]),
       ),
       pullRequests: Object.fromEntries(
         indexes.map((i) => [states[i].name, states[i].pr_url!]),

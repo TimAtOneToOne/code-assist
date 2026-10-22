@@ -8,6 +8,7 @@ import {
   publicationReady,
 } from "./coding-repositories.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
+import { supplyMain } from "./coding-main.ts";
 import { readFile } from "node:fs/promises";
 import { readReceipt } from "./coding-receipt.ts";
 import type { PgBoss } from "pg-boss";
@@ -398,6 +399,7 @@ export async function registerCodingWorker(
                 "Working tree differs from its saved checkpoint; preserved for inspection.",
               );
           }
+          await supplyMain(directory, run, workspace, signal, log);
         }
         if (step.kind === "implement" || step.kind === "review") {
           let completed = receipt;

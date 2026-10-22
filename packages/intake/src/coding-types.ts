@@ -69,6 +69,7 @@ export type CodingRun = {
   created_at: Date;
 };
 export type CodingChangeRequest = {
+  kind?: "bring_in_main";
   id: string;
   text: string;
   requestedBy: string;
