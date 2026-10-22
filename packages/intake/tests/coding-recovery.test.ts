@@ -10,7 +10,11 @@ import {
 } from "node:fs";
 import { resolve, join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { freezeEvidence, verifyEvidence } from "../src/coding-evidence.ts";
+import {
+  freezeEvidence,
+  verifyEvidence,
+  requireBrowserEvidence,
+} from "../src/coding-evidence.ts";
 import { readReceipt, writeReceipt } from "../src/coding-receipt.ts";
 import { executeCoding } from "../src/coding-runtime.ts";
 import { createLogger } from "@code-assist/observability";
@@ -57,6 +61,29 @@ test("evidence replay uses a complete frozen snapshot and accepts real directori
       "/work/evidence/browser/",
       "/work/evidence/browser/screen.png",
     ]);
+    const receiptPath = join(work, "result.json");
+    const paths = ["/work/evidence/browser/screen.png"];
+    for (const tool of [
+      "browser_run_code_unsafe",
+      "browser_run_code",
+      "browser_navigate",
+    ]) {
+      writeReceipt(receiptPath, {
+        result: { browserEvidence: paths },
+        browserCalls: [tool, "browser_console_messages"],
+      });
+      const recovered = readReceipt(receiptPath)!;
+      const savedPaths = recovered.result.browserEvidence as string[];
+      requireBrowserEvidence(savedPaths, recovered.browserCalls);
+      verifyEvidence(work, origin, savedPaths);
+    }
+    assert.throws(() =>
+      requireBrowserEvidence(paths, ["browser_console_messages"]),
+    );
+    assert.throws(() => requireBrowserEvidence(paths, []));
+    assert.throws(() =>
+      requireBrowserEvidence([], ["browser_run_code_unsafe"]),
+    );
     assert.throws(() =>
       verifyEvidence(work, origin, ["/work/evidence/missing"]),
     );

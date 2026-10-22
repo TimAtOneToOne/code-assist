@@ -11,6 +11,26 @@ import {
 import { join, resolve, relative, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
+export function requireBrowserEvidence(
+  paths: string[],
+  completedTools: string[],
+) {
+  // Current Playwright names the code runner "unsafe"; saved receipts can use the older name.
+  if (
+    !paths.length ||
+    !completedTools.some((tool) =>
+      [
+        "browser_navigate",
+        "browser_run_code",
+        "browser_run_code_unsafe",
+      ].includes(tool),
+    )
+  )
+    throw new Error(
+      "The implementation did not supply successful browser evidence. Its code checkpoint is saved.",
+    );
+}
+
 function evidenceDirectory(work: string, origin: string) {
   if (!/^[a-f0-9-]{36}$/.test(origin))
     throw new Error("Invalid evidence attempt ID");

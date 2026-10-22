@@ -225,7 +225,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
         directionQuestion: "",
         browserEvidence: ["/work/evidence/browser/"],
       },
-      browserCalls: ["browser_navigate"],
+      browserCalls: ["browser_run_code_unsafe"],
     };
     assert(
       await finishCoding(

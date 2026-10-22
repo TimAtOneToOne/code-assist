@@ -9,6 +9,7 @@ import {
 } from "./coding-repositories.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { supplyMain } from "./coding-main.ts";
+import { requireBrowserEvidence } from "./coding-evidence.ts";
 import { readFile } from "node:fs/promises";
 import { readReceipt } from "./coding-receipt.ts";
 import type { PgBoss } from "pg-boss";
@@ -567,16 +568,10 @@ export async function registerCodingWorker(
               );
               return;
             }
-            if (
-              repositoryIndex(run) === codingIndexes(run).at(-1) &&
-              (!result.browserEvidence.length ||
-                !saved.browserCalls.some(
-                  (tool) =>
-                    tool === "browser_navigate" || tool === "browser_run_code",
-                ))
-            )
-              throw new Error(
-                "The implementation did not supply successful browser evidence. Its code checkpoint is saved.",
+            if (repositoryIndex(run) === codingIndexes(run).at(-1))
+              requireBrowserEvidence(
+                result.browserEvidence,
+                saved.browserCalls,
               );
             stage = "verifying browser evidence (implementation is saved)";
             await verifyBrowserEvidence(
