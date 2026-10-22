@@ -18,6 +18,7 @@
 	let planning = $derived(
 		data.item.planning.find((run) => run.discovery_id === data.item.current_discovery_id)
 	);
+	let labels = $derived(data.item.ticket.labels.filter((label) => label.toLowerCase() !== 'plan'));
 	function eventText(event: {
 		type: string;
 		details: { repositories?: string[]; repository?: string };
@@ -51,17 +52,24 @@
 
 <svelte:head><title>{data.item.ticket.identifier} · Code Assist</title></svelte:head>
 <a class="mb-5 inline-block text-sm text-muted-foreground" href={resolve('/')}>← Home</a>
-<div class="eyebrow">{data.item.ticket.identifier}</div>
-<h1>{data.item.ticket.title}</h1>
-<p class="intro">
-	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Linear URLs are external. -->
-	<a href={data.item.ticket.url} target="_blank" rel="noreferrer" class="underline"
-		>Open in Linear</a
-	>
-</p>
-<div class="mb-6 flex flex-wrap gap-2">
-	{#if data.item.removed_at}<Badge variant="outline">Removed</Badge>{/if}
-	{#each data.item.ticket.labels as label (label)}<Badge variant="secondary">{label}</Badge>{/each}
+<div class="ticket-header mb-6">
+	<div class="flex items-baseline justify-between gap-4">
+		<div class="eyebrow">{data.item.ticket.identifier}</div>
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Linear URLs are external. -->
+		<a
+			href={data.item.ticket.url}
+			target="_blank"
+			rel="noreferrer"
+			class="shrink-0 text-sm text-muted-foreground underline underline-offset-4">Open in Linear</a
+		>
+	</div>
+	<h1>{data.item.ticket.title}</h1>
+	{#if data.item.removed_at || labels.length}
+		<div class="mt-4 flex flex-wrap gap-2">
+			{#if data.item.removed_at}<Badge variant="outline">Removed</Badge>{/if}
+			{#each labels as label (label)}<Badge variant="secondary">{label}</Badge>{/each}
+		</div>
+	{/if}
 </div>
 {#if form?.error}<p role="alert" class="mb-4 text-destructive">{form.error}</p>{/if}
 {#if form?.message}<p role="status" class="mb-4">{form.message}</p>{/if}
