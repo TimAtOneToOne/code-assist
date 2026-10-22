@@ -8,6 +8,7 @@ import {
   publicationReady,
 } from "./coding-repositories.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
+import { isWindmill, readWindmillIntent } from "./windmill-publication.ts";
 import { supplyMain } from "./coding-main.ts";
 import {
   requireBrowserEvidence,
@@ -674,6 +675,9 @@ export async function registerCodingWorker(
             log,
             assertCurrent,
           );
+          const deployment = isWindmill(run)
+            ? (await readWindmillIntent(directory, run))?.evidence
+            : undefined;
           const indexes = codingIndexes(run);
           const following = indexes[indexes.indexOf(repositoryIndex(run)) + 1];
           await finishCoding(
@@ -686,6 +690,7 @@ export async function registerCodingWorker(
                 : "Pull request opened for Tim to review.",
               url,
               commit: run.commit,
+              ...(deployment ? { deployment } : {}),
             },
             following === undefined ? "pr_open" : "publish",
             undefined,

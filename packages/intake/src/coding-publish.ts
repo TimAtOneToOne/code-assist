@@ -9,6 +9,13 @@ import {
 } from "./coding-repositories.ts";
 import { executeCoding } from "./coding-runtime.ts";
 import { requireMainAncestor } from "./coding-main.ts";
+import {
+  isWindmill,
+  publicationRun,
+  prepareWindmillFork,
+  verifyWindmillFork,
+  beginWindmillSync,
+} from "./windmill-publication.ts";
 export class CodingBranchConflict extends Error {}
 export async function checkCodingBranch(
   run: CodingRun,
@@ -16,6 +23,7 @@ export async function checkCodingBranch(
   log: ReturnType<typeof createLogger>,
   execute = executeCoding,
 ) {
+  run = publicationRun(run);
   const remote = await execute(
     "/usr/bin/git",
     ["-C", activeSnapshot(run).source, "remote", "get-url", "origin"],
@@ -108,6 +116,7 @@ export async function publishCoding(
   assertCurrent: () => Promise<void>,
   execute = executeCoding,
 ) {
+  run = publicationRun(run);
   if (!run.commit || !/^[a-f0-9]{40}$/.test(run.commit))
     throw new Error("No validated commit to publish.");
   const local = repositoryDirectory(directory, run),
@@ -136,7 +145,41 @@ export async function publishCoding(
     await gh(["repo", "view", repository, "--json", "defaultBranchRef"]),
   );
   const base = metadata.defaultBranchRef.name as string;
-  const prs = JSON.parse(
+  if (isWindmill(run)) {
+    if (repository !== "OnetoOneHealth/windmill-work" || base !== "main")
+      throw new Error(
+        "Windmill publication requires the configured windmill-work repository and main base.",
+      );
+    const files = await git([
+      "diff",
+      "--name-only",
+      activeSnapshot(run).commit,
+      run.commit,
+    ]);
+    if (
+      files
+        .split("\n")
+        .some(
+          (path) =>
+            path.startsWith("workspaces/") &&
+            !path.startsWith("workspaces/production/"),
+        )
+    )
+      throw new Error(
+        "This Windmill change targets another parent workspace. Configure that workspace's publication path before publishing; the production fork cannot deploy those files.",
+      );
+  }
+  const fork = isWindmill(run)
+    ? await prepareWindmillFork(
+        directory,
+        run,
+        remote,
+        git,
+        signal,
+        assertCurrent,
+      )
+    : undefined;
+  let prs = JSON.parse(
     await gh([
       "pr",
       "list",
@@ -218,6 +261,7 @@ export async function publishCoding(
           "The PR base changed. Reconcile it before updating the branch.",
         );
       await assertCurrent();
+      if (fork) await beginWindmillSync(directory, run, signal);
       await git([
         "push",
         `--force-with-lease=refs/heads/${run.branch}:${expectedHead}`,
@@ -226,6 +270,18 @@ export async function publishCoding(
       ]);
     }
     await assertCurrent();
+    const deployment = fork
+      ? await verifyWindmillFork(directory, run, signal, assertCurrent)
+      : undefined;
+    if (fork) {
+      const head = (
+        await git(["ls-remote", "--heads", remote, `refs/heads/${run.branch}`])
+      ).split(/\s+/)[0];
+      if (head !== run.commit)
+        throw new Error(
+          "The Windmill branch changed during synchronization. Review the new commit before publication.",
+        );
+    }
     const revisionMarker = `<!-- code-assist-change:${request.id} -->`;
     if (!prs[0].body.includes(revisionMarker)) {
       let body = prs[0].body;
@@ -235,7 +291,7 @@ export async function publishCoding(
             `- ${name}: ${request.baseCommits[name]}`,
             `- ${name}: ${commit}`,
           );
-      body += `\n\n**Requested Changes:**\n\n${request.text}\n\nUpdated after fresh validation and Claude review. [Revision evidence](http://100.91.0.83:3000/tickets/${run.issue_id}).\n\n${revisionMarker}\n`;
+      body += `\n\n**Requested Changes:**\n\n${request.text}\n\nUpdated after fresh validation and Claude review. [Revision evidence](http://100.91.0.83:3000/tickets/${run.issue_id}).${deployment ? `\n\n[Windmill fork](${deployment.url}) synced ${deployment.commit}: [native deployment job](${deployment.jobUrl}).` : ""}\n\n${revisionMarker}\n`;
       const bodyFile = join(local, `pull-request-${request.id}.md`);
       await writeFile(bodyFile, body, { mode: 0o600 });
       await gh(["pr", "edit", intent.url, "--body-file", bodyFile]);
@@ -256,10 +312,41 @@ export async function publishCoding(
       prs[0].state === "OPEN" &&
       prs[0].headRefOid === run.commit &&
       prs[0].baseRefName === base &&
-      prs[0].body.includes(marker) &&
+      (prs[0].body.includes(marker) || !!fork) &&
       intent?.commit === run.commit
-    )
+    ) {
+      if (fork) {
+        const deployment = await verifyWindmillFork(
+          directory,
+          run,
+          signal,
+          assertCurrent,
+        );
+        const head = (
+          await git([
+            "ls-remote",
+            "--heads",
+            remote,
+            `refs/heads/${run.branch}`,
+          ])
+        ).split(/\s+/)[0];
+        if (head !== run.commit)
+          throw new Error(
+            "The Windmill branch changed during synchronization. Review the new commit before publication.",
+          );
+        if (!prs[0].body.includes(marker)) {
+          const bodyFile = join(local, "pull-request-reconciled.md");
+          await writeFile(
+            bodyFile,
+            `${prs[0].body}\n\n[Code Assist validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\nReviewed commit: ${run.commit}. [Windmill fork](${deployment.url}) · [Native deployment job](${deployment.jobUrl}).\n\n**Optional optimizations and controls:** none.\n\n${marker}\n`,
+            { mode: 0o600 },
+          );
+          await assertCurrent();
+          await gh(["pr", "edit", prs[0].url, "--body-file", bodyFile]);
+        }
+      }
       return prs[0].url;
+    }
     throw new Error(
       "This branch already has a PR or was previously merged/closed. Tim must choose a new branch or reconcile the existing work.",
     );
@@ -272,6 +359,7 @@ export async function publishCoding(
   ]);
   if (
     remoteHead &&
+    remoteHead.split(/\s+/)[0] !== fork?.initialHead &&
     (!intent ||
       intent.commit !== run.commit ||
       remoteHead.split(/\s+/)[0] !== run.commit)
@@ -298,15 +386,19 @@ export async function publishCoding(
   }
   if (intent.commit !== run.commit || intent.base !== base)
     throw new Error("Publication intent no longer matches this commit.");
-  if (!remoteHead) {
+  if (!remoteHead || remoteHead.split(/\s+/)[0] === fork?.initialHead) {
     await assertCurrent();
+    if (fork) await beginWindmillSync(directory, run, signal);
     await git([
       "push",
-      `--force-with-lease=refs/heads/${run.branch}:`,
+      `--force-with-lease=refs/heads/${run.branch}:${fork?.initialHead ?? ""}`,
       remote,
       `${run.commit}:refs/heads/${run.branch}`,
     ]);
   }
+  const deployment = fork
+    ? await verifyWindmillFork(directory, run, signal, assertCurrent)
+    : undefined;
   await assertCurrent();
   const body = join(local, "pull-request.md");
   await writeFile(
@@ -324,9 +416,47 @@ export async function publishCoding(
       .map(([name, commit]) => `- ${name}: ${commit}`)
       .join(
         "\n",
-      )}\n\n**Optional optimizations and controls:** none.\n\n[Code Assist plan, validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\n${marker}\n`,
+      )}${deployment ? `\n\n[Windmill fork](${deployment.url}) · [Successful native Git Sync job](${deployment.jobUrl}). The fork synced the reviewed commit ${deployment.commit}; runtime business acceptance and operator-managed configuration are separate evidence.` : ""}\n\n**Optional optimizations and controls:** none.\n\n[Code Assist plan, validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\n${marker}\n`,
     { mode: 0o600 },
   );
+  if (fork) {
+    // Native Git Sync can open the PR while applying the push.
+    prs = JSON.parse(
+      await gh([
+        "pr",
+        "list",
+        "--repo",
+        repository,
+        "--state",
+        "all",
+        "--head",
+        run.branch,
+        "--json",
+        "state,headRefOid,baseRefName,url,body",
+      ]),
+    );
+    const head = (
+      await git(["ls-remote", "--heads", remote, `refs/heads/${run.branch}`])
+    ).split(/\s+/)[0];
+    if (head !== run.commit)
+      throw new Error(
+        "The Windmill branch changed during synchronization. Review the new commit before publication.",
+      );
+    if (prs.length) {
+      if (
+        prs.length !== 1 ||
+        prs[0].state !== "OPEN" ||
+        prs[0].headRefOid !== run.commit ||
+        prs[0].baseRefName !== base
+      )
+        throw new Error(
+          "The native Windmill PR does not match the reviewed commit and base.",
+        );
+      await assertCurrent();
+      await gh(["pr", "edit", prs[0].url, "--body-file", body]);
+      return prs[0].url;
+    }
+  }
   return (
     await gh([
       "pr",

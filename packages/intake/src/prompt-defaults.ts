@@ -1,3 +1,5 @@
+export const windmillInstructions = `For windmill-work, read docs/dev-do-this-every-time.md and docs/git-sync-operations.md. Code Assist owns publication: implement and test locally in the controller-provided checkout, even though the interactive developer guide begins by creating a fork. Do not create a fork, change branches, push Git, run sync push, or deploy from the agent guest. After local validation and Claude review pass, the controller creates a fresh production workspace fork, pushes the exact reviewed commit to its native wm-fork/main/... branch, verifies native Git Sync, and reports the fork and PR links. The controller retains the Windmill publication credential; do not request it in the guest. Local tests are not deployed-fork or live-integration evidence. Plan separately for operator-managed resources, variables, triggers, schedules and datatable state excluded by wmill.yaml. Production changes and external business writes require their own explicit task authorization; a fork deployment does not establish their completion.`;
+
 export const promptDefinitions = {
   global: {
     title: "Global",
@@ -68,6 +70,7 @@ export function composeInstructions(
       : []),
   ];
   for (const repo of repositories) {
+    if (repo.name === "windmill-work") sections.push(windmillInstructions);
     const instructions = (["global", phase] as const)
       .map((scope) => {
         const text = promptText(settings, scope, repo.source);

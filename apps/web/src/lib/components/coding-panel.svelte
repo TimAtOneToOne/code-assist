@@ -42,6 +42,11 @@
 			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(' ');
 	const latest = $derived(run.steps.find((s) => s.id === run.current_step_id));
+	const deployments = $derived(
+		run.steps.filter(
+			(step) => step.kind === 'publish' && step.status === 'completed' && step.result?.deployment
+		)
+	);
 	const needsBrowserChecks = $derived(
 		run.status === 'failed' && missingBrowserEvidence(run, latest)
 	);
@@ -115,6 +120,24 @@
 		Plan v{run.version} · <span class="break-all">{run.branch}</span>{#if run.commit}
 			· {run.commit.slice(0, 7)}{/if}
 	</p>
+	{#if deployments.length}
+		{@const deployment = deployments.at(-1)!.result!.deployment as {
+			url: string;
+			jobUrl: string;
+			branch: string;
+		}}
+		<div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Controller-verified Windmill fork URL. -->
+			<a class="underline" href={deployment.url} target="_blank" rel="noreferrer"
+				>Open Windmill Fork</a
+			>
+			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Controller-verified native Git Sync job. -->
+			<a class="underline" href={deployment.jobUrl} target="_blank" rel="noreferrer"
+				>View Deployment</a
+			>
+			<span class="break-all text-muted-foreground">{deployment.branch}</span>
+		</div>
+	{/if}
 	{#if run.repositories}
 		<div class="space-y-2 text-sm">
 			<h3 id={'coding-repositories-' + run.id} tabindex="-1" class="font-medium">
