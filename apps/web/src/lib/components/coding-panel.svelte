@@ -35,6 +35,9 @@
 			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(' ');
 	const latest = $derived(run.steps.find((s) => s.id === run.current_step_id));
+	const directionQuestion = $derived(
+		typeof latest?.result?.directionQuestion === 'string' ? latest.result.directionQuestion : ''
+	);
 	async function requestChange(expand: () => void) {
 		expand();
 		await tick();
@@ -67,6 +70,19 @@
 			{/if}
 		</div>
 	{/snippet}
+	{#if run.status === 'needs_direction'}
+		<section
+			aria-labelledby={'coding-question-' + run.id}
+			class="space-y-2 rounded-md border border-yellow-300 bg-yellow-50 p-4"
+		>
+			<h3 id={'coding-question-' + run.id} class="text-base font-medium">Agent Question</h3>
+			<p class="break-words whitespace-pre-wrap text-foreground!">
+				{directionQuestion ||
+					'The agent stopped without a question. Review its latest result in Coding Activity below.'}
+			</p>
+			<p class="text-sm">Coding is paused. The saved code and evidence are preserved.</p>
+		</section>
+	{/if}
 	<p class="text-sm text-muted-foreground">
 		Plan v{run.version} · {run.branch}{#if run.commit}
 			· {run.commit.slice(0, 7)}{/if}
@@ -148,34 +164,37 @@
 		</p>
 	{/if}
 	{#if run.error}<p role="alert">{run.error}</p>{/if}
-	{#if latest?.kind === 'collect'}<p class="text-sm text-muted-foreground">
+	{#if latest?.kind === 'collect' && (run.status === 'collect' || run.status === 'failed')}<p
+			class="text-sm text-muted-foreground"
+		>
 			The agent result and code checkpoint are saved. Evidence collection resumes from that
 			checkpoint without running the agent again.
 		</p>{/if}
 	{#if run.pr_url}
-		<div class="flex flex-wrap items-center gap-3">
-			{#if !run.repositories}
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub URL from the publication controller. -->
-				<a class="font-medium underline" href={run.pr_url} target="_blank" rel="noreferrer"
-					>{run.merged_at
-						? 'View Merged Pull Request →'
-						: run.status === 'pr_closed'
-							? 'View Closed Pull Request →'
-							: 'Review Pull Request →'}</a
-				>
-			{/if}
-			<form method="POST" use:enhance>
-				<input type="hidden" name="intent" value="github-refresh" />
-				<input type="hidden" name="codingId" value={run.id} />
-				<Button type="submit" variant="outline" size="sm">Refresh GitHub</Button>
-			</form>
+		<div class="space-y-2">
+			<div class="flex flex-wrap items-center gap-3">
+				{#if !run.repositories}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub URL from the publication controller. -->
+					<a class="font-medium underline" href={run.pr_url} target="_blank" rel="noreferrer"
+						>{run.merged_at
+							? 'View Merged Pull Request →'
+							: run.status === 'pr_closed'
+								? 'View Closed Pull Request →'
+								: 'Review Pull Request →'}</a
+					>
+				{/if}
+				<form method="POST" use:enhance>
+					<input type="hidden" name="intent" value="github-refresh" />
+					<input type="hidden" name="codingId" value={run.id} />
+					<Button type="submit" variant="outline" size="sm">Refresh GitHub</Button>
+				</form>
+			</div>
+			<p class="text-sm text-muted-foreground">
+				{#if run.github_checked_at}Last checked {new Date(
+						run.github_checked_at
+					).toLocaleString()}.{:else}Waiting for the first GitHub check.{/if}
+			</p>
 		</div>
-		<p class="text-sm text-muted-foreground">
-			{#if run.github_checked_at}GitHub Checked: {new Date(
-					run.github_checked_at
-				).toLocaleString()}.{:else}Waiting for the first GitHub check.{/if}
-			{#if run.status !== 'done'}PRs and main workflows are checked every five minutes.{/if}
-		</p>
 		{#if run.github_error}<p role="alert">{run.github_error}</p>{/if}
 		{#if run.merged_at && run.merge_commit}
 			<p class="text-sm">
@@ -229,11 +248,6 @@
 			workflow evidence are preserved. Any code fix goes through validation, Claude review, and a
 			new PR.
 		</p>{/if}
-	{#if run.status === 'needs_direction'}<p>
-			The agent needs your direction. Read its question below. If it needs upstream changes, use
-			Bring In Main under Requested Code Changes. For scope changes, request a revision to the
-			approved plan.
-		</p>{/if}
 	{#if run.status === 'failed' && editable && latest}<form method="POST" use:enhance>
 			<input type="hidden" name="intent" value="coding-retry" /><input
 				type="hidden"
@@ -272,52 +286,59 @@
 			</form>
 		</details>
 	{/if}
-	<div class="space-y-3">
-		{#each run.steps as step (step.id)}
-			<details
-				open={step.id === run.current_step_id && step.status !== 'completed'}
-				class="rounded-md border p-3"
-			>
-				<summary class="cursor-pointer text-sm font-medium"
-					>{titles[step.kind]}{run.repositories
-						? ` · ${run.repositories[step.repository_index ?? 0].name}`
-						: ''} · {workflowLabel(step.status)} · {new Date(
-						step.created_at
-					).toLocaleString()}</summary
+	<details
+		open={latest?.status === 'running' || latest?.status === 'queued' || run.status === 'failed'}
+	>
+		<summary class="cursor-pointer text-sm font-medium"
+			>Coding Activity ({run.steps.length} {run.steps.length === 1 ? 'Step' : 'Steps'})</summary
+		>
+		<div class="mt-3 space-y-3">
+			{#each run.steps as step (step.id)}
+				<details
+					open={step.id === run.current_step_id && step.status !== 'completed'}
+					class="rounded-md border p-3"
 				>
-				<div class="mt-3 space-y-3 text-sm">
-					<a class="underline" href={resolve(`/logs?attempt=${step.id}`)}
-						>Agent Activity and Logs →</a
+					<summary class="cursor-pointer text-sm font-medium"
+						>{titles[step.kind]}{run.repositories
+							? ` · ${run.repositories[step.repository_index ?? 0].name}`
+							: ''} · {workflowLabel(step.status)} · {new Date(
+							step.created_at
+						).toLocaleString()}</summary
 					>
-					{#if step.input_commit}<p class="text-muted-foreground">
-							Input Commit: {step.input_commit.slice(0, 7)}
-						</p>{/if}
-					{#if step.error}<p>{step.error}</p>{/if}
-					{#if step.result}
-						{#if typeof step.result.summary === 'string'}<p class="whitespace-pre-wrap">
-								{step.result.summary}
+					<div class="mt-3 space-y-3 text-sm">
+						<a class="underline" href={resolve(`/logs?attempt=${step.id}`)}
+							>Agent Activity and Logs →</a
+						>
+						{#if step.input_commit}<p class="text-muted-foreground">
+								Input Commit: {step.input_commit.slice(0, 7)}
 							</p>{/if}
-						{#if typeof step.result.directionQuestion === 'string' && step.result.directionQuestion}<p
-								class="font-medium"
-							>
-								{step.result.directionQuestion}
-							</p>{/if}
-						{#if step.result.commands && typeof step.result.commands === 'object'}<ul>
-								{#each Object.entries(step.result.commands) as [command, code] (command)}<li>
-										{command}: {code === 0 ? 'Passed' : 'Failed'}
-									</li>{/each}
-							</ul>{/if}
-						{#if Array.isArray(step.result.findings)}{#each step.result.findings as finding (finding.id)}<div
-									class="rounded-md border p-3"
+						{#if step.error}<p>{step.error}</p>{/if}
+						{#if step.result}
+							{#if typeof step.result.summary === 'string'}<p class="whitespace-pre-wrap">
+									{step.result.summary}
+								</p>{/if}
+							{#if typeof step.result.directionQuestion === 'string' && step.result.directionQuestion}<p
+									class="font-medium"
 								>
-									<p class="font-medium">{finding.severity} · {finding.title}</p>
-									<p>{finding.detail}</p>
-									<p>{finding.recommendation}</p>
-								</div>{/each}{/if}
-					{/if}
-				</div>
-			</details>
-		{/each}
-	</div>
+									{step.result.directionQuestion}
+								</p>{/if}
+							{#if step.result.commands && typeof step.result.commands === 'object'}<ul>
+									{#each Object.entries(step.result.commands) as [command, code] (command)}<li>
+											{command}: {code === 0 ? 'Passed' : 'Failed'}
+										</li>{/each}
+								</ul>{/if}
+							{#if Array.isArray(step.result.findings)}{#each step.result.findings as finding (finding.id)}<div
+										class="rounded-md border p-3"
+									>
+										<p class="font-medium">{finding.severity} · {finding.title}</p>
+										<p>{finding.detail}</p>
+										<p>{finding.recommendation}</p>
+									</div>{/each}{/if}
+						{/if}
+					</div>
+				</details>
+			{/each}
+		</div>
+	</details>
 	<CodingChanges {run} {editable} />
 </TicketSection>
