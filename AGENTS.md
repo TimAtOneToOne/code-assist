@@ -12,6 +12,13 @@ Tim authorized direct commits and pushes to `main` in this repository on October
 
 Build the observability application with SvelteKit and serve it from the Mia Mac mini over Tailscale. Changes published to Code Assist's `main` must be picked up and deployed automatically by the mini. Keep deployment releases separate from durable job state and agent workspaces.
 
+## Check Mia Is Idle Before Deployment
+
+- Before pushing to `main` or triggering a deployment/restart on Mia, check live pg-boss jobs, discovery/planning/coding steps, and any associated agent or validation processes for active work. Pushing to `main` triggers automatic deployment, including documentation-only changes.
+- If work is active, keep changes local and wait until it finishes or reaches a stable state awaiting human input. A brief gap between steps with a queued continuation is not an idle workflow. Recheck immediately before pushing or deploying; an earlier check is not sufficient.
+- Do not stop, cancel, or interrupt work to make room for a deployment. Do not assume worker draining or durable recovery makes deploying during active work acceptable. If activity cannot be verified, hold the push and explain the blocker to Tim.
+- The worker service itself normally stays running; check whether it is executing work, not merely whether its process exists. This is an agent pre-deployment rule, not an automatic deployment lock implemented by the updater.
+
 ## GitOps Approval in Code Assist
 
 Tim clarified on October 20, 2026 that Code Assist's exact-version plan approval
