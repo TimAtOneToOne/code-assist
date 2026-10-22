@@ -13,7 +13,7 @@
 	<link rel="icon" href="/favicon.svg" />
 </svelte:head>
 
-<Toaster richColors closeButton />
+<Toaster position="top-right" richColors closeButton />
 
 <div class="shell">
 	<aside data-sveltekit-reload>
