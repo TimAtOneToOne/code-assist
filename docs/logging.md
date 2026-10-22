@@ -7,13 +7,14 @@ Code Assist keeps structured JSON events and full payload files on Mia, then ind
 ## Evidence
 
 - Web: dynamic requests, status, duration, request IDs, errors and configuration saves. Static assets bypass SvelteKit hooks. Request headers, bodies and query strings are not recorded.
-- Worker: lifecycle, pg-boss errors/warnings and probe start/result-prepared/failure. `job.result_prepared` is not proof that the enclosing SQL transaction committed; PostgreSQL records the actual workflow state.
+- Worker: lifecycle, pg-boss errors/warnings, intake, discovery, planning, coding, GitHub observation, setup and cleanup events, plus diagnostic probes. A prepared result is not proof that the enclosing SQL transaction committed; PostgreSQL records actual workflow state.
+- Agents: discovery/planning SDK inputs, events, results and failures; coding SDK and validation output, with a redacted guest-local log mirror and host evidence archives. See [Discovery](discovery.md), [Planning](planning.md), and [Coding](coding.md) for correlation and recovery details.
 - Processes: launchd web, worker and updater stdout/stderr, including deployment output.
 - Payloads: complete JSON files referenced by UUID, byte count and SHA-256. Large evidence goes in artifacts rather than inline event fields.
 
 Structured events have stable fields for UUID, timestamp, service, host, PID and release. Child loggers attach attempt/job/ticket/session/parent-session/request/repository-commit/trace IDs where available. IDs are values, never dynamic column names.
 
-The shared TypeScript package is ready for future native SDK hosts:
+The shared TypeScript package is used by the native SDK runners. New instrumentation follows the same pattern:
 
 ```ts
 import { createLogger } from "@code-assist/observability";
@@ -25,7 +26,7 @@ for await (const event of events) {
 }
 ```
 
-Record every exposed native event, including tool arguments/results, usage, identifiers and errors. This foundation does not launch Codex/Claude SDK sessions or automatically instrument them. The failure probe is a synthetic child process, not a real repository test or model invocation.
+Record every exposed native event, including tool arguments/results, usage, identifiers and errors. Workflow runners launch and instrument Codex/Claude sessions explicitly; the logger itself does not launch agents or automatically instrument new callers. The standalone failure probe remains a synthetic child process, not a real repository test or model invocation.
 
 Known credential fields and values from the logger's environment are redacted before storage. Artifacts report redaction; hashes describe stored bytes. Unknown credentials in arbitrary prose are not reliably detected. Never record environment dumps, secret files or browser authentication state. Existing stdout/stderr and independently submitted OTLP data bypass this logger's redaction.
 
@@ -61,7 +62,7 @@ Root: `~/Library/Application Support/CodeAssist`.
 
 Data stays outside release folders. No automatic deletion, rotation, sampling, disk quota or artifact clipping is configured. Raw and indexed copies both use disk. No disk alert or backup schedule exists. Disk exhaustion can fail evidence writes and work; extra capacity is not a backup.
 
-For an external-drive move, stop the updater, writers and containers before copying data. Preserve permissions and verify copies. Set `CODE_ASSIST_OBSERVABILITY_DIR` in `observability.env`, `CODE_ASSIST_LOG_DIR` in both env files, and `CODE_ASSIST_ARTIFACT_DIR` in `runtime.env`; run the installer and restart services. Existing launchd output remains in `logs/` unless its definitions change.
+For an external-drive move, stop the updater, writers and containers before copying data. Preserve permissions and verify copies. Set `CODE_ASSIST_OBSERVABILITY_DIR` in `observability.env`, `CODE_ASSIST_LOG_DIR` in both env files, and `CODE_ASSIST_ARTIFACT_DIR` in `runtime.env`; run the installer and restart services. The collector mounts `CODE_ASSIST_LOG_DIR` as `/logs` and reads process output only from `/logs/*.log`. LaunchAgent stdout/stderr paths remain fixed under the installation's original `logs/` directory. Moving only `CODE_ASSIST_LOG_DIR` therefore stops indexing new launchd output, although the original files remain. A complete migration must also align the LaunchAgent output paths or collector mounts/configuration, and verify both structured events and process output after restart. The current installer does not perform that alignment automatically.
 
 Use canonical absolute paths. Installation and application writes reject an absent/unmounted `/Volumes/<name>` filesystem before creating directories. Container bind mounts do not create missing host paths. No external drive is configured yet: an actual migration needs unplug/remount and OrbStack login-start tests, including a startup mount check appropriate to that drive. Symlink aliases and replacement drives with the same name are not validated storage identities.
 
@@ -91,7 +92,7 @@ node "$HOME/Library/Application Support/CodeAssist/current/ops/install-observabi
 node "$HOME/Library/Application Support/CodeAssist/current/ops/log-probe.ts"
 ```
 
-The probe intentionally exits 7 and prints an attempt ID/Logs URL with full stdout/stderr. Readiness uses `/healthz`. OTLP HTTP accepts logs and traces on local port 4318; application trace instrumentation is not implemented.
+The probe launches a synthetic child that intentionally exits 7. The probe itself exits successfully when it observes that expected code, and prints a short JSON record with the attempt ID, Logs URL and expected/actual exit codes. Full child stdout/stderr is saved in a `command.output` artifact. Readiness uses `/healthz`. OTLP HTTP accepts logs and traces on local port 4318; application trace instrumentation is not implemented.
 
 The collector retains offsets and an export queue using shipped retry/queue limits. Long outages, rejection, queue exhaustion or full disks can leave index gaps while original files remain. Delivery is not exactly-once; duplicates retain event IDs. The native 1 MiB record limit splits oversized inline records; payload files avoid that parser limit.
 
@@ -106,7 +107,7 @@ For gaps, inspect source files and collector errors. Re-ingest relevant original
 - Stopped both logging containers, wrote evidence while the collector was down, then restarted them. Existing indexed history survived; attempt `1e981333-eee9-4d38-8056-9f2706143521` included both the new payload and an eight-hour-old backfill event.
 - Downloaded all 2,200,051 stored bytes of that payload over Tailscale. Beginning/middle/end markers, credential redaction and SHA-256 passed.
 - Live pagination, SQL-literal escaping, invalid-input 400s, missing-artifact 404s and private port 5080 passed. An isolated production web process configured with a mismatched owner rejected page, search and artifact requests with 403, including spoofed forwarded headers. Both actual Macs belong to Tim's Tailscale account.
-- Chrome exercised the filter form and event expansion; no browser warning/error logs were observed. Full reboot, external-drive migration, native MCP and actual SDK instrumentation remain unverified.
+- Chrome exercised the filter form and event expansion; no browser warning/error logs were observed. At this initial logging milestone, full reboot, external-drive migration, native MCP and actual SDK instrumentation were unverified. Subsequent discovery/planning/coding work added SDK instrumentation and evidence described above; the other operational proof remains outstanding in the checked-in record.
 - Initial data footprint was approximately 65 MiB of observability data, 2.1 MiB of test artifacts and 168 KiB of source logs. This excludes container images and is not a forecast of transcript growth.
 
 References: [search API](https://openobserve.ai/docs/reference/api/search/search/), [MCP](https://openobserve.ai/docs/integration/ai/mcp/), [file receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.163.0/receiver/filelogreceiver), [SvelteKit hooks](https://svelte.dev/docs/kit/hooks).

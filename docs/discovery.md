@@ -2,7 +2,7 @@
 
 This step reads a Plan ticket and its user-confirmed repositories, records initial findings and open questions, and saves Tim's answers as the planning baseline. Confirming the answers queues the [adversarial planning cycle](planning.md): Codex drafts and revises, Claude reviews, and Tim approves the exact plan.
 
-The UI follows `docs/initial/index.html`: a Now/Next summary, a scope-and-questions checkpoint, saved answers, and earlier activity. Home retains the compact ticket cards. Repository selection is collapsed after confirmation; it remains editable. A changed scope creates a new discovery, preserving earlier findings and answers.
+The UI provides discovery status, a scope-and-questions checkpoint, saved answers, and earlier activity; `docs/initial/index.html` preserves the original visual reference. Home uses compact ticket cards. Repository selection is collapsed after confirmation; it remains editable. A changed scope creates a new discovery, preserving earlier findings and answers.
 
 ## Trigger and state
 
@@ -59,7 +59,7 @@ References: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [native permi
 
 Optional optimizations and controls:
 
-- **Explicit model selection — requested by Tim October 20, 2026.** Discovery and Codex planning use `gpt-6.1-sol`; Claude review uses `claude-opus-5-5`. New runs no longer follow changes to the SDKs' default model selection; model upgrades require an explicit configuration change. These are provider model IDs, not immutable model-weight snapshots.
-- **Owned subprocess cleanup — approved by Tim October 20, 2026.** SDK cancellation left an active shell command orphaned in the real Mia crash test. Discovery runners now freeze and terminate only their descendants before cancelling the SDK. Cancellation ends those commands immediately; it does not give them a graceful exit. This applies only to discovery, including future calls through its runner. No global process matching, workload limit or automatic retry was added.
+- **Explicit model selection — requested by Tim October 20, 2026.** The initial defaults are `gpt-6.1-sol` for Codex and `claude-opus-5-5` for Claude. Each discovery/planning step uses the saved Agent Models selection. New runs no longer follow changes to the SDKs' default model selection; model upgrades require an explicit configuration change. These are provider model IDs, not immutable model-weight snapshots.
+- **Owned subprocess cleanup — approved by Tim October 20, 2026.** SDK cancellation left an active shell command orphaned in the real Mia crash test. The shared discovery/planning runner freezes and terminates only its descendants before cancelling the SDK. Cancellation ends those commands immediately; it does not give them a graceful exit. Coding guests use separate systemd unit ownership described in [Coding](coding.md). No global process matching, workload limit or automatic retry was added by this cleanup behavior.
 
 Snapshot isolation, read-only permissions, credential separation, stale-input checks and human scope confirmation implement the requested discovery boundary.

@@ -1,6 +1,6 @@
-# Mac mini configuration
+# Mac Mini Configuration
 
-Verified October 19, 2026. The Mia Mac mini hosts Code Assist at **http://100.91.0.83:3000**. OrbStack and PostgreSQL 18 are running. A separate pg-boss worker runs the [durable diagnostic workflow](worker.md); Linear intake, agent execution and managed-repository validation are not implemented yet. Product requirements remain in [the standalone brief](initial/standalone-brief.md); application operation is documented in [deployment](deployment.md).
+Machine inventory verified October 19, 2026; application-status references updated October 22 without a new live inventory. Mia hosts Code Assist at **http://100.91.0.83:3000** using OrbStack and PostgreSQL 18. The [durable worker](worker.md) implements intake, discovery, planning, coding, validation, publication and lifecycle monitoring. Read [Current Status](current-status.md) for implemented features and remaining evidence gaps, and [Deployment](deployment.md) for operation.
 
 This reference contains machine specifications and operational settings only. Login credentials, provider keys, tokens, and database connection secrets are excluded. Versions and disk availability are a dated snapshot.
 
@@ -79,7 +79,7 @@ The Docker smoke test passed image building, Compose startup and health checks, 
 | Locale and encoding | `en_US.UTF-8`, UTF-8 |
 | Data checksums | Enabled |
 | Authentication | Fresh `initdb` defaults: local connections use `trust` |
-| Application database | `code_assist`, owned by the non-superuser `code_assist` login role; pg-boss, intake, repository selections, attention outbox and diagnostic state |
+| Application database | `code_assist`, owned by the non-superuser `code_assist` login role; pg-boss and durable ticket/discovery/planning/coding/setup/outbox/diagnostic state |
 
 PostgreSQL 16 was uninstalled. At Tim's direction, PostgreSQL 18 was then reinitialized from scratch: both former Hint Lite databases, migrated roles, old PostgreSQL 16 data, and the upgrade backup were deleted. There is no retained backup of those old databases. Code Assist subsequently received its own database and local application role.
 
@@ -98,7 +98,7 @@ Code Assist's repository-root setting defaults to `/Users/miasocci/CODE/repos/On
 | Codex CLI | Present at `~/.local/bin/codex` |
 | Claude CLI | Present at `~/.local/bin/claude` |
 
-Node and the agent CLIs are available in the interactive login shell. SSH commands and supervised services must use deliberate executable paths or an explicitly configured environment. CLI availability does not establish that either agent SDK can yet run a complete repository workflow.
+Node and the agent CLIs are available in the interactive login shell. SSH commands and supervised services must use deliberate executable paths or an explicitly configured environment. CLI installation alone is not execution evidence; subsequent SDK and repository workflow results are recorded in [Discovery](discovery.md) and [Coding](coding.md).
 
 ## Routine inspection
 
@@ -118,7 +118,7 @@ df -h /System/Volumes/Data
 
 ## Central logs
 
-[Logging configuration](logging.md) describes the Logs page, evidence paths, local OpenObserve service, storage migration and delivery limits. Agent SDK runtime integration and full reboot recovery are still pending.
+[Logging configuration](logging.md) describes the Logs page, SDK event/artifact integration, evidence paths, local OpenObserve service, storage migration and delivery limits. Full reboot recovery remains unverified.
 
 ## Browser tools
 
@@ -127,9 +127,9 @@ As of October 20, 2026, [Playwright MCP](browser-testing.md) is pinned in Code A
 ## Remaining setup and validation
 
 - Test the configured login startup and recovery after logout, reboot, and power interruption, including whether manual login is needed before services become available.
-- Select the first supported repository and prove its unchanged full validation, Docker services, and browser workflows through both SDKs.
-- The October 20 [concurrent isolation proof](concurrent-isolation-proof.md) passed unchanged ICU validation, same-port operation, separate storage and browser sessions in two OrbStack machines. Network blocking failed, including cross-machine database access; the agent access boundary remains unresolved.
-- Web and worker supervision, release locations and pg-boss storage are configured. Define and test backup/restore before real jobs; no ongoing database backup schedule is configured.
-- Home, ticket pages and settings require the configured owner's Tailscale identity. Future approval routes must preserve that boundary.
+- Repository validation and both SDK browser interactions have subsequent recorded evidence in [Coding](coding.md#verification--october-20-2026) and [Repository Setup](repository-setup.md); new features still require their own acceptance checks.
+- The October 20 [concurrent isolation proof](concurrent-isolation-proof.md) exposed cross-machine database access. The subsequent [loopback proof](loopback-isolation-proof.md) closed that demonstrated path using native container-port defaults, now used by coding workspaces. These defaults prevent accidental exposure; explicit all-interface bindings can override them. They are not a hostile-code network sandbox.
+- Web and worker supervision, release locations and pg-boss storage are configured. Backup/restore remains unproven and no ongoing database backup schedule is recorded.
+- Home, ticket pages, settings and plan approvals use the configured owner's Tailscale identity. Preserve this boundary when adding routes.
 
 Optional optimizations and controls introduced by this documentation: none.

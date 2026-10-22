@@ -1,6 +1,6 @@
 # Mac mini deployment
 
-The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, ticket selection, Configuration, Mac mini settings, Secrets, Logs and `/health` routes. The separate pg-boss process in `apps/worker` runs [Linear intake and attention notifications](intake.md), [initial Codex discovery](discovery.md), and the diagnostic confirmation probe against local PostgreSQL. See [worker operation and limits](worker.md) and [central logging](logging.md).
+The web application is in `apps/web`, generated with the official Svelte CLI and its Node adapter. It has Home, ticket workflows, Configuration, repository setup, prompts/models, AWS planning access, Secrets, Logs and `/health` routes. The separate pg-boss process in `apps/worker` runs intake, attention notifications, discovery, planning, coding, GitHub observation, repository setup tests, completed-workspace cleanup, and the diagnostic confirmation probe against local PostgreSQL. See [Current Status](current-status.md), [worker operation and limits](worker.md), and [central logging](logging.md).
 
 The shell uses shadcn-svelte Button, Card and Badge components installed through its CLI. AI Elements and AG-UI preferences are recorded in `AGENTS.md` for future agent/chat features.
 
@@ -45,7 +45,7 @@ The installation is under `~/Library/Application Support/CodeAssist/`:
 | `data/models.json` | Operator-selected Codex and Claude model IDs for new agent steps |
 | `data/discovery/<attempt>/` | Captured repository commits, isolated Codex home and native session files |
 | `data/secrets/store.json` | Shared secret values and repository mappings; mode 600 inside a mode 700 directory |
-| `data/workspaces/<uuid>/workspace.json` | Preparation state and approved inputs for an isolated coding workspace; no environment values |
+| `data/workspaces/<uuid>/workspace.json` | Preparation state, approved inputs and compiled runtime profiles, including literal environment overrides; excludes mapped secret and generated values |
 
 ## Mac mini settings
 
@@ -58,6 +58,8 @@ The production launcher loads `runtime.env` and sets `CODE_ASSIST_DATA_DIR` to t
 Local development permits loopback access and uses the repository's gitignored `.tmp/local-web-data/` directory when `CODE_ASSIST_DATA_DIR` is unset. Production requires an explicit data directory.
 
 ## Login services and updates
+
+Before pushing Code Assist `main` or triggering any deployment/restart, inspect live pg-boss jobs, queued continuations, agent steps, and associated processes. Hold the change while work is active or cannot be verified. This applies to documentation-only pushes too. Worker recovery and draining do not replace the operator's immediate pre-deployment idle check; the updater itself does not implement that check.
 
 Provision the local `code_assist` database and `runtime.env` before installation. The installer, `ops/install.ts`, is run once as Mia's logged-in operating user using Node 24. It builds published `main` and registers three user LaunchAgents:
 
@@ -97,7 +99,7 @@ launchctl kickstart -k "gui/$(id -u)/com.code-assist.web"
 
 Release cleanup runs on the next scheduled updater pass after activation, once the web health check reports the expected commit. It keeps the current release, the two newest other built releases as rollback candidates, and every release referenced by a running process. The worker and updater use their exact release directories as their working directories so an older running version remains identifiable after `current` changes. Cleanup checks open files and process command lines, and skips deletion if it cannot identify the running web/worker releases. It only removes real, commit-named directories under `releases/`; unfinished builds, durable `data/`, logs, configuration, source clones and OrbStack machines are untouched. There is no automatic rollback. To roll back operationally, first unload the updater, then atomically point `current` to a compatible existing release, restart the web service and signal the worker with `launchctl kill SIGTERM "gui/$(id -u)/com.code-assist.worker"`. Fix `main` before re-enabling automatic updates. Do not roll the worker back to a release without worker code, or reverse database state during code rollback. Runtime health failures are logged; successful compilation alone does not prove that a future release is healthy.
 
-These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. Worker draining covers diagnostic, intake and attention handlers. Discovery cleans up its owned subprocesses, checkpoints on graceful shutdown and rejects stale results. On its first startup, it queues discovery for all already-selected eligible tickets, using the saved `OPENAI_API_KEY`. Read [the cleanup scope and validated recovery behavior](discovery.md#recovery-and-subprocess-ownership) before changing the process lifecycle.
+These are login services. A full reboot with FileVault and unattended recovery before login remain unverified. Worker shutdown signals active agent/setup/cleanup handlers and unregisters all queue workers before closing pg-boss. Discovery and planning clean up owned subprocesses and checkpoint replacement work on graceful shutdown; coding uses guest unit ownership and saved stage results/checkpoints. Read [worker operation](worker.md), [discovery recovery](discovery.md#recovery-and-subprocess-ownership), and [coding recovery](coding.md#recovery-and-publication) before changing the process lifecycle. These recovery paths do not authorize deployment during active work.
 
 ## Initial verification — October 19, 2026
 

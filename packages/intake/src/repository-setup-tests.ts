@@ -208,7 +208,7 @@ export async function registerSetupTestWorker(
   const { rows } = await boss
     .getDb()
     .executeSql(
-      "UPDATE code_assist.repository_setup_test SET status='failed',error='Worker restarted during setup test. Run Test Setup again.',finished_at=now() WHERE status='running' RETURNING job_id",
+      "UPDATE code_assist.repository_setup_test SET status='failed',error='Worker restarted during setup test. Select Save and Test Setup again.',finished_at=now() WHERE status='running' RETURNING job_id",
     );
   for (const row of rows) {
     await boss.fail(setupTestQueue, row.job_id, {

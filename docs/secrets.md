@@ -63,7 +63,7 @@ The staging/production Medusa variants and the spike-only
 `LINEAR_DEVELOPER_TOKEN_USER` were not imported. ICU uses its configured model
 gateway; Code Assist's agent provider keys are separate.
 
-The runner still needs to supply `DATABASE_URL`, `TEST_DATABASE_URL`, `ORIGIN`,
+The workspace runner supplies `DATABASE_URL`, `TEST_DATABASE_URL`, `ORIGIN`,
 a fresh `BETTER_AUTH_SECRET`, and the local storage configuration:
 `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
 `AWS_ENDPOINT_URL_S3`, and `ICU_CHAT_ATTACHMENTS_BUCKET`. These must describe
@@ -80,9 +80,10 @@ not launch an agent or provision services.
 
 Optional optimizations and controls: none.
 
-The [ICU workspace provisioner](workspaces.md) now supplies those attempt-local
-settings and resolves these mappings during preparation. Automatic coding-worker
-integration remains the next step.
+The [ICU workspace provisioner](workspaces.md) supplies those attempt-local
+settings and resolves these mappings during preparation. The coding worker invokes
+it for approved runs; [Repository Setup](repository-setup.md) pins the runtime
+profile and environment configuration for each new workspace.
 
 ## Consolidating Duplicate Secrets
 

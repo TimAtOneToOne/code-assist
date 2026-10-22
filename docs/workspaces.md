@@ -18,7 +18,9 @@ pnpm --filter @code-assist/worker workspace destroy <workspace-uuid>
 
 Preparation requires the ticket's current, eligible, approved plan. It verifies
 that the approval matches the current plan version, plan hash and input hash.
-Profiles currently support ICU, Companion, and Workplace Agents. All selected
+Saved [Repository Setup](repository-setup.md) profiles support additional repositories;
+ICU, Companion, and Workplace Agents have built-in defaults. Each new workspace
+pins its selected profile. All selected
 repositories share a ticket-local guest for paired tests, while separate tickets
 retain separate guests. Unknown repository profiles fail visibly.
 
@@ -69,8 +71,12 @@ application services; its package build uses the guest’s zip utility. No Workp
 Agents cloud/provider credentials are imported automatically.
 
 Values are delivered over stdin into `/work/environments/<repository>.json`, mode `0600`, in
-the guest's private `/work` directory. No `.env` is added to the source tree and no
-values are placed in the workspace manifest. `/work/run.mjs` loads that JSON and
+the guest's private `/work` directory. No `.env` is added to the source tree, and
+mapped secret values and generated values are not placed in the workspace manifest.
+The manifest does retain compiled profiles, including literal Local Environment
+Overrides. Those profiles are also written to the guest's root-owned, world-readable
+`/etc/code-assist/profiles.json` (mode `0644`). Use secret mappings for credentials,
+not Local Environment Overrides. `/work/run.mjs` loads the private environment JSON and
 launches a command with the mapped/generated environment and explicit guest
 PATH/HOME. It does not inherit the Code Assist controller's environment. For example:
 
@@ -87,17 +93,21 @@ URLs still require a separate Medusa service on guest port 8000.
 ## State, Logs, and Cleanup
 
 `data/workspaces/<uuid>/workspace.json` records the machine, approved inputs,
-variable names and last preparation stage. State is `preparing`, `ready`, `failed`,
+variable names, compiled profiles and last preparation stage. State is `preparing`, `ready`, `failed`,
 or `destroyed`. Stage and command-output logs use service `workspace` with the
 workspace UUID as `attempt_id`. The approved inputs are checked again before the
 workspace becomes ready.
 
-This operator CLI is not yet a pg-boss job. It has no automatic restart or retry.
-After a hard interruption, a record may remain `preparing`; inspect the machine
-and logs, stop any remaining preparation process, then explicitly destroy that
-workspace and prepare another. Failed workspaces remain available for diagnosis.
+The direct operator CLI runs provisioning outside pg-boss and has no automatic
+restart or retry. Normal ticket preparation runs through the durable coding
+worker; disposable setup tests use their own queue. After an interrupted CLI
+operation, a record may remain `preparing`; inspect its machine, logs, ownership
+and associated work before deciding how to recover. Failed coding workspaces
+remain available for diagnosis; use the ticket's recovery actions for worker-owned
+runs. Eligible Done runs have [automatic guest cleanup](coding.md#completed-workspace-cleanup)
+after 24 hours, preserving host checkpoints and archived evidence.
 The destroy command removes the exact recorded machine, including its environment,
-containers and volumes, while retaining the non-secret manifest and logs. It does
+containers and volumes, while retaining the manifest (including profile overrides) and logs. It does
 not remove other machines or change the host's container configuration.
 
 ## Verification
@@ -122,5 +132,8 @@ Code Assist's `make verify` also passed.
 Optional optimizations and controls: Tim requested and approved localhost container
 publishing defaults to prevent accidental cross-attempt service access. They apply
 only to these machines; direct access to published services from other machines
-requires an explicit routing/binding decision. No additional optional controls,
-automatic cleanup, retries, caches, or concurrency caps were introduced.
+requires an explicit routing/binding decision. The initial provisioning proof did
+not add automatic cleanup or retries. The subsequent coding workflow includes
+requested [completed-workspace cleanup](coding.md#completed-workspace-cleanup) and
+approved [checkpoint/evidence-collection retries](coding.md#recovery-and-publication).
+No new controls are introduced by this documentation correction.

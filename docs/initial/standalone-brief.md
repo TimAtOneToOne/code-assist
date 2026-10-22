@@ -1,19 +1,19 @@
 # Standalone Development Assistant Brief
 
-October 19, 2026. Code Assist is a standalone TypeScript application deployed to a Mac mini. Its UI, controller, agents, database and artifacts run locally. External integrations are Linear, GitHub, OpenAI, Anthropic and the configured Teams notification endpoint. This is the current product brief; detailed implementation choices remain to be made.
+Originally written October 19, 2026; reconciled with implementation October 22, 2026. Code Assist is a standalone TypeScript application deployed to a Mac mini. Its UI, controller, agents, database and artifacts run locally. External integrations include Linear, GitHub, OpenAI, Anthropic, the configured Teams notification endpoint, Windmill test-fork publication, and the configured read-only AWS staging role for planning evidence. This brief records product requirements. Read [Current Status](../current-status.md) for delivered behavior and remaining verification gaps.
 
 ## Product Goal
 
 Help Tim move a Linear ticket through requirements, reviewed planning, implementation, validation and a human-reviewed PR. Run both the native Codex SDK and Claude Agent SDK. Prefer simplicity and resilience over promptness. Do not require managed repositories to upgrade their frameworks or change their normal validation just to fit the assistant's execution host.
 
-The accepted interface answers three questions quickly: what needs Tim, what the agents are doing, and what happened while he was away. Home groups work into Needs You, Agents Working, Waiting on GitHub and Completed. A ticket shows a timeline, Now/Next status, agent activity, review rounds and the current human checkpoint. Implementation details belong in settings or diagnostics, not the main workflow.
+The interface answers three questions quickly: what needs Tim, what the agents are doing, and what happened while he was away. The current Home shows a Tickets list with a Needs Your Attention badge, plus Paused Work and Completed sections. Ticket pages show workflow status, agent activity, review rounds, history and human actions. The original prototype used Needs You / Agents Working / Waiting on GitHub groups and Now/Next summaries; those are historical design labels, not current UI labels. Implementation details belong in settings or diagnostics, not the main workflow.
 
 Build the observability application in SvelteKit and serve it from the Mia Mac mini at its Tailscale address, reachable from Tim's other computers. Code lives in the Code Assist repository. Changes published to `main` must be picked up and deployed automatically on the mini, preserving durable work across application updates. Tim authorized direct pushes to `main` in Code Assist during the initial build; this does not change approval and branch requirements for repositories managed by the assistant.
 
 ## First-Release Workflow
 
 1. Poll all pages of Linear issues with `Plan` and without `Code`. Use the stable issue UUID to maintain one tracked work record. Keep observing tracked work when its labels change; a partial poll cannot establish removal. On October 20, Tim requested marking tickets Removed and hiding them from Home when a returned ticket no longer has `Plan`. Preserve history and choices, pause pending attention prompts, and restore the record if `Plan` returns. The configured initial cadence is five minutes.
-2. Tim confirms all applicable repositories. On October 20, 2026, he expanded intake to a searchable multi-select, prefilled with suggestions and without explanatory suggestion cards. Saved choices take precedence. Cross-repository planning, execution dependencies and coordinated PRs remain to be implemented; selecting repositories does not approve GitOps changes.
+2. Tim confirms all applicable repositories through a searchable multi-select, prefilled with suggestions and without explanatory suggestion cards. Saved choices take precedence. Discovery and planning inspect all selected snapshots; coding implements repositories sequentially, validates candidates, and reviews them together before publishing separate PRs. Selecting repositories does not approve implementation or GitOps changes; exact-version plan approval does.
 3. Read the ticket and repository, ask needed questions in the application and persist the answers. `Plan` authorizes planning, not implementation. Do not automatically comment on Linear, change its labels or move tickets between states.
 4. Codex drafts a versioned plan; Claude reviews; Codex revises; Claude reviews again. Preserve every version and review. Before presentation, address all critical/high and most medium concerns; show remaining medium findings for Tim's decision. Do not invent a numeric meaning for “most.”
 5. Present the plan and receive feedback. Revise and review again until critical/high concerns are addressed. Tim approves the exact current plan version, bound to requirements and repository; stale approval must fail. Scope changes require new approval.
@@ -39,20 +39,22 @@ Preserve these behavioral requirements:
 
 Tim accepted at-least-once state-change notifications: save the event and notification intent in the same transaction, then post through the configured Power Automate endpoint. Keep `sent_at`, attempt count and safe error details; resend pending notifications on subsequent controller passes. Duplicate messages are acceptable. Include ticket, old/new state, step, reason, time and relevant links. HTTP success establishes webhook acceptance, not proven Teams receipt. Store destination credentials outside Git and out of agent subprocesses. No signed webhook URL is included in this handoff.
 
-## Mac Mini Requirements and Gaps
+## Mac Mini Requirements and Implementation
 
-| Area | Required outcome / decision still needed |
+The original decision areas below now have implementations. Remaining operational proof is distinguished from the selected approach; see [Current Status](../current-status.md) and the linked guides for evidence boundaries.
+
+| Area | Current Implementation and Remaining Verification |
 | --- | --- |
-| Execution | Both native SDKs must run the real repository toolchain. Prove an unchanged full validation before building the workflow UI. |
-| Docker | Tim explicitly wants Docker-backed validation. Select and verify a Mac-compatible container engine, including availability after restart. |
-| Workspace isolation | Separate attempts must not share working files, databases, Docker project/volume names, app ports or browser profiles. Verify the chosen arrangement with two stories; do not silently add a global concurrency cap. |
-| Process supervision | Workers need to continue without an open browser or terminal and recover after restart. Decide machine sleep, login/startup and process ownership; test the selected setup. |
-| Storage | Keep durable state, completed source commits and validation artifacts on persistent storage. Choose local locations and a backup/restore approach. |
-| Credentials | Define a local secret location and repository-specific test environment. Keep provider keys, GitHub authority, webhook credentials and browser auth state out of source and evidence. A private GitHub repository is not a secret store. |
-| Access | Tim only initially, from other computers over Tailscale at `100.91.0.83`. Verify and implement the identity/access boundary; tailnet membership alone does not establish that only Tim can access the application. |
-| Publishing | Separate trusted GitHub publication from model subprocesses. Enforce approval and expected-head checks; choose the local credential/process boundary and GitHub identity deliberately. |
-| UI stack | SvelteKit, using the accepted prototype design, served by the Mac mini. TypeScript is this repository's default language. |
-| Deployment | Automatically pick up published Code Assist `main` changes. Build separate releases; preserve PostgreSQL state, artifacts and workspaces across updates. Verify recovery during an active job. |
+| Execution | Native Codex and Claude SDKs run repository tooling in isolated coding guests; validation and acceptance evidence are tied to candidate commits. |
+| Docker | OrbStack hosts ticket-local Ubuntu guests with private Docker engines; full unattended machine-reboot recovery remains unverified. |
+| Workspace isolation | Separate ticket runs have separate guests, services, ports and browser profiles; selected repositories share one guest for paired acceptance. See [isolation proof](../concurrent-isolation-proof.md). |
+| Process supervision | launchd supervises host services; guest systemd units own coding processes. Step recovery is implemented; FileVault/pre-login recovery remains unverified. |
+| Storage | PostgreSQL, host Git checkpoints, logs and artifacts live outside releases. Completed guest cleanup preserves evidence. Backup/restore remains unproven. |
+| Credentials | Private host secret store, repository mappings and per-workspace environments are implemented. Publication credentials stay in the controller. |
+| Access | Direct Tailscale binding plus actual-peer owner checks; tailnet membership alone does not grant access. |
+| Publishing | Controller-owned GitHub writes require current approval, exact-commit evidence, publication intent and expected-head checks. |
+| UI stack | SvelteKit with shadcn-svelte components; TypeScript is the default language. |
+| Deployment | Main updater validates separate releases and preserves durable state. Agent operators must verify Mia is idle immediately before pushes or restarts; recovery does not waive that requirement. |
 
 ## Browsers and Repository Services
 
@@ -62,14 +64,14 @@ For UI work, exercise approved acceptance scenarios, inspect rendering and relev
 
 Use repository-owned setup and validation commands. Record them in the repository manifest rather than assuming universal commands or ports. Give each workspace a deliberate test environment separate from the assistant service environment; do not inherit deployment settings accidentally.
 
-For migration conflicts, preserve the updated base history and intended schema change. Regenerate only this ticket's unmerged generated migration additions using that repository's installed tooling. Do not discard handwritten SQL, data migrations or already-applied history. Revalidate and rereview the rebased commit.
+For migration conflicts, preserve the updated base history and intended schema change. Regenerate only this ticket's unmerged generated migration additions using that repository's installed tooling. Do not discard handwritten SQL, data migrations or already-applied history. Revalidate and rereview the resulting candidate commit. The implemented Bring In Main action merges a pinned main commit into the feature branch; it does not rebase or rewrite published history.
 
-## Delivery Sequence
+## Original Delivery Sequence
 
 1. Prove one real repository on the Mac: restore a known commit, set up its environment/services, run unchanged full validation, and exercise browsers through both SDKs. Verify resource use, isolation and interruption behavior.
 2. Deliver intake, durable questions/answers, plan/review versions, exact-version approval and notifications together.
 3. Deliver implementation, code review, browser evidence, guarded PR publication, feedback/rebase handling and merge observation.
 
-Remaining product decisions: interruption of active agent work after label removal, how Tim accepts medium plan findings, how non-converging reviews request help, and remaining Mac access/secret/process arrangements. Keep these visible instead of inventing controls.
+The core workflow in these phases is implemented. The original feedback/rebase goal is only partially delivered: Tim can request code changes and explicitly Bring In Main through a merge, while automatic GitHub review-comment ingestion and automatic rebase/revalidation remain unimplemented. Label/input changes supersede obsolete attempts; pending results cannot advance them. Tim explicitly accepts each remaining medium plan finding before approval. Reviews can request human direction, without a review-round quota. Access, secret storage and process ownership are implemented as described above. Remaining work and operational proof are tracked in [Current Status](../current-status.md).
 
 Do not add a broker, cache, automatic provider fallback, global concurrency cap, review-round budget or arbitrary shorter timeout to v1. New controls require a demonstrated need and Tim's approval. Optional optimizations and controls introduced by this document: none.

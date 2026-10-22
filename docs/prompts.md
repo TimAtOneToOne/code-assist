@@ -4,7 +4,8 @@ Open **Configuration → Prompt Management** on Mia at
 <http://100.91.0.83:3000/configuration/prompts>.
 
 The editor exposes shared instructions and the actual task instructions used by
-Codex discovery, Codex plan drafting/revision, and Claude adversarial review.
+Codex discovery, Codex plan drafting/revision, and Claude adversarial plan review,
+plus shared coding-phase instructions used by implementation and code review.
 The default global prompt requests Title Case for document titles, section
 headings, and proposed UI titles, including “Adversarial Planning” and “Status and
 Evidence.” Ordinary prose remains sentence case.
@@ -29,7 +30,7 @@ correctness, authorization, security, and data-integrity requirements still appl
 | --- | --- |
 | Global | Every implemented agent step |
 | Planning | Initial discovery, plan drafting/revision, and adversarial review |
-| Coding | Saved for the future coding runner; currently unused |
+| Coding | Codex implementation/revision and Claude code review |
 | Agent Task | Discovery, drafting, or review, depending on the step |
 | Repository Global | The named repository in every phase |
 | Repository Planning / Coding | The named repository in the corresponding phase |
@@ -56,7 +57,7 @@ additional text.
 The worker loads settings when each agent step starts, including retries. Saving
 does not restart agents, revise existing plans, or invalidate recorded approvals.
 A running step retains its assembled prompt. Each execution's full assembled
-prompt is saved in the existing `discovery.input` or `planning.input` log artifact.
+prompt is saved in the `discovery.input`, `planning.input`, or `coding.input` log artifact.
 This is execution evidence, not an editable prompt-history interface.
 
 Prompt editing uses the existing owner-only settings access check and SvelteKit
@@ -71,7 +72,9 @@ directly, while preserving read-only planning and human-only merges and applies.
 This workflow-specific exception takes precedence over generic separate-approval
 instructions in repository evidence.
 
-Skills and agent-definition management are not included. Coding prompts are
-editable now, but need to be connected when the coding phase is implemented.
+Skills and agent-definition management are not included. Coding uses global,
+coding-phase and repository instructions together with controller-owned task,
+approval, checkpoint, acceptance and reply context. The discovery/drafting/plan-review
+task overrides do not replace the controller's coding task instructions.
 
 Optional optimizations and controls: none.

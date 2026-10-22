@@ -7,6 +7,10 @@ Repositories: `windmill`, `windmill-work`
 
 Record each intervention honestly. A run completed with operator repairs is not proof of unattended operation. Derive a reusable pattern after observing this run; do not silently introduce blanket retries or source-integrity exceptions.
 
+## Reading This Historical Record
+
+This document preserves the observations and interventions from ONE-5239 in sequence. Statements about open PRs, missing forks and missing controller capabilities describe their respective milestones, not a fresh live-state check. Later sections record the manual fork recovery and successful small-file upload. On October 22, source commit `f21c951` added [native controller fork publication](coding.md#windmill-production-fork-publication); its first real approved controller-driven publication remains unverified in the checked-in record. Consult [Current Status](current-status.md) before treating these earlier limitations as outstanding implementation work.
+
 ## 1. Terraform Validation Mutated Tracked Lockfiles
 
 - Failed step: `5e300f0c-0558-4de1-ab25-192e027f93f9` (validation).

@@ -1,12 +1,24 @@
-# Durable worker
+# Durable Worker
 
-Code Assist uses pg-boss 12.38.0 in `apps/worker`, running as a separate native Node process with PostgreSQL 18 on Mia. Tim selected pg-boss on October 19, 2026. SvelteKit remains the UI; HTTP requests will record commands, not execute agents.
+Code Assist uses pg-boss 12.38.0 in `apps/worker`, running as a separate native Node process with PostgreSQL 18 on Mia. Tim selected pg-boss on October 19, 2026. SvelteKit records commands and displays state; the worker executes long-running agent work outside HTTP requests.
 
-The worker runs [Linear intake and attention notifications](intake.md) and [initial Codex discovery](discovery.md). The original diagnostic workflow remains available:
+`apps/worker/src/main.ts` registers the following workflows:
+
+| Queue | Purpose |
+| --- | --- |
+| `linear-intake`, `attention-notification` | [Ticket polling and durable attention delivery](intake.md) |
+| `initial-discovery` | [Codex investigation and saved scope questions](discovery.md) |
+| `adversarial-planning` | [Alternating Codex/Claude planning and exact-version approval](planning.md) |
+| `approved-coding` | [Workspace preparation, implementation, checkpoints, validation, review, and publication](coding.md) |
+| `github-pr-refresh` | PR/main-workflow observation and scoped corrective-work initiation |
+| `repository-setup-test` | [Disposable runtime profile tests](repository-setup.md) |
+| `completed-workspace-cleanup` | [Eligible completed guest cleanup with retained evidence](coding.md#completed-workspace-cleanup) |
+
+The original diagnostic workflow also remains available:
 
 `queued → waiting for confirmation → confirmed → completed`
 
-The probe exercises job creation, execution, a human-style wait, explicit continuation and durable history. Probe confirmation is an operator CLI command, separate from ticket repository selection and the future plan-approval API. The probe does not run models, approve a plan or publish a PR.
+The probe exercises job creation, execution, a human-style wait, explicit continuation and durable history. Probe confirmation is an operator CLI command, separate from ticket repository selection and plan approval. The probe does not run models, approve a plan or publish a PR.
 
 ## State and transaction boundaries
 
@@ -19,7 +31,7 @@ The `code_assist` database is owned by the local `code_assist` role, which is no
 - A probe handler uses pg-boss's native transactional worker so its state change, event and job completion commit together.
 - Waiting leaves no active job. Confirmation creates a new job, using a locked state check so a repeated confirmation cannot enqueue a second continuation.
 
-The probe handlers only execute SQL. Future agent/network steps must run outside transactions and commit their result, event and next job in a short transaction after validating the current attempt. Do not extend the probe's transactional callback to contain an agent call.
+The bullets above describe the diagnostic probe. Production ticket workflows have their own intake, discovery, planning, coding, setup-test and outbox records; see their linked guides. Agent/network steps run outside transactions and commit results, events and continuations in short transactions after validating the current attempt. Probe handlers only execute SQL; do not extend their transactional callback to contain an agent call.
 
 ## Runtime and defaults
 
@@ -29,7 +41,11 @@ The diagnostic queue explicitly sets `retryLimit: 0`, matching the brief's visib
 
 These are diagnostic-queue settings, not a global ticket concurrency policy or an agent execution budget. Discovery also uses native queue defaults and explicit failure/manual Retry. Its reconciliation detects missing worker PIDs and expired jobs; durable application history retains questions and answers after queue retention. Queue durability does not provide exactly-once external effects.
 
-`SIGTERM` and `SIGINT` terminate the discovery runner's owned subprocesses, abort the native SDK and checkpoint a replacement attempt with captured repository snapshots. Native `offWork()` waits for discovery, probe, intake and attention handlers before closing pg-boss. The updater sends `SIGTERM` after activating a release; launchd starts the replacement when the old worker exits. Web and worker may briefly report different releases during draining. The LaunchAgent retains macOS shutdown defaults: machine shutdown or unloading the service may terminate a handler before it finishes, leaving its uncommitted transaction rolled back. See [discovery recovery](discovery.md#recovery-and-subprocess-ownership) for cleanup scope and limits.
+Coding jobs have Tim's approved 60-minute expiration per step. Checkpoint and evidence-collection jobs additionally allow two retries with a ten-second delay to recover saved output. Other stages do not inherit these retries: validation findings can return to implementation, while execution failures expose recovery actions. These settings are local to those jobs, not a global retry or concurrency policy. See [coding recovery](coding.md#recovery-and-publication) for receipts, checkpoint replay and process ownership.
+
+`SIGTERM` and `SIGINT` signal active handlers. Discovery/planning runners clean up owned subprocesses and checkpoint replacement work; coding uses owned guest systemd units and saved stage results. Native `offWork()` unregisters setup-test, coding, cleanup, GitHub, planning, discovery, probe, intake and attention workers before pg-boss closes. The updater sends `SIGTERM` after activating a release; launchd starts the replacement when the old worker exits. Web and worker may briefly report different releases during draining. Machine shutdown or unloading a service can interrupt recovery. See [discovery recovery](discovery.md#recovery-and-subprocess-ownership) and [coding recovery](coding.md#recovery-and-publication) for limits.
+
+Immediately before a push or restart that deploys Code Assist, operators must verify no active workflow or queued continuation remains. Recovery support does not waive this check. The worker process normally stays running; process existence alone does not establish active work or idleness.
 
 ## Operations
 
@@ -50,7 +66,7 @@ For an existing web installation, provision the database and runtime setting fir
 
 ## Verification
 
-`make verify` checks formatting, lint, application types, web tests and the web build. Node runs the worker's TypeScript directly. `skipLibCheck` skips third-party declaration internals because pg-boss 12.38.0 publishes references to an omitted internal type; our application and its calls to the public API remain type-checked. No dependency patch or custom transaction adapter is used.
+`make verify` runs formatting/lint and type checks across the apps, packages and ops, unit tests for ops, web, observability, secrets and intake, then the production web build. PostgreSQL, live-browser and OrbStack integration suites are separate targets; worker and browser packages do not have unit-test suites in the root test command. Node runs the worker's TypeScript directly. `skipLibCheck` skips third-party declaration internals because pg-boss 12.38.0 publishes references to an omitted internal type; our application and its calls to the public API remain type-checked. No dependency patch or custom transaction adapter is used.
 
 Run the PostgreSQL integration test separately:
 
@@ -60,7 +76,7 @@ TEST_DATABASE_URL=postgresql://<local-admin>@127.0.0.1:5432/postgres make test-w
 
 The test creates a uniquely named disposable database and removes only that database afterward. It proves queued work is consumed, waiting survives a killed worker, confirmation survives worker downtime, a new release completes the continuation, duplicate confirmation is rejected, state/event failure rolls back completion, explicit retry succeeds, enqueue rolls back with application state, and SIGTERM waits for an active SQL handler without claiming the next job.
 
-Discovery implements attempt fencing, additive migrations, owned-process cleanup and saved human checkpoints. Full planning/implementation still needs exact-version plan approvals, GitHub-write reconciliation and database backup/restore. No claim is made that an active Codex/Claude process survives deployment or a full machine reboot.
+Discovery, planning and coding implement attempt checks, exact-version approvals, saved human checkpoints and guarded GitHub-write reconciliation. `make test-intake` covers their PostgreSQL integration fixtures separately from the diagnostic suite. Database backup/restore and full machine reboot recovery remain unproven. Checkpoint recovery does not mean an active Codex/Claude process survives a deployment.
 
 ### Initial installation evidence — October 19, 2026
 

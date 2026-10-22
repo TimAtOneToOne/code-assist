@@ -16,7 +16,7 @@ Open **Configuration → Repository Setup** to search synced repositories and ed
 - **Generate Fresh Values Per Workspace:** variable names that receive independent random 32-byte hex values, such as `BETTER_AUTH_SECRET`.
 - **Instructions for Coding Agents:** repository-specific runtime guidance, included alongside the startup/readiness/smoke commands in coding prompts.
 
-Scripts run through Bash with error/unset-variable checking. Commands other than Additional System Dependencies run as the workspace user through the same environment launcher used for coding. All execution happens in the isolated guest, including its private container engine; host repositories are read only to export the pinned Git commit.
+Scripts run through Bash with error/unset-variable checking. Additional System Dependencies and the provisioner's `playwright install-deps chromium` OS dependency step run as root inside the guest. Repository setup, browser binary installation, validation and app/smoke commands run as the workspace user through the same environment launcher used for coding. All execution happens in the isolated guest, including its private container engine; host repositories are read only to export the pinned Git commit.
 
 ## Test Setup
 
@@ -24,17 +24,17 @@ Scripts run through Bash with error/unset-variable checking. Commands other than
 
 Results show the tested commit, whether the profile matches the current saved setup, each executed check, omitted app/browser checks, failure stage, and a link to central workspace logs. **Refresh Results** fetches progress. The machine is deleted after success or failure; logs, profile snapshots, and result history remain. Guest-local files are removed with the machine. Cleanup failures have a **Retry Cleanup** action.
 
-Tests use the coding workflow's one-hour job expiration and explicit retry approach. Worker interruption marks an active test failed, preserves its result, and cleans up its machine on restart. Run Test Setup again to repeat a test. A passing result means the configured checks passed; it does not certify an omitted authentication flow or feature-specific acceptance tests.
+Tests use the coding workflow's one-hour job expiration and explicit retry approach. Worker interruption marks an active test failed, preserves its result, and cleans up its machine on restart. Select **Save and Test Setup** again to repeat a test using the saved form values. A passing result means the configured checks passed; it does not certify an omitted authentication flow or feature-specific acceptance tests.
 
 ## Coding Integration
 
-Saved profiles live in `CODE_ASSIST_DATA_DIR/repository-setups.json` (mode 0600), keyed by the original synced repository path. New coding workspaces use them even when source is exported from a controller-owned checkpoint repository. The exact profile is retained in the workspace manifest and in the guest's root-owned `/etc/code-assist/profiles.json`. Coding prompts and validation use this pinned profile, so editing settings does not change a running workspace. Existing workspaces created before profiles were saved retain their built-in behavior.
+Saved profiles live in `CODE_ASSIST_DATA_DIR/repository-setups.json` (mode 0600), keyed by the original synced repository path. New coding workspaces use them even when source is exported from a controller-owned checkpoint repository. The exact profile, including Local Environment Overrides, is retained in the workspace manifest and in the guest's root-owned, world-readable `/etc/code-assist/profiles.json` (mode 0644). Mapped secrets and generated environment values are stored separately in private environment files. Coding prompts and validation use this pinned profile, so editing settings does not change a running workspace. Existing workspaces created before profiles were saved retain their built-in behavior.
 
 The setup-test records are in `code_assist.repository_setup_test`; the worker consumes `repository-setup-test`. Tests run the same provisioning function as coding, without fabricating a plan approval. Approved coding work still checks the current exact plan before and after provisioning.
 
 ## Current Ticket Repositories
 
-Profiles are saved on Mia for the six repositories selected across the current ticket set. Edit them in the UI; the saved configuration and each setup test's frozen copy are the source of truth.
+The October 20 setup record covers saved profiles on Mia for these six repositories. This table is a dated configuration summary, not a fresh live inventory. Edit profiles in the UI; the saved configuration and each setup test's frozen copy are the source of truth.
 
 | Repository | Runtime and Local Services | Validation |
 | --- | --- | --- |

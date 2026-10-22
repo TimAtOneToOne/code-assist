@@ -1,6 +1,8 @@
-# Browser testing on Mia
+# Browser Testing on Mia
 
-Coding agents running as `miasocci` use the official [Microsoft Playwright MCP server](https://github.com/microsoft/playwright-mcp), registered as **`playwright`** in Codex CLI and Claude Code. It launches native headless Chromium on Mia, which can reach local applications and Tailscale URLs, including `http://100.91.0.83:3000`.
+The automated [coding workflow](coding.md) supplies the official Playwright MCP server explicitly to both SDKs inside each ticket's isolated OrbStack guest. Guest localhost is that ticket's application; browser output and screenshots are retained with its coding evidence. The host CLI registration below is for operator sessions on Mia, not configuration inherited by isolated SDK runs.
+
+Operator-launched sessions running as `miasocci` use the official [Microsoft Playwright MCP server](https://github.com/microsoft/playwright-mcp), registered as **`playwright`** in Codex CLI and Claude Code. It launches native headless Chromium on Mia, which can reach local applications and Tailscale URLs, including `http://100.91.0.83:3000`.
 
 Each client starts its own server over stdio when needed. There is no listening MCP port or separate login service. `--isolated` gives each server a fresh browser profile; cookies and local storage disappear when the browser closes. This isolates browser state, not operating-system access or the applications being tested.
 
@@ -31,7 +33,7 @@ MCP="$HOME/Library/Application Support/CodeAssist/current/packages/browser-mcp/n
 
 Inspect with `~/.local/bin/codex mcp get playwright --json` and `~/.local/bin/claude mcp get playwright`.
 
-The future Code Assist SDK runner must explicitly supply this stdio server to both SDKs, particularly with an isolated HOME. Use the attempt's workspace as cwd and a distinct attempt output directory; do not share a server between attempts. SDK execution, interruption/recovery and browser evidence integration with central logs are not implemented yet.
+The coding SDK runner supplies its own guest-local stdio server to both SDKs with the isolated workspace environment. It records browser tool calls and saved evidence, and stops owned browser/SDK/shell processes through guest systemd units. Missing browser evidence has a dedicated Run Browser Checks recovery action; evidence transfer can retry from saved output. See [Coding](coding.md) for exact-commit evidence requirements and recovery limits. The host registration is not used by read-only discovery or planning.
 
 ## Agent usage
 

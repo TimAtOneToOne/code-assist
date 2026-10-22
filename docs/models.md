@@ -31,6 +31,6 @@ suggested or operator-entered model.
 
 Optional optimizations and controls: operator-selected model IDs, requested by
 Tim, prevent SDK default changes from silently selecting another model. They
-apply to new discovery/planning steps; changing the selection is an explicit UI
+apply to new discovery, planning and coding steps; changing the selection is an explicit UI
 action. Provider revisions behind those model IDs can still change. No additional
 optional controls were introduced.

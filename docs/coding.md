@@ -1,6 +1,6 @@
 # Coding Workflow
 
-Approved plans enter the `approved-coding` pg-boss queue. Repository setup profiles currently cover `internal-chat-ui`, `elation_companion`, and `workplace-agents`. An unsupported repository produces a visible preparation failure rather than silently leaving an approved plan idle.
+Approved plans enter the `approved-coding` pg-boss queue. [Repository Setup](repository-setup.md) supplies editable, saved runtime profiles; `internal-chat-ui`, `elation_companion`, and `workplace-agents` also have built-in defaults. Other repositories can run through a configured profile. A repository with no saved profile or built-in default produces a visible preparation failure rather than silently leaving an approved plan idle.
 
 ## Lifecycle
 
@@ -44,7 +44,7 @@ Publication runs from Mia's login-session worker, where the operator's GitHub ke
 
 ## GitHub PR and Main Workflow Tracking
 
-The existing `github-pr-refresh` pg-boss queue checks published, unfinished coding runs every five minutes, independently of Linear intake. The worker uses Mia’s login-session GitHub CLI credentials. Home’s **Refresh GitHub** queues a check of unfinished runs; the ticket button checks a specific run, including completed work. Use **Refresh** to reload the observed result.
+The existing `github-pr-refresh` pg-boss queue checks published, unfinished coding runs every five minutes, independently of Linear intake. The worker uses Mia’s login-session GitHub CLI credentials. Home’s **Refresh GitHub** queues a check of unfinished runs; the ticket's **Check GitHub** action checks a specific run, including completed work. Use **Refresh View** in the coding actions dropdown to reload the observed result.
 
 Each repository retains its own PR, merge commit, workflow runs and observation timestamp. A multi-repository ticket reaches Done only when every repository satisfies the completion rule. A merge saves the PR’s merge commit and time. **Done** requires the PR to have merged into `main`, at least one matching workflow, and success for every observed GitHub Actions run with `event=push`, `head_branch=main`, and that exact merge SHA. This is repository-independent: PR checks, manual workflows, unrelated commits, and separate production promotions cannot satisfy the rule. No matching run means **Waiting for Main Workflow**; pending runs mean **Main Workflows Running**. Non-success terminal conclusions, including cancelled or skipped workflows, mean **Main Workflow Failed**. Done and active states are green; failures and closed-unmerged PRs are yellow. The detail page links each workflow and shows its attempt and outcome.
 
@@ -62,11 +62,11 @@ The new run provisions its own isolated OrbStack workspace from the failed merge
 
 A justified code fix follows the same implementation → lint/type checks/tests/build → Claude review loop. It opens a fresh `feature/<ticket>-main-fix-<run-id>` branch and corrective PR, preserving the merged PR and never reusing its branch. Tim merges; agents do not dispatch deployment workflows or deploy. The corrective PR must merge and its own main workflows must succeed before the current ticket shows Done. Old failures remain visible as history. Removed or superseded approvals still permit observation, but do not authorize automatic repair.
 
-For multi-repository runs, repair targets one failed repository at a time while retaining the other candidate checkouts and their PR outcomes. Combined review still covers the pair. A new corrective PR replaces only the failed repository’s completion requirement; every other repository must also complete. Workspaces and evidence remain on disk for deliberate operator cleanup. Automatic ingestion of GitHub review comments and automatic rebase/revalidation remain unimplemented.
+For multi-repository runs, repair targets one failed repository at a time while retaining the other candidate checkouts and their PR outcomes. Combined review still covers the pair. A new corrective PR replaces only the failed repository’s completion requirement; every other repository must also complete. Failed and active workspaces are retained; eligible completed guests use the [completed workspace cleanup](#completed-workspace-cleanup) workflow while host checkpoints and evidence remain. Automatic ingestion of GitHub review comments and automatic rebase/revalidation remain unimplemented. Requested Code Changes and Bring In Main below are explicit user actions.
 
 ## Requested Code Changes
 
-At the bottom of a ticket with current open PRs, **Requested Code Changes** lets Tim submit refinements to the implementation. Submission saves the request, owner, time, original PR URLs and published commits with the next pg-boss implementation step in one transaction. Duplicate or stale submissions cannot start a second revision. Earlier requests, plans, steps and evidence remain available.
+For a ticket with current open PRs, **Request Code Changes** in the coding actions dropdown opens a **Request Changes** form for refinements to the implementation. Submission saves the request, owner, time, original PR URLs and published commits with the next pg-boss implementation step in one transaction. Duplicate or stale submissions cannot start a second revision. Earlier requests, plans, steps and evidence remain available.
 
 Codex resumes the saved workspace and branch. The usual checkpoint, evidence collection, validation and Claude review loop runs again, sequentially across repositories where applicable. Every step carries the request ID: old validation and reviews cannot authorize a new revision even if its commit is unchanged. Material scope changes still require a revised approved plan. Closed or merged PRs cannot be revised through this action.
 
@@ -78,7 +78,7 @@ Optional optimizations and controls: none. Request binding, PR ownership and exp
 
 ## Missing Browser Evidence
 
-Missing browser evidence is reported as **Browser Checks Needed**. **Run Browser Checks** starts a fresh Codex attempt from the saved checkpoint; it does not replay the incomplete result. Even a no-code-change attempt must perform its browser checks. Evidence transfer failures with a valid browser receipt still retry collection without rerunning the agent.
+Missing browser evidence appears in an alert with a **Run Browser Checks** action. That action starts a fresh Codex attempt from the saved checkpoint; it does not replay the incomplete result. Even a no-code-change attempt must perform its browser checks. Evidence transfer failures with a valid browser receipt still retry collection without rerunning the agent.
 
 ## Replies to Coding Questions
 
@@ -88,7 +88,7 @@ The agent continues from the existing workspace and checkpoints. Multiple reposi
 
 ## Bring In Main
 
-**Bring In Main**, under Requested Code Changes, starts a normal code revision for open PRs. It can also resume a blocked code revision that already has an open PR. Existing checkpoints and feedback remain intact; a blocked revision retains its recorded published head separately from any newer unpublished checkpoint.
+**Bring In Main**, a separate item in the coding actions dropdown, starts a normal code revision for open PRs. It can also resume a blocked code revision that already has an open PR. Existing checkpoints and feedback remain intact; a blocked revision retains its recorded published head separately from any newer unpublished checkpoint.
 
 The controller fetches `main` into a request-specific Git ref in each host bare repository and supplies a bundle to the guest. No GitHub credentials enter the guest. Each repository's main commit is pinned when its implementation starts and reused on retry. Codex merges that local ref using `--no-commit --no-ff`, resolves conflicts while preserving upstream changes, and runs checks. The controller saves the merge commit, including both parents even when the merge has no tree changes. Unresolved conflicts are preserved and cannot be checkpointed as resolved code.
 
