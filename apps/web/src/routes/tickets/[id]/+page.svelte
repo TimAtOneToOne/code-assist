@@ -52,9 +52,10 @@
 
 <svelte:head><title>{data.item.ticket.identifier} · Code Assist</title></svelte:head>
 <a class="mb-5 inline-block text-sm text-muted-foreground" href={resolve('/')}>← Home</a>
-<div class="ticket-header mb-6">
-	<div class="flex items-baseline justify-between gap-4">
-		<div class="eyebrow">{data.item.ticket.identifier}</div>
+<div class="ticket-header mb-8">
+	<h1>{data.item.ticket.title}</h1>
+	<div class="mt-4 flex items-baseline justify-between gap-4 text-sm text-muted-foreground">
+		<span class="ticket-identifier">{data.item.ticket.identifier}</span>
 		<!-- eslint-disable svelte/no-navigation-without-resolve -- Linear URLs are external. -->
 		<a
 			href={data.item.ticket.url}
@@ -64,7 +65,6 @@
 		>
 		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 	</div>
-	<h1>{data.item.ticket.title}</h1>
 	{#if data.item.removed_at || labels.length}
 		<div class="mt-4 flex flex-wrap gap-2">
 			{#if data.item.removed_at}<Badge variant="outline">Removed</Badge>{/if}
