@@ -10,18 +10,18 @@ Discovery and planning use recorded source snapshots and read-only agent access.
 
 ## Implemented Workflow
 
-| Area | Current Behavior | Details |
-| --- | --- | --- |
-| Intake | Paginated Linear discovery for Plan without Code; saved multi-repository selection; removal/restoration preserves history; no automatic Linear writes | [Intake](intake.md) |
-| Discovery | Codex reads pinned snapshots; findings, questions, answers, explicit scope confirmation, retries, and stale-attempt rejection | [Discovery](discovery.md) |
-| Planning | Codex drafts/revises; Claude reviews; immutable plan versions; feedback, direction, plan comparisons, and exact-version approval with explicit acceptance of remaining medium findings | [Planning](planning.md) |
-| Repository Setup | Editable runtime profiles, secret mappings, pinned local Git dependencies, and disposable setup/validation/browser tests; three built-in defaults plus saved profiles | [Repository Setup](repository-setup.md), [Secrets](secrets.md) |
-| Coding | Sequential multi-repository implementation; saved checkpoints and evidence; repository validation; unchanged repeated validation failures pause for direction; combined Claude review; critical/high/medium findings return to implementation | [Coding](coding.md) |
-| Human Follow-Up | Replies to coding questions, requested changes to owned open PRs, explicit Bring In Main, fresh evidence for revisions, and Run Browser Checks recovery | [Coding](coding.md) |
-| Publication | Exact-commit validation/review checks, durable publication intents, remote-head checks and retry reconciliation, separate PRs for selected repositories; private-tool links and attribution omitted from external templates | [Coding](coding.md#external-publication-privacy) |
-| Windmill Work | Controller-owned native production-workspace fork creation, ticket fork branches, exact-commit Git Sync evidence, and native PR adoption; latest addition in `f21c951` | [Windmill Publication](coding.md#windmill-production-fork-publication) |
-| GitHub Completion | PR/merge monitoring; every repository needs observed successful push-to-main workflows for its exact merge commit; scoped corrective coding for failed main workflows | [Coding](coding.md#github-pr-and-main-workflow-tracking) |
-| Operations | Owner-only Tailscale access, Home updates through PostgreSQL notifications/SSE, central logs/artifacts, Teams attention outbox, automatic main deployment, and completed-workspace cleanup after 24 hours with retained evidence | [Deployment](deployment.md), [Worker](worker.md), [Logging](logging.md) |
+| Area              | Current Behavior                                                                                                                                                                                                                              | Details                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Intake            | Paginated Linear discovery for Plan without Code; saved multi-repository selection; removal/restoration preserves history; no automatic Linear writes                                                                                         | [Intake](intake.md)                                                     |
+| Discovery         | Codex reads pinned snapshots; findings, questions, answers, explicit scope confirmation, retries, and stale-attempt rejection                                                                                                                 | [Discovery](discovery.md)                                               |
+| Planning          | Codex drafts/revises; Claude reviews; immutable plan versions; feedback, direction, plan comparisons, and exact-version approval with explicit acceptance of remaining medium findings                                                        | [Planning](planning.md)                                                 |
+| Repository Setup  | Editable runtime profiles, secret mappings, pinned local Git dependencies, and disposable setup/validation/browser tests; three built-in defaults plus saved profiles                                                                         | [Repository Setup](repository-setup.md), [Secrets](secrets.md)          |
+| Coding            | Sequential multi-repository implementation; saved checkpoints and evidence; repository validation; unchanged repeated validation failures pause for direction; combined Claude review; critical/high/medium findings return to implementation | [Coding](coding.md)                                                     |
+| Human Follow-Up   | Replies to coding questions, requested changes to owned open PRs, explicit Bring In Main, fresh evidence for revisions, and Run Browser Checks recovery                                                                                       | [Coding](coding.md)                                                     |
+| Publication       | Exact-commit validation/review checks, durable publication intents, remote-head checks and retry reconciliation, separate PRs for selected repositories; private-tool links and attribution omitted from external templates                   | [Coding](coding.md#external-publication-privacy)                        |
+| Windmill Work     | Controller-owned native production-workspace fork creation, ticket fork branches, exact-commit Git Sync evidence, and native PR adoption; latest addition in `f21c951`                                                                        | [Windmill Publication](coding.md#windmill-production-fork-publication)  |
+| GitHub Completion | PR/merge monitoring; every repository needs observed successful push-to-main workflows for its exact merge commit; scoped corrective coding for failed main workflows                                                                         | [Coding](coding.md#github-pr-and-main-workflow-tracking)                |
+| Operations        | Owner-only Tailscale access, Home updates through PostgreSQL notifications/SSE, central logs/artifacts, Teams attention outbox, automatic main deployment, and completed-workspace cleanup after 24 hours with retained evidence              | [Deployment](deployment.md), [Worker](worker.md), [Logging](logging.md) |
 
 Exact-version approval authorizes implementation and publication for the confirmed scope, including described GitOps work inside Code Assist. Changed scope requires a revised approved plan. Agents never merge PRs, enable auto-merge, apply Terraform, or initiate managed infrastructure deployment. Windmill test-fork publication is distinct from parent production publication.
 
@@ -45,18 +45,25 @@ and the repository's `AGENTS.md`. Optional optimizations and controls: none.
 
 ## Code Map
 
-| Location | Responsibility |
-| --- | --- |
-| `apps/web/src/routes` and `apps/web/src/lib/components` | Home, ticket timeline/actions, configuration, logs, and workflow UI |
-| `apps/worker/src/main.ts` | Registers setup, intake, notification, discovery, planning, coding, GitHub, cleanup, and diagnostic workers |
-| `packages/intake/src/store.ts`, `discovery*.ts`, `planning*.ts`, `coding*.ts` | PostgreSQL workflow state, durable jobs, provider execution, approval checks, recovery, and publication |
-| `packages/intake/src/github*.ts`, `windmill-publication.ts` | GitHub observations and completion; Windmill fork publication |
-| `packages/intake/src/workspace*.ts`, `repository-*.ts` | Guest provisioning, repository profiles, environment isolation, and setup tests |
-| `packages/observability`, `packages/secrets`, `packages/browser-mcp` | Logs/artifacts, private secret storage, and browser integration package/tests |
-| `ops` | launchd installation, release builds/activation, release cleanup, and runtime probes |
+| Location                                                                      | Responsibility                                                                                              |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/routes` and `apps/web/src/lib/components`                       | Home, ticket timeline/actions, configuration, logs, and workflow UI                                         |
+| `apps/worker/src/main.ts`                                                     | Registers setup, intake, notification, discovery, planning, coding, GitHub, cleanup, and diagnostic workers |
+| `packages/intake/src/store.ts`, `discovery*.ts`, `planning*.ts`, `coding*.ts` | PostgreSQL workflow state, durable jobs, provider execution, approval checks, recovery, and publication     |
+| `packages/intake/src/github*.ts`, `windmill-publication.ts`                   | GitHub observations and completion; Windmill fork publication                                               |
+| `packages/intake/src/workspace*.ts`, `repository-*.ts`                        | Guest provisioning, repository profiles, environment isolation, and setup tests                             |
+| `packages/observability`, `packages/secrets`, `packages/browser-mcp`          | Logs/artifacts, private secret storage, and browser integration package/tests                               |
+| `ops`                                                                         | launchd installation, release builds/activation, release cleanup, and runtime probes                        |
 
 ## Remaining Gaps and Evidence Boundaries
 
+- The October 23 ONE-5321 rehearsal completed a synthetic single-repository
+  feature through planning, approved coding, Playwright acceptance, independent
+  review, PR revision, operator-authorized test-repo merge, successful push CI on
+  the exact merge commit, and observed Done. Fresh setup and merged-commit browser
+  checks also passed. It exposed missing guest Chromium OS dependencies and the
+  organization's full-SHA Action policy; the test profile and PR were corrected.
+  See [the rehearsal record](one-5321-rehearsal.md) for scope and evidence limits.
 - Automatic ingestion of GitHub review comments and automatic rebase/revalidation are not implemented. Request Code Changes and Bring In Main are explicit user actions.
 - The latest native Windmill fork publisher has local Git tests with synthetic service responses and documented live read-only configuration inspection. Its first real approved controller-driven fork publication remains unverified in the checked-in record. Git Sync success proves source synchronization, not feature acceptance or provisioning of excluded resources, triggers, variables, or datatables.
 - ONE-5239's manual fork recovery and successful small-file hosted upload are historical evidence, not proof that the new controller path ran. See [the run findings](one-5239-run-findings.md); the deferred 25 MB test and full non-admin acceptance are separate limitations.
