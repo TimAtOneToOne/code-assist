@@ -61,6 +61,66 @@ Local development permits loopback access and uses the repository's gitignored `
 
 Before pushing Code Assist `main` or triggering any deployment/restart, inspect live pg-boss jobs, queued continuations, agent steps, and associated processes. Hold the change while work is active or cannot be verified. This applies to documentation-only pushes too. Worker recovery and draining do not replace the operator's immediate pre-deployment idle check; the updater itself does not implement that check.
 
+### Deployment Status
+
+Use the read-only operator command from the local repository:
+
+```sh
+make deploy-status
+make deploy-status EXPECTED_COMMIT=<full-pushed-sha>
+make deploy-status JSON=1
+```
+
+The first command is the immediate pre-push inspection. The second verifies the
+expected release after publication. Each invocation makes one SSH connection to
+Mia, using the existing local `.env` password configuration and strict SSH host-key
+verification. Credentials are passed only through the child process environment.
+On Mia, use `make deploy-status LOCAL=1` from the active release instead.
+
+The collector reports the selected release, actual web and worker releases from
+their launchd PIDs and working directories, web HTTP health, updater PID and last
+exit code, and the updater's last fetched main commit. JSON also includes staging
+directory names; an old staging directory alone does not establish an active build.
+It reads current pg-boss jobs, including future-dated continuations, and current
+unfinished discovery/planning/coding/setup steps in a read-only database snapshot.
+Human waits are not active steps. Superseded historical steps alone do not establish
+activity; their queued jobs and surviving processes are still inspected.
+
+Host inspection checks service descendants and processes associated with the
+installation's paths, excluding the collector itself and unrelated applications.
+Running `ca-*` guests are inspected for active/starting/stopping `ca-step-*` systemd
+units and recognizable agent/validation runners. Stopped guests are not contacted.
+Normal guest services and the known setup preview service are not active agent work.
+Raw process arguments, provider credentials, job payloads, and runtime configuration
+values are omitted from the report. Failed commands retain a named Unknown check
+while other evidence remains available.
+
+**Idle** means all required inspections succeeded without observed work, deployment
+activity, or release mismatches. **Busy** identifies observed activity or an expected
+commit that has not reached every service. **Unknown** takes precedence when a check
+fails or a service/release changes during inspection. Hold publication for Busy or
+Unknown; the command never cancels work, reconciles state, or gates the updater.
+
+For exact exit codes, run `node ops/deploy-status.ts --json`: `0` Idle, `1` Busy,
+`2` Unknown. Supply `EXPECTED_COMMIT` as an environment variable. Make itself returns
+`2` for any failed recipe, so automation using Make must inspect the JSON `status`.
+The report includes collection start/end times and duration. It is a snapshot, not
+a lock: work can start after inspection. Process recognition supplements durable
+jobs and owned systemd units; it is not a general detector for arbitrary processes
+deliberately detached outside those ownership mechanisms. HTTP health and matching
+releases do not replace feature acceptance tests.
+
+October 23, 2026: a temporary copy of the collector inspected Mia's six running
+ticket guests and idle workflow in 484 ms, without deployment or service changes.
+Fixture tests cover Busy/Unknown outcomes, unrelated processes, future continuations,
+mixed releases, and credential-safe reporting. A PostgreSQL integration test proves
+inspection preserves queued jobs and respects human waits and superseded history.
+Check the deployed release for availability of the permanent command.
+
+Optional optimizations and controls: none. This command implements Tim's requested
+aggregation of the existing deployment checks, without a new schedule, retry policy,
+cache, workload limit, or automatic deployment gate.
+
 Provision the local `code_assist` database and `runtime.env` before installation. The installer, `ops/install.ts`, is run once as Mia's logged-in operating user using Node 24. It builds published `main` and registers three user LaunchAgents:
 
 | Service | Behavior |

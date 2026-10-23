@@ -6,7 +6,7 @@ import { domain, origin, webLabel, workerLabel } from "./settings.ts";
 
 const releaseName = /^[a-f0-9]{40}$/;
 type Release = { name: string; modified: number };
-function inspectProcess(command: string, args: string[]) {
+export function inspectProcess(command: string, args: string[]) {
   try {
     return execFileSync(command, args, {
       encoding: "utf8",

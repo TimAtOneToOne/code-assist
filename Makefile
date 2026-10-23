@@ -1,4 +1,9 @@
-.PHONY: install dev lint format check test test-worker test-browser test-intake build verify
+.PHONY: install dev lint format check test test-worker test-browser test-intake build verify deploy-status
+
+export EXPECTED_COMMIT
+
+deploy-status:
+	@node ops/deploy-status.ts $(if $(filter 1,$(JSON)),--json) $(if $(filter 1,$(LOCAL)),--local)
 
 install:
 	pnpm install --frozen-lockfile

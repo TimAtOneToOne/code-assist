@@ -1,6 +1,6 @@
 # Current Status
 
-Updated October 22, 2026 against the source tree, including the repeated-validation pause added after `ff4a8d4`, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
+Updated October 23, 2026 against the source tree, including deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
 
 ## Product and Runtime
 
@@ -34,6 +34,14 @@ agent work to be settled. See [Owner Completion Override](coding.md#owner-comple
 As requested October 23, the source moves Done tickets into Home's **Completed**
 section after four hours. Workspace cleanup remains at 24 hours. Check the deployed
 release before assuming the display change is live.
+
+The October 23 deployment-status command consolidates pre-push inspection and
+post-push commit verification: `make deploy-status`, then
+`make deploy-status EXPECTED_COMMIT=<pushed-sha>`. It reports Idle/Busy/Unknown from
+durable jobs, workflow steps, host/guest processes, actual service releases, updater
+state, and web health. A temporary live collector passed against Mia in 484 ms;
+permanent command availability depends on deployment. See [Deployment Status](deployment.md#deployment-status)
+and the repository's `AGENTS.md`. Optional optimizations and controls: none.
 
 ## Code Map
 

@@ -19,6 +19,15 @@ Build the observability application with SvelteKit and serve it from the Mia Mac
 - Do not stop, cancel, or interrupt work to make room for a deployment. Do not assume worker draining or durable recovery makes deploying during active work acceptable. If activity cannot be verified, hold the push and explain the blocker to Tim.
 - The worker service itself normally stays running; check whether it is executing work, not merely whether its process exists. This is an agent pre-deployment rule, not an automatic deployment lock implemented by the updater.
 
+### Deployment Status Command
+
+- Run `make deploy-status` from this repository immediately before each push or restart. It makes one SSH call to Mia using the entire local `.env` configuration (`MAC_MINI_USER` / `MAC_MINI_PSWD`) and preserves host-key verification. Do not recreate the checks with ad hoc SSH scripts.
+- Require an **Idle** report. **Busy** includes running/queued jobs, continuations, current unfinished workflow steps, associated host/guest processes, an active updater, or releases that have not converged. **Unknown** means inspection was incomplete or changed during collection. Keep the change local for either result and inspect the reported reasons; never stop work to obtain Idle.
+- After pushing, run `make deploy-status EXPECTED_COMMIT=<full-pushed-sha>` to verify the selected release, actual web and worker releases, and HTTP health all match. Use `JSON=1` for the complete structured report and evidence. The build target is the updater's last fetched main commit, not a fresh GitHub query.
+- For machine-readable exit codes, call `EXPECTED_COMMIT=<sha> node ops/deploy-status.ts --json`: `0` = Idle, `1` = Busy / expected deployment pending, `2` = Unknown. GNU Make reports any failed recipe as exit `2`, so consumers of `make ... JSON=1` must read the JSON `status` field.
+- On Mia itself use `make deploy-status LOCAL=1` from the active release, or run its `ops/deploy-status.ts --local` with the installed Node executable. The collector is read-only: it does not reconcile jobs, fetch Git, change configuration, or restart services. It inspects running `ca-*` guests and leaves stopped guests alone.
+- The report records start/end times and is a fresh observation, not a deployment lock. Re-run it if anything intervenes before the push. The existing pre-deployment idle rule still applies. See `docs/deployment.md` for coverage and verification limits.
+
 ## GitOps Approval in Code Assist
 
 Tim clarified on October 20, 2026 that Code Assist's exact-version plan approval
