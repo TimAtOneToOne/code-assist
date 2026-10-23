@@ -2,9 +2,6 @@
 
 export EXPECTED_COMMIT
 
-deploy-status:
-	@node ops/deploy-status.ts $(if $(filter 1,$(JSON)),--json) $(if $(filter 1,$(LOCAL)),--local)
-
 install:
 	pnpm install --frozen-lockfile
 
@@ -34,5 +31,8 @@ test-browser:
 
 test-intake:
 	pnpm --filter @code-assist/intake test:integration
+
+deploy-status:
+	@node ops/deploy-status.ts $(if $(filter 1,$(JSON)),--json) $(if $(filter 1,$(LOCAL)),--local)
 
 verify: lint check test build
