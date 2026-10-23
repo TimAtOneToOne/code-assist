@@ -12,11 +12,16 @@
 	import DiscoveryPanel from '#lib/components/discovery-panel.svelte';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
+	let completed = $derived(!!data.item.owner_completed_at);
 	let discovery = $derived(
-		data.item.discoveries.find((run) => run.id === data.item.current_discovery_id)
+		completed
+			? undefined
+			: data.item.discoveries.find((run) => run.id === data.item.current_discovery_id)
 	);
 	let planning = $derived(
-		data.item.planning.find((run) => run.discovery_id === data.item.current_discovery_id)
+		completed
+			? undefined
+			: data.item.planning.find((run) => run.discovery_id === data.item.current_discovery_id)
 	);
 	let labels = $derived(data.item.ticket.labels.filter((label) => label.toLowerCase() !== 'plan'));
 	function eventText(event: {
@@ -24,6 +29,7 @@
 		details: { repositories?: string[]; repository?: string };
 	}) {
 		const labels: Record<string, string> = {
+			issue_completed_by_owner: 'Marked Done at your request; original evidence retained',
 			coding_direction_answered: 'You replied to the coding agent and continued the work',
 			coding_changes_requested: 'You requested code changes on the existing PR',
 			repository_needed: 'Waiting for repository selection',
@@ -75,6 +81,18 @@
 </div>
 {#if form?.error}<p role="alert" class="mb-4 text-destructive">{form.error}</p>{/if}
 {#if form?.message}<p role="status" class="mb-4">{form.message}</p>{/if}
+{#if completed}
+	<section aria-label="Completion" class="mb-6 space-y-2 rounded-lg border p-4">
+		<Badge variant="active">Done</Badge>
+		<p>
+			Marked Done at your request on {new Date(data.item.owner_completed_at!).toLocaleString()}.
+		</p>
+		<p class="text-sm text-muted-foreground">
+			Earlier work is saved below. Ticket updates will not restart discovery. The original GitHub
+			and validation evidence is unchanged.
+		</p>
+	</section>
+{/if}
 {#if data.item.removed_at}<p class="mb-4">
 		Removed from Home because the Plan label was removed in Linear. History and repository
 		selections are saved. Adding Plan back restores this ticket on the next check.
@@ -84,8 +102,10 @@
 	</p>{/if}
 {#each data.item.coding as run (run.id)}<CodingPanel
 		{run}
+		ownerCompleted={completed}
 		html={data.codingHtml}
-		editable={data.item.eligible &&
+		editable={!completed &&
+			data.item.eligible &&
 			!data.item.removed_at &&
 			run.planning_id === planning?.id &&
 			run.version === planning?.current_version &&
@@ -113,7 +133,7 @@
 		editable={data.item.eligible}
 	/>
 {/if}
-{#if !data.item.removed_at}<TicketSection
+{#if !data.item.removed_at && !completed}<TicketSection
 		collapsed={!!data.item.selected_repositories.length}
 		title={data.item.selected_repositories.length
 			? 'Repository Scope · ' +

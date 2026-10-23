@@ -25,6 +25,7 @@ import {
   selectRepositories,
   dashboard,
   readWorkItem,
+  completeWorkItem,
 } from "../src/store.ts";
 import {
   discoveryQueue,
@@ -777,6 +778,49 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       ).length,
       22,
     );
+    await assert.rejects(
+      completeWorkItem(boss, ticket.id, randomUUID(), "owner"),
+      /published work/,
+    );
+    await assert.rejects(
+      completeWorkItem(boss, ticket.id, published.id, "owner"),
+      /still active/,
+    );
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.planning_run SET status='needs_direction' WHERE id=$1",
+        [plan.id],
+      );
+    const evidenceBefore = await readCoding(boss.getDb(), ticket.id);
+    await completeWorkItem(boss, ticket.id, published.id, "owner");
+    await completeWorkItem(boss, ticket.id, published.id, "owner");
+    const ownerCompleted = (await readWorkItem(boss.getDb(), ticket.id))!;
+    assert.equal(ownerCompleted.coding_status, "done");
+    assert(ownerCompleted.owner_completed_at);
+    assert.equal(
+      ownerCompleted.events.filter((e) => e.type === "issue_completed_by_owner")
+        .length,
+      1,
+    );
+    assert.deepEqual(await readCoding(boss.getDb(), ticket.id), evidenceBefore);
+    assert.equal(
+      await recordGitHubObservation(boss, await original(), new Date(++tick), {
+        pr: merged,
+        main: { runs: [] },
+      }),
+      false,
+    );
+    await refreshGitHub(
+      boss,
+      { runId: published.id },
+      new AbortController().signal,
+      randomUUID(),
+      async () => {
+        throw new Error("Completed work must not poll GitHub");
+      },
+    );
+    assert.deepEqual(await readCoding(boss.getDb(), ticket.id), evidenceBefore);
   } finally {
     await boss.stop();
     await admin.query(`DROP DATABASE ${database} WITH (FORCE)`);

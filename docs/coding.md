@@ -22,6 +22,29 @@ Linear's `updatedAt` timestamp alone does not change discovery inputs. PR integr
 
 ## Execution and Evidence
 
+### Owner Completion Override
+
+For published work, **More Coding Actions → Move to Done State** marks the ticket
+Done in Code Assist at the owner's explicit request. This also works when a
+repository has no automatic main workflow, or a later ticket comment has started
+another discovery. Active local agent work must settle before completion; the
+action does not cancel running work. It records an `issue_completed_by_owner`
+event with the actor and coding run, and repeated submissions retain one event.
+
+Owner completion takes precedence on Home and the ticket page. Earlier plans,
+questions, code, PR states and validation evidence remain available as history.
+Intake updates do not restart discovery, automatic planning/coding and GitHub
+polling stop for that ticket, and stale attention notifications are suppressed.
+GitHub and Linear are not modified, and no successful CI result is fabricated.
+Normal automatic completion still requires the observed main merge and successful
+main workflows. Owner-completed tickets follow the existing 24-hour move to
+Home's Completed section; saved workspace evidence is retained.
+
+Optional optimizations and controls: Tim requested the manual Done action on
+October 22, 2026. It bypasses automatic completion requirements only for the
+explicitly selected ticket and stops its automated follow-up. Other tickets keep
+their existing completion checks.
+
 ### External Publication Privacy
 
 PR templates omit Code Assist links, plan-version references and model attribution.

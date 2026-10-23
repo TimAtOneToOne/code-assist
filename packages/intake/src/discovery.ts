@@ -9,7 +9,7 @@ import type { Db, PgBoss } from "pg-boss";
 import type { Ticket } from "./linear.ts";
 
 export const discoveryQueue = "initial-discovery";
-export const currentAttention = `(e.type='repository_needed' OR
+export const currentAttention = `(NOT EXISTS (SELECT 1 FROM code_assist.intake_event completion WHERE completion.issue_id=i.id AND completion.type='issue_completed_by_owner') AND (e.type='repository_needed' OR
   EXISTS (SELECT 1 FROM code_assist.coding_run c WHERE c.issue_id=i.id AND e.details->>'codingId'=c.id::text AND ((e.type='coding_done' AND c.status='done') OR (e.type='coding_pr_closed' AND c.status='pr_closed') OR (e.type='coding_main_failed' AND c.status='main_failed'))) OR
   (i.eligible AND EXISTS (SELECT 1 FROM code_assist.coding_run c JOIN code_assist.planning_run cp ON cp.id=c.planning_id WHERE cp.discovery_id=i.current_discovery_id AND cp.status='approved' AND cp.current_version=c.version AND e.details->>'codingId'=c.id::text AND e.details->>'stepId'=c.current_step_id::text AND ((e.type='coding_failed' AND c.status='failed') OR (e.type='coding_direction' AND c.status='needs_direction') OR (e.type='coding_pr_open' AND c.status='pr_open')))) OR
   (e.details->>'runId'=i.current_discovery_id::text AND EXISTS (
@@ -22,7 +22,7 @@ export const currentAttention = `(e.type='repository_needed' OR
       (e.type='planning_direction' AND p.status='needs_direction' AND e.details->>'version'=p.current_version::text) OR
       (e.type='planning_failed' AND p.status='failed' AND e.details->>'stepId'=p.current_step_id::text)
     )
-  )))`;
+  ))))`;
 export class DiscoveryConflict extends Error {}
 export type DiscoveryResult = {
   summary: string;
@@ -96,6 +96,11 @@ export async function syncDiscovery(
   );
   const item = rows[0];
   if (!item) throw new DiscoveryConflict("Ticket not found.");
+  const { rows: completed } = await db.executeSql(
+    "SELECT id FROM code_assist.intake_event WHERE issue_id=$1 AND type='issue_completed_by_owner' LIMIT 1",
+    [issueId],
+  );
+  if (completed.length) return null;
   const current = item.current_discovery_id
     ? await readDiscovery(db, item.current_discovery_id)
     : null;

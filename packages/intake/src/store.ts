@@ -1,4 +1,5 @@
 import { initializeSetupTests } from "./repository-setup-tests.ts";
+import { recordIntakeEvent } from "./intake-events.ts";
 import { initializeDashboardEvents } from "./dashboard-events.ts";
 import { initializeCoding, readCoding, type CodingRun } from "./coding.ts";
 import { initializeGitHub } from "./github.ts";
@@ -39,6 +40,7 @@ export type WorkItem = {
   planning_status: PlanningRun["status"] | null;
   coding_status: CodingRun["status"] | null;
   coding_done_at: Date | null;
+  owner_completed_at: Date | null;
   created_at: Date;
   observed_at: Date;
 };
@@ -46,11 +48,14 @@ export type WorkItem = {
 // Read existing single-repository choices until the user saves a new selection.
 const currentCodingQuery =
   "FROM code_assist.coding_run c JOIN code_assist.planning_run p ON p.id=c.planning_id WHERE p.discovery_id=current_discovery_id AND p.current_version=c.version AND p.status='approved' AND c.status<>'superseded' ORDER BY c.created_at DESC,c.id DESC LIMIT 1";
+const ownerCompletion =
+  "(SELECT max(e.created_at) FROM code_assist.intake_event e WHERE e.issue_id=code_assist.intake_issue.id AND e.type='issue_completed_by_owner')";
 const issueColumns = `*, COALESCE(selected_repositories, array_remove(ARRAY[selected_repository], NULL)) AS selected_repositories,
+  ${ownerCompletion} AS owner_completed_at,
   (SELECT status FROM code_assist.discovery_run WHERE id=current_discovery_id) AS discovery_status,
   (SELECT status FROM code_assist.planning_run WHERE discovery_id=current_discovery_id) AS planning_status,
-  (SELECT c.status ${currentCodingQuery}) AS coding_status,
-  (SELECT (SELECT max(e.created_at) FROM code_assist.intake_event e WHERE e.type='coding_done' AND e.issue_id=c.issue_id AND e.details->>'codingId'=c.id::text AND c.status='done') ${currentCodingQuery}) AS coding_done_at`;
+  CASE WHEN ${ownerCompletion} IS NOT NULL THEN 'done' ELSE (SELECT c.status ${currentCodingQuery}) END AS coding_status,
+  COALESCE(${ownerCompletion}, (SELECT (SELECT max(e.created_at) FROM code_assist.intake_event e WHERE e.type='coding_done' AND e.issue_id=c.issue_id AND e.details->>'codingId'=c.id::text AND c.status='done') ${currentCodingQuery})) AS coding_done_at`;
 
 export async function withIntake<T>(
   connectionString: string,
@@ -300,6 +305,8 @@ export async function selectRepositories(
     );
     const item = rows[0] as WorkItem | undefined;
     if (!item) throw new Error("Ticket not found.");
+    if (item.owner_completed_at)
+      throw new SelectionConflict("This ticket was marked Done by its owner.");
     if (item.removed_at)
       throw new SelectionConflict(
         "This ticket was removed because its Plan label is gone. Refresh to see its history.",
@@ -325,6 +332,58 @@ export async function selectRepositories(
       );
     }
     await syncDiscovery(boss, tx.db, id);
+    await tx.commit();
+  } catch (error) {
+    await tx.rollback();
+    throw error;
+  }
+}
+
+export async function completeWorkItem(
+  boss: PgBoss,
+  issueId: string,
+  codingId: string,
+  requestedBy: string,
+) {
+  const tx = await boss.getDb().beginTransaction!();
+  try {
+    const { rows } = await tx.db.executeSql(
+      `SELECT ${issueColumns} FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE`,
+      [issueId],
+    );
+    if (!rows.length) throw new SelectionConflict("Ticket not found.");
+    if (!rows[0].owner_completed_at) {
+      const { rows: published } = await tx.db.executeSql(
+        "SELECT id FROM code_assist.coding_run WHERE id=$1 AND issue_id=$2 AND pr_url IS NOT NULL AND status IN ('pr_open','pr_closed','awaiting_main','main_running','main_failed','done')",
+        [codingId, issueId],
+      );
+      if (!published.length)
+        throw new SelectionConflict(
+          "Only published work can be moved to Done.",
+        );
+      const { rows: active } = await tx.db.executeSql(
+        `SELECT id FROM code_assist.discovery_run WHERE issue_id=$1 AND status IN ('queued','running')
+         UNION ALL SELECT id FROM code_assist.planning_run WHERE issue_id=$1 AND status IN ('queued','drafting','reviewing','revising')
+         UNION ALL SELECT id FROM code_assist.coding_run WHERE issue_id=$1 AND status IN ('prepare','implement','checkpoint','collect','validate','review','publish')`,
+        [issueId],
+      );
+      if (active.length)
+        throw new SelectionConflict(
+          "Agent work is still active for this ticket. Wait until it finishes or needs your direction before moving it to Done.",
+        );
+      await recordIntakeEvent(
+        boss,
+        tx.db,
+        issueId,
+        "issue_completed_by_owner",
+        {
+          codingId,
+          requestedBy,
+          reason:
+            "Owner explicitly moved published work to Done. GitHub and validation evidence retained without alteration.",
+        },
+      );
+    }
     await tx.commit();
   } catch (error) {
     await tx.rollback();

@@ -10,20 +10,30 @@
 	let {
 		run,
 		editable,
+		ownerCompleted = false,
 		statusLabel,
 		retryLabel,
 		onreveal
 	}: {
 		run: CodingDetail;
 		editable: boolean;
+		ownerCompleted?: boolean;
 		statusLabel: string;
 		retryLabel: string;
 		onreveal: (target: 'changes' | 'activity' | 'reply' | 'repositories') => void | Promise<void>;
 	} = $props();
 	let githubForm = $state<HTMLFormElement>();
 	let mainForm = $state<HTMLFormElement>();
+	let doneForm = $state<HTMLFormElement>();
 	let submitting = $state(false);
 	let revealAfterClose: 'changes' | undefined;
+	const canComplete = $derived(
+		!ownerCompleted &&
+			!!run.pr_url &&
+			['pr_open', 'pr_closed', 'awaiting_main', 'main_running', 'main_failed', 'done'].includes(
+				run.status
+			)
+	);
 	const canRetry = $derived(editable && run.status === 'failed' && !!run.current_step_id);
 	const canReply = $derived(editable && run.status === 'needs_direction');
 	const canBringMain = $derived(
@@ -80,7 +90,7 @@
 		<Button class="rounded-r-none" onclick={() => onreveal('repositories')}
 			>View Pull Requests</Button
 		>
-	{:else if checkState}
+	{:else if checkState && !ownerCompleted}
 		<Button class="rounded-r-none" onclick={() => githubForm!.requestSubmit()}>Check GitHub</Button>
 	{:else}
 		<Button class="rounded-r-none" onclick={() => onreveal('activity')}>{statusLabel}</Button>
@@ -118,6 +128,11 @@
 					>Bring In Main</DropdownMenu.Item
 				>
 			{/if}
+			{#if canComplete}
+				<DropdownMenu.Item disabled={submitting} onSelect={() => doneForm!.requestSubmit()}
+					>Move to Done State</DropdownMenu.Item
+				>
+			{/if}
 			{#if run.pr_url && !reviewState && !run.repositories}
 				<DropdownMenu.Item>
 					{#snippet child({ props })}
@@ -126,7 +141,7 @@
 					{/snippet}
 				</DropdownMenu.Item>
 			{/if}
-			{#if run.pr_url && !checkState}
+			{#if run.pr_url && !checkState && !ownerCompleted}
 				<DropdownMenu.Item onSelect={() => githubForm!.requestSubmit()}
 					>Check GitHub</DropdownMenu.Item
 				>
@@ -136,6 +151,34 @@
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
 </div>
+{#if canComplete}
+	<form
+		bind:this={doneForm}
+		method="POST"
+		use:enhance={() => {
+			submitting = true;
+			return async ({ result, update }) => {
+				try {
+					if (result.type === 'success')
+						toast.success(String(result.data?.message ?? 'Moved to Done.'));
+					else
+						toast.error(
+							result.type === 'failure'
+								? String(result.data?.error ?? 'Could not move to Done.')
+								: 'Could not move to Done.'
+						);
+					await update();
+				} finally {
+					submitting = false;
+				}
+			};
+		}}
+		hidden
+	>
+		<input type="hidden" name="intent" value="move-to-done" />
+		<input type="hidden" name="codingId" value={run.id} />
+	</form>
+{/if}
 {#if run.pr_url}
 	<form bind:this={githubForm} method="POST" use:enhance hidden>
 		<input type="hidden" name="intent" value="github-refresh" />

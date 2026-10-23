@@ -108,6 +108,11 @@ export async function recordGitHubObservation(
       "SELECT id FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE",
       [run.issue_id],
     );
+    const { rows: completed } = await db.executeSql(
+      "SELECT id FROM code_assist.intake_event WHERE issue_id=$1 AND type='issue_completed_by_owner' LIMIT 1",
+      [run.issue_id],
+    );
+    if (completed.length) return false;
     const { rows } = await db.executeSql(
       "SELECT * FROM code_assist.coding_run WHERE id=$1 FOR UPDATE",
       [run.id],
@@ -338,8 +343,8 @@ export async function refreshGitHub(
     .getDb()
     .executeSql(
       request.runId
-        ? "SELECT * FROM code_assist.coding_run WHERE id=$1 AND pr_url IS NOT NULL"
-        : "SELECT * FROM code_assist.coding_run WHERE pr_url IS NOT NULL AND status<>'done' ORDER BY created_at,id",
+        ? "SELECT * FROM code_assist.coding_run c WHERE id=$1 AND pr_url IS NOT NULL AND NOT EXISTS (SELECT 1 FROM code_assist.intake_event e WHERE e.issue_id=c.issue_id AND e.type='issue_completed_by_owner')"
+        : "SELECT * FROM code_assist.coding_run c WHERE pr_url IS NOT NULL AND status<>'done' AND NOT EXISTS (SELECT 1 FROM code_assist.intake_event e WHERE e.issue_id=c.issue_id AND e.type='issue_completed_by_owner') ORDER BY created_at,id",
       request.runId ? [request.runId] : [],
     );
   let failures = 0;

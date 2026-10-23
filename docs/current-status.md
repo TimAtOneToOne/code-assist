@@ -25,6 +25,12 @@ Discovery and planning use recorded source snapshots and read-only agent access.
 
 Exact-version approval authorizes implementation and publication for the confirmed scope, including described GitOps work inside Code Assist. Changed scope requires a revised approved plan. Agents never merge PRs, enable auto-merge, apply Terraform, or initiate managed infrastructure deployment. Windmill test-fork publication is distinct from parent production publication.
 
+Published work also has an explicit **Move to Done State** owner action. It records
+completion separately from GitHub/CI evidence and stops ticket automation without
+changing external systems. This handles owner-confirmed completion when a repository
+has no main workflow, including ONE-5190's reported case. The action requires local
+agent work to be settled. See [Owner Completion Override](coding.md#owner-completion-override).
+
 ## Code Map
 
 | Location | Responsibility |

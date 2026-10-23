@@ -16,8 +16,14 @@
 	let {
 		run,
 		editable,
+		ownerCompleted = false,
 		html
-	}: { run: CodingDetail; editable: boolean; html: Record<string, string> } = $props();
+	}: {
+		run: CodingDetail;
+		editable: boolean;
+		ownerCompleted?: boolean;
+		html: Record<string, string>;
+	} = $props();
 	const titles = {
 		prepare: 'Preparing Workspace',
 		implement: 'Codex Implementing',
@@ -94,6 +100,7 @@
 		<CodingActions
 			{run}
 			{editable}
+			{ownerCompleted}
 			statusLabel={editable ? titles[run.status] : 'View Previous Run'}
 			{retryLabel}
 			onreveal={(target) => reveal(target, expand)}

@@ -272,7 +272,7 @@ export async function syncApprovedCoding(boss: PgBoss) {
   const { rows } = await boss
     .getDb()
     .executeSql(
-      `SELECT p.issue_id FROM code_assist.planning_run p JOIN code_assist.intake_issue i ON i.current_discovery_id=p.discovery_id JOIN code_assist.discovery_run d ON d.id=p.discovery_id WHERE p.status='approved' AND i.eligible AND i.removed_at IS NULL`,
+      `SELECT p.issue_id FROM code_assist.planning_run p JOIN code_assist.intake_issue i ON i.current_discovery_id=p.discovery_id JOIN code_assist.discovery_run d ON d.id=p.discovery_id WHERE p.status='approved' AND i.eligible AND i.removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM code_assist.intake_event e WHERE e.issue_id=i.id AND e.type='issue_completed_by_owner')`,
     );
   for (const row of rows)
     await codingTransaction(boss, (db) => syncCoding(boss, db, row.issue_id));

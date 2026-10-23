@@ -159,7 +159,7 @@ async function enqueue(
 // Discovery/issue changes and planning commands share the issue-row lock.
 export async function syncPlanning(boss: PgBoss, db: Db, discoveryId: string) {
   const { rows } = await db.executeSql(
-    "SELECT d.* FROM code_assist.discovery_run d JOIN code_assist.intake_issue i ON i.current_discovery_id=d.id WHERE d.id=$1 AND d.status='ready' AND i.eligible AND i.removed_at IS NULL FOR UPDATE OF i",
+    "SELECT d.* FROM code_assist.discovery_run d JOIN code_assist.intake_issue i ON i.current_discovery_id=d.id WHERE d.id=$1 AND d.status='ready' AND i.eligible AND i.removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM code_assist.intake_event e WHERE e.issue_id=i.id AND e.type='issue_completed_by_owner') FOR UPDATE OF i",
     [discoveryId],
   );
   const discovery = rows[0] as DiscoveryRun | undefined;

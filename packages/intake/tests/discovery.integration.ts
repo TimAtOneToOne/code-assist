@@ -347,6 +347,58 @@ test("discovery snapshots, fenced results, answers, removal, retries and deploym
       history.events.filter((e) => e.type === "discovery_answered").length,
       2,
     );
+    await boss
+      .getDb()
+      .executeSql(
+        "INSERT INTO code_assist.intake_event(issue_id,type,details,created_at) VALUES($1,'issue_completed_by_owner',$2,now()-interval '25 hours')",
+        [
+          ticket.id,
+          JSON.stringify({
+            requestedBy: "owner",
+            reason: "Submitted; repository has no main CI workflow.",
+          }),
+        ],
+      );
+    const completed = (await readWorkItem(boss.getDb(), ticket.id))!;
+    assert.equal(completed.coding_status, "done");
+    assert(completed.owner_completed_at);
+    assert.deepEqual(completed.discoveries, history.discoveries);
+    assert.deepEqual(completed.planning, history.planning);
+    await recordScan(
+      boss,
+      await requestScan(boss),
+      [
+        {
+          ...ticket,
+          updatedAt: "2026-10-23T01:00:00.000Z",
+          comments: [
+            ...ticket.comments,
+            { id: "submitted", body: "Build submitted." },
+          ],
+        },
+      ],
+      repositories,
+    );
+    await syncSelectedDiscoveries(boss);
+    const afterScan = (await readWorkItem(boss.getDb(), ticket.id))!;
+    assert.equal(afterScan.coding_status, "done");
+    assert.equal(afterScan.current_discovery_id, history.current_discovery_id);
+    assert.deepEqual(afterScan.discoveries, history.discoveries);
+    const home = await dashboard(boss);
+    assert.equal(
+      home.completedIssues.find((item) => item.id === ticket.id)?.coding_status,
+      "done",
+    );
+    assert(!home.notifications.some((item) => item.issue_id === ticket.id));
+    await assert.rejects(
+      selectRepositories(
+        boss,
+        ticket.id,
+        [repositories[0].path],
+        afterScan.ticket.updatedAt,
+      ),
+      /marked Done/,
+    );
   } finally {
     await boss.stop();
     await admin.query(`DROP DATABASE ${database} WITH (FORCE)`);

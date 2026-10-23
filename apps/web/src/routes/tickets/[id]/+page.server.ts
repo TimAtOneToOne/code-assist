@@ -15,7 +15,12 @@ import {
 	PlanningConflict
 } from '@code-assist/intake/planning';
 import { error, fail } from '@sveltejs/kit';
-import { readWorkItem, selectRepositories, SelectionConflict } from '@code-assist/intake';
+import {
+	readWorkItem,
+	selectRepositories,
+	completeWorkItem,
+	SelectionConflict
+} from '@code-assist/intake';
 import {
 	answerDiscovery,
 	retryDiscovery,
@@ -122,6 +127,22 @@ export const actions = {
 		const approver = await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const id = issueId(event.params.id);
+		if (form.get('intent') === 'move-to-done') {
+			try {
+				await withController((boss) =>
+					completeWorkItem(boss, id, issueId(String(form.get('codingId'))), approver)
+				);
+				return { message: 'Moved to Done. GitHub, Linear, and saved evidence are unchanged.' };
+			} catch (cause) {
+				if (cause instanceof SelectionConflict) return fail(409, { error: cause.message });
+				throw cause;
+			}
+		}
+		const currentItem = await withController((boss) => readWorkItem(boss.getDb(), id));
+		if (currentItem?.owner_completed_at)
+			return fail(409, {
+				error: 'This ticket was marked Done by its owner. Earlier work is read-only.'
+			});
 		if (form.get('intent') === 'coding-direction') {
 			try {
 				await withController((boss) =>
