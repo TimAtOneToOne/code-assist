@@ -329,7 +329,7 @@
 			/>
 		</summary>
 		<div class="px-4 pb-3">
-			<p class="mb-3 text-sm text-muted-foreground">Done for more than 24 hours.</p>
+			<p class="mb-3 text-sm text-muted-foreground">Done for more than 4 hours.</p>
 			{#each completedIssues as item (item.id)}{@render ticketCard(item, false, false)}{/each}
 		</div>
 	</details>

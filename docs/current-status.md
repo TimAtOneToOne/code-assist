@@ -31,6 +31,10 @@ changing external systems. This handles owner-confirmed completion when a reposi
 has no main workflow, including ONE-5190's reported case. The action requires local
 agent work to be settled. See [Owner Completion Override](coding.md#owner-completion-override).
 
+As requested October 23, the source moves Done tickets into Home's **Completed**
+section after four hours. Workspace cleanup remains at 24 hours. Check the deployed
+release before assuming the display change is live.
+
 ## Code Map
 
 | Location | Responsibility |

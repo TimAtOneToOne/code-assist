@@ -37,7 +37,7 @@ Intake updates do not restart discovery, automatic planning/coding and GitHub
 polling stop for that ticket, and stale attention notifications are suppressed.
 GitHub and Linear are not modified, and no successful CI result is fabricated.
 Normal automatic completion still requires the observed main merge and successful
-main workflows. Owner-completed tickets follow the existing 24-hour move to
+main workflows. Owner-completed tickets follow the four-hour move to
 Home's Completed section; saved workspace evidence is retained.
 
 Optional optimizations and controls: Tim requested the manual Done action on
@@ -110,7 +110,7 @@ All pages of matching workflow runs are read through the GitHub REST API. The wo
 
 GitHub read failures preserve the previous state and show an error. If workflow metadata is available but failure logs are unavailable, the failure remains visible and repair waits for diagnostic evidence. Scheduled/manual refresh reads again. Observations are ordered by check start time so delayed responses cannot overwrite newer evidence. Events and central Logs (`service=github`) retain the transitions; failures, completion and closed-unmerged PRs use the existing Teams flow. Observation never changes Linear state or grants new plan approval.
 
-On Home, tickets remain in the main list for 24 hours after their latest transition to Done. Older completed tickets appear in the collapsed **Completed** section at the bottom, with the same links and green badges. This uses the current coding run’s saved completion event, not the PR merge time or last GitHub check. Refreshing Home updates the grouping; reopened or corrective work returns to the main list.
+On Home, tickets remain in the main list for four hours after their latest transition to Done, as requested October 23, 2026. Older completed tickets appear in the collapsed **Completed** section at the bottom, with the same links and green badges. This uses the current coding run’s saved completion event, not the PR merge time or last GitHub check. Refreshing Home updates the grouping; reopened or corrective work returns to the main list. Workspace cleanup retains its separate 24-hour threshold.
 
 ## Corrective Coding After a Failed Main Workflow
 

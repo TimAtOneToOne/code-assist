@@ -248,7 +248,7 @@ export async function dashboard(boss: PgBoss) {
       scan.error = "The queued check was interrupted or expired. Check again.";
     }
   }
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 4 * 60 * 60 * 1000;
   const currentIssues: WorkItem[] = [],
     completedIssues: WorkItem[] = [];
   for (const issue of issues as WorkItem[]) {

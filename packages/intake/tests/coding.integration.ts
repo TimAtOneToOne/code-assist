@@ -561,15 +561,21 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       1,
     );
     assert.equal((await dashboard(boss)).issues[0].coding_status, "done");
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.intake_event SET created_at=now()-interval '3 hours' WHERE type='coding_done' AND details->>'codingId'=$1",
+        [published.id],
+      );
     assert.equal(
       (await dashboard(boss)).completedIssues.length,
       0,
-      "Newly done work remains in the main list",
+      "Work done three hours ago remains in the main list",
     );
     await boss
       .getDb()
       .executeSql(
-        "UPDATE code_assist.intake_event SET created_at=now()-interval '25 hours' WHERE type='coding_done' AND details->>'codingId'=$1",
+        "UPDATE code_assist.intake_event SET created_at=now()-interval '5 hours' WHERE type='coding_done' AND details->>'codingId'=$1",
         [published.id],
       );
     const archived = await dashboard(boss);
