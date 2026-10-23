@@ -154,6 +154,10 @@ test("native fork creation resumes without creating a second fork and records ex
       api.request,
     );
     assert.equal(api.calls.filter((x) => x.endsWith("/create_fork")).length, 1);
+    assert.doesNotMatch(
+      (await readWindmillIntent(f.directory, run))!.name,
+      /Code Assist/,
+    );
     assert.equal(
       api.calls.filter((x) => x.endsWith("/create_workspace_fork_branch"))
         .length,
@@ -175,6 +179,21 @@ test("native fork creation resumes without creating a second fork and records ex
       (await readWindmillIntent(f.directory, run))?.evidence?.commit,
       run.commit,
     );
+    // A saved fork from the older publisher remains owned after the naming change.
+    const intent = (await readWindmillIntent(f.directory, run))!;
+    intent.name = `${run.identifier} · Code Assist ${run.id.slice(0, 8)}`;
+    api.forks[0].name = intent.name;
+    await writeFile(join(f.path, "windmill-fork.json"), JSON.stringify(intent));
+    await prepareWindmillFork(
+      f.directory,
+      run,
+      "remote",
+      api.git,
+      signal,
+      current,
+      api.request,
+    );
+    assert.equal(api.calls.filter((x) => x.endsWith("/create_fork")).length, 1);
   } finally {
     await rm(f.directory, { recursive: true, force: true });
   }
@@ -379,7 +398,11 @@ test("publication pushes the reviewed commit to the native branch, adopts its PR
       url,
     );
     assert.match(body, /Windmill fork/);
-    assert.match(body, /code-assist:/);
+    assert.match(body, /<!-- publication:/);
+    assert.doesNotMatch(
+      body,
+      /Code Assist|code-assist|100\.91\.0\.83|Claude|Codex/,
+    );
     assert.equal(
       await publishCoding(f.directory, run, signal, log, current, execute),
       url,

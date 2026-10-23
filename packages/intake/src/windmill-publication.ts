@@ -137,7 +137,8 @@ export async function prepareWindmillFork(
   request: Request = windmillRequest(directory, signal),
 ) {
   const workspace = `wm-fork-${run.branch.slice("wm-fork/main/".length)}`;
-  const name = `${run.identifier} · Code Assist ${run.id.slice(0, 8)}`;
+  let intent = await readWindmillIntent(directory, run);
+  const name = intent?.name ?? `${run.identifier} · ${run.id.slice(0, 8)}`;
   const users = await request<{ email: string; workspaces: Fork[] }>(
     "/workspaces/users",
   );
@@ -146,12 +147,14 @@ export async function prepareWindmillFork(
       "Windmill did not identify the configured publication account.",
     );
   let fork = users.workspaces.find((w) => w.id === workspace);
-  let intent = await readWindmillIntent(directory, run);
   if (
     intent &&
     (intent.workspace !== workspace ||
       intent.branch !== run.branch ||
-      intent.name !== name ||
+      ![
+        `${run.identifier} · ${run.id.slice(0, 8)}`,
+        `${run.identifier} · Code Assist ${run.id.slice(0, 8)}`,
+      ].includes(intent.name) ||
       intent.actor !== users.email)
   )
     throw new Error(

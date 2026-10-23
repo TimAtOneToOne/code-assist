@@ -10,6 +10,11 @@ import {
 import { executeCoding } from "./coding-runtime.ts";
 import { requireMainAncestor } from "./coding-main.ts";
 import {
+  ownsPublication,
+  publicationMarker,
+  publicPublicationBody,
+} from "./publication-metadata.ts";
+import {
   isWindmill,
   publicationRun,
   prepareWindmillFork,
@@ -99,7 +104,7 @@ function verifyRevisionPr(
     prs.length !== 1 ||
     prs[0].state !== "OPEN" ||
     prs[0].url !== request.pullRequests[activeSnapshot(run).name] ||
-    !prs[0].body.includes(`<!-- code-assist:${run.id} -->`) ||
+    !ownsPublication(prs[0].body, run.id) ||
     prs[0].headRefOid !== expectedHead ||
     remoteHead !== expectedHead
   ) {
@@ -282,23 +287,25 @@ export async function publishCoding(
           "The Windmill branch changed during synchronization. Review the new commit before publication.",
         );
     }
-    const revisionMarker = `<!-- code-assist-change:${request.id} -->`;
-    if (!prs[0].body.includes(revisionMarker)) {
-      let body = prs[0].body;
+    const revisionMarker = `<!-- revision:${request.id} -->`;
+    let body = publicPublicationBody(prs[0].body);
+    if (!body.includes(revisionMarker)) {
       for (const [name, commit] of Object.entries(commitSet(run)))
         if (request.baseCommits[name])
           body = body.replace(
             `- ${name}: ${request.baseCommits[name]}`,
             `- ${name}: ${commit}`,
           );
-      body += `\n\n**Requested Changes:**\n\n${request.text}\n\nUpdated after fresh validation and Claude review. [Revision evidence](http://100.91.0.83:3000/tickets/${run.issue_id}).${deployment ? `\n\n[Windmill fork](${deployment.url}) synced ${deployment.commit}: [native deployment job](${deployment.jobUrl}).` : ""}\n\n${revisionMarker}\n`;
+      body += `\n\n**Requested Changes:** Updated the implementation after fresh validation and code review.${deployment ? `\n\n[Windmill fork](${deployment.url}) synced ${deployment.commit}: [native deployment job](${deployment.jobUrl}).` : ""}\n\n${revisionMarker}\n`;
+    }
+    if (body !== prs[0].body) {
       const bodyFile = join(local, `pull-request-${request.id}.md`);
       await writeFile(bodyFile, body, { mode: 0o600 });
       await gh(["pr", "edit", intent.url, "--body-file", bodyFile]);
     }
     return intent.url;
   }
-  const marker = `<!-- code-assist:${run.id} -->`,
+  const marker = publicationMarker(run.id),
     intentFile = join(local, "publication.json");
   let intent: { commit: string; base: string } | undefined;
   try {
@@ -312,7 +319,7 @@ export async function publishCoding(
       prs[0].state === "OPEN" &&
       prs[0].headRefOid === run.commit &&
       prs[0].baseRefName === base &&
-      (prs[0].body.includes(marker) || !!fork) &&
+      (ownsPublication(prs[0].body, run.id) || !!fork) &&
       intent?.commit === run.commit
     ) {
       if (fork) {
@@ -338,12 +345,27 @@ export async function publishCoding(
           const bodyFile = join(local, "pull-request-reconciled.md");
           await writeFile(
             bodyFile,
-            `${prs[0].body}\n\n[Code Assist validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\nReviewed commit: ${run.commit}. [Windmill fork](${deployment.url}) · [Native deployment job](${deployment.jobUrl}).\n\n**Optional optimizations and controls:** none.\n\n${marker}\n`,
+            `${publicPublicationBody(prs[0].body)}\n\nReviewed commit: ${run.commit}. [Windmill fork](${deployment.url}) · [Native deployment job](${deployment.jobUrl}).\n\n**Optional optimizations and controls:** none.${ownsPublication(prs[0].body, run.id) ? "" : `\n\n${marker}`}\n`,
             { mode: 0o600 },
           );
           await assertCurrent();
-          await gh(["pr", "edit", prs[0].url, "--body-file", bodyFile]);
+          await gh([
+            "pr",
+            "edit",
+            prs[0].url,
+            "--title",
+            `${run.repair ? "fix" : "feat"}: ${run.title}`,
+            "--body-file",
+            bodyFile,
+          ]);
         }
+      } else if (publicPublicationBody(prs[0].body) !== prs[0].body) {
+        const bodyFile = join(local, "pull-request-reconciled.md");
+        await writeFile(bodyFile, publicPublicationBody(prs[0].body), {
+          mode: 0o600,
+        });
+        await assertCurrent();
+        await gh(["pr", "edit", prs[0].url, "--body-file", bodyFile]);
       }
       return prs[0].url;
     }
@@ -403,20 +425,20 @@ export async function publishCoding(
   const body = join(local, "pull-request.md");
   await writeFile(
     body,
-    `## Summary\n\n${run.repair ? "Repairs a failed main workflow for" : "Implements"} ${run.identifier}: ${run.title}, following approved plan v${run.version}.${
+    `## Summary\n\n${run.repair ? "Repairs a failed main workflow for" : "Implements"} ${run.identifier}: ${run.title}.${
       run.repair
         ? `\n\nFailure evidence: ${run.repair.workflows.runs
             .filter((r) => r.conclusion && r.conclusion !== "success")
             .map((r) => `[${r.name}, attempt ${r.run_attempt}](${r.html_url})`)
             .join(", ")}. Corrective base: ${run.repair.baseCommit}.`
         : ""
-    }\n\nValidation: the repository’s configured checks passed; browser evidence and Claude’s combined adversarial review are recorded for the candidate commits below.\n\n${Object.entries(
+    }\n\nValidation: the repository’s configured checks passed; browser evidence and code review are recorded for the candidate commits below.\n\n${Object.entries(
       commitSet(run),
     )
       .map(([name, commit]) => `- ${name}: ${commit}`)
       .join(
         "\n",
-      )}${deployment ? `\n\n[Windmill fork](${deployment.url}) · [Successful native Git Sync job](${deployment.jobUrl}). The fork synced the reviewed commit ${deployment.commit}; runtime business acceptance and operator-managed configuration are separate evidence.` : ""}\n\n**Optional optimizations and controls:** none.\n\n[Code Assist plan, validation and review](http://100.91.0.83:3000/tickets/${run.issue_id})\n\n${marker}\n`,
+      )}${deployment ? `\n\n[Windmill fork](${deployment.url}) · [Successful native Git Sync job](${deployment.jobUrl}). The fork synced the reviewed commit ${deployment.commit}; runtime business acceptance and operator-managed configuration are separate evidence.` : ""}\n\n**Optional optimizations and controls:** none.\n\n${marker}\n`,
     { mode: 0o600 },
   );
   if (fork) {
@@ -453,7 +475,15 @@ export async function publishCoding(
           "The native Windmill PR does not match the reviewed commit and base.",
         );
       await assertCurrent();
-      await gh(["pr", "edit", prs[0].url, "--body-file", body]);
+      await gh([
+        "pr",
+        "edit",
+        prs[0].url,
+        "--title",
+        `${run.repair ? "fix" : "feat"}: ${run.title}`,
+        "--body-file",
+        body,
+      ]);
       return prs[0].url;
     }
   }

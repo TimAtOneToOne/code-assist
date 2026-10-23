@@ -284,8 +284,6 @@ export async function setupCodingRuntime(
   await git("init");
   await git("fetch", "/work/source.bundle", "refs/heads/base");
   await git("checkout", "--force", "-b", run.branch, "FETCH_HEAD");
-  await git("config", "user.name", "Code Assist");
-  await git("config", "user.email", "code-assist@localhost");
   await guest(["rm", "/work/source.bundle"]);
   await rm(bundle);
   await ensureCodingRuntime(directory, run, workspace, signal, log);
@@ -298,12 +296,13 @@ export async function ensureCodingRuntime(
   signal: AbortSignal,
   log: Log,
 ) {
-  const { root, guest } = guestCommands(
+  const { root, guest, git } = guestCommands(
     workspace,
     signal,
     log,
     activeSnapshot(run).name,
   );
+  await configureCommitIdentity(run, signal, log, git);
   if (!workspace.environments) {
     const name = workspace.input.snapshot.name;
     await root(["mkdir", "-p", "/work/environments"]);
@@ -371,6 +370,23 @@ export async function ensureCodingRuntime(
     { runtime_release: release },
   );
 }
+async function configureCommitIdentity(
+  run: CodingRun,
+  signal: AbortSignal,
+  log: Log,
+  git: ReturnType<typeof guestCommands>["git"],
+) {
+  for (const key of ["user.name", "user.email"]) {
+    const value = await executeCoding(
+      "/usr/bin/git",
+      ["-C", activeSnapshot(run).source, "config", "--get", key],
+      signal,
+      log,
+    );
+    await git("config", key, value);
+  }
+}
+
 export async function checkpoint(
   directory: string,
   run: CodingRun,
@@ -408,10 +424,11 @@ export async function checkpoint(
     await git("add", "-A");
     // A crash after commit but before update-ref leaves a clean HEAD to adopt.
     if (merging || (await git("status", "--porcelain"))) {
+      await configureCommitIdentity(run, signal, log, git);
       await git(
         "commit",
         "-m",
-        `feat(${run.identifier.toLowerCase()}): implement approved plan v${run.version}`,
+        `feat(${run.identifier.toLowerCase()}): ${run.title}`,
       );
     }
     commit = await git("rev-parse", "HEAD");

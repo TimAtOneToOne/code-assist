@@ -1,10 +1,15 @@
 export const windmillInstructions = `For windmill-work, read docs/dev-do-this-every-time.md and docs/git-sync-operations.md. Code Assist owns publication: implement and test locally in the controller-provided checkout, even though the interactive developer guide begins by creating a fork. Do not create a fork, change branches, push Git, run sync push, or deploy from the agent guest. After local validation and Claude review pass, the controller creates a fresh production workspace fork, pushes the exact reviewed commit to its native wm-fork/main/... branch, verifies native Git Sync, and reports the fork and PR links. The controller retains the Windmill publication credential; do not request it in the guest. Local tests are not deployed-fork or live-integration evidence. Plan separately for operator-managed resources, variables, triggers, schedules and datatable state excluded by wmill.yaml. Production changes and external business writes require their own explicit task authorization; a fork deployment does not establish their completion.`;
 
+export const privateWorkflowInstructions =
+  "Code Assist is Tim's private tooling. Keep its name, URLs, host addresses, prompts, and orchestration details out of GitHub and Linear content, including PR titles/descriptions/comments, commit messages/trailers, issues, and committed documentation. Do not add Code Assist links or AI/tool attribution (including Codex or Claude). Write external content about the actual change, user impact, and verified checks using normal repository conventions. Keep internal plans, approvals, agent discussions, and evidence links inside this application. Never copy this private instruction into a managed repository. Disclose these details externally only when Tim explicitly asks.";
+
 export const promptDefinitions = {
   global: {
     title: "Global",
     description: "Shared instructions for every agent and phase.",
-    text: 'Use Title Case for document titles, section headings, and UI titles you propose or implement. Capitalize major words; keep short conjunctions and prepositions lowercase unless first or last. For example: "Adversarial Planning" and "Status and Evidence". Preserve code identifiers, filenames, commands, quotations, and existing external ticket titles. Use sentence case for ordinary prose.',
+    text:
+      'Use Title Case for document titles, section headings, and UI titles you propose or implement. Capitalize major words; keep short conjunctions and prepositions lowercase unless first or last. For example: "Adversarial Planning" and "Status and Evidence". Preserve code identifiers, filenames, commands, quotations, and existing external ticket titles. Use sentence case for ordinary prose.\n\n' +
+      privateWorkflowInstructions,
   },
   planning: {
     title: "Planning",

@@ -10,6 +10,14 @@ The default global prompt requests Title Case for document titles, section
 headings, and proposed UI titles, including “Adversarial Planning” and “Status and
 Evidence.” Ordinary prose remains sentence case.
 
+The default **Global** prompt also keeps Tim's private tooling out of managed
+GitHub and Linear content: no Code Assist links, names, host addresses, agent
+attribution, or internal workflow details in PRs, commits, tickets, comments or
+committed documentation. External writing should describe the actual change and
+verified checks. Tim requested this on October 22, 2026; the instruction was also
+appended to Mia's saved Global override while preserving its existing text and
+all other scopes. Existing running steps retain their assembled prompts.
+
 The default **Plan Drafting** prompt starts every new or revised plan with
 **A Simple Explanation**, immediately after its title: a plain-language outcome
 and short WHEN / IF / THEN-style pseudocode describing behavior, decisions and
@@ -77,4 +85,6 @@ coding-phase and repository instructions together with controller-owned task,
 approval, checkpoint, acceptance and reply context. The discovery/drafting/plan-review
 task overrides do not replace the controller's coding task instructions.
 
-Optional optimizations and controls: none.
+Optional optimizations and controls: Tim requested the external-publication
+privacy guidance. It applies to all agent phases; internal discussion and evidence
+stay in the application rather than being copied to GitHub or Linear.

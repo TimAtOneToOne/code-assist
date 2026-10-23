@@ -18,7 +18,7 @@ Discovery and planning use recorded source snapshots and read-only agent access.
 | Repository Setup | Editable runtime profiles, secret mappings, pinned local Git dependencies, and disposable setup/validation/browser tests; three built-in defaults plus saved profiles | [Repository Setup](repository-setup.md), [Secrets](secrets.md) |
 | Coding | Sequential multi-repository implementation; saved checkpoints and evidence; repository validation; unchanged repeated validation failures pause for direction; combined Claude review; critical/high/medium findings return to implementation | [Coding](coding.md) |
 | Human Follow-Up | Replies to coding questions, requested changes to owned open PRs, explicit Bring In Main, fresh evidence for revisions, and Run Browser Checks recovery | [Coding](coding.md) |
-| Publication | Exact-commit validation/review checks, durable publication intents, remote-head checks and retry reconciliation, separate PRs for selected repositories | [Coding](coding.md) |
+| Publication | Exact-commit validation/review checks, durable publication intents, remote-head checks and retry reconciliation, separate PRs for selected repositories; private-tool links and attribution omitted from external templates | [Coding](coding.md#external-publication-privacy) |
 | Windmill Work | Controller-owned native production-workspace fork creation, ticket fork branches, exact-commit Git Sync evidence, and native PR adoption; latest addition in `f21c951` | [Windmill Publication](coding.md#windmill-production-fork-publication) |
 | GitHub Completion | PR/merge monitoring; every repository needs observed successful push-to-main workflows for its exact merge commit; scoped corrective coding for failed main workflows | [Coding](coding.md#github-pr-and-main-workflow-tracking) |
 | Operations | Owner-only Tailscale access, Home updates through PostgreSQL notifications/SSE, central logs/artifacts, Teams attention outbox, automatic main deployment, and completed-workspace cleanup after 24 hours with retained evidence | [Deployment](deployment.md), [Worker](worker.md), [Logging](logging.md) |
@@ -56,5 +56,14 @@ Use Node 24 and pnpm 10.28.0. `make verify` runs lint/format checks, type checks
 Publishing Code Assist `main` triggers Mia's updater even for documentation-only changes. Immediately before pushing or restarting, inspect live pg-boss jobs, queued continuations, agent steps, and associated processes. Hold deployment while work is active or cannot be verified. Durable state, workspaces, and evidence live outside replaceable releases.
 
 Keep this page and the affected workflow guide current when behavior changes. Date live evidence and name its commit/run; preserve original plans and historical findings rather than rewriting their outcomes. The [initial brief](initial/standalone-brief.md) records product requirements; the [original plan](plans/plan_v1.md) and [prototype](initial/index.html) are historical design references.
+
+On October 22, Tim requested that managed GitHub and Linear content not identify
+Code Assist. The source now omits the old public links and attribution, uses neutral
+ownership markers and the publisher's configured Git identity for new commits,
+and keeps private revision requests inside the application. The matching instruction
+was added to Mia's saved Global prompt and the default prompt. Existing commits are
+not rewritten, and existing PR descriptions are cleaned only when next updated by
+the normal publisher. Check the deployed release before assuming template changes
+are live; see [Coding](coding.md#external-publication-privacy).
 
 Optional optimizations and controls: Tim approved the repeated-validation pause on October 22, 2026. It applies to all coding runs and requires a reply when another implementation attempt leaves the same candidates and failing command outcomes; validation and review remain required. See [Coding](coding.md#repeated-validation-failures) for its comparison scope and transient-failure tradeoff.

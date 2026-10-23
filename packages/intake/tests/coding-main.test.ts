@@ -37,6 +37,8 @@ test("main snapshots survive interrupted delivery, conflicts preserve both paren
   const workspace = {} as Workspace;
   try {
     await mkdir(work);
+    gitAt(source, "config", "user.name", "Publisher Fixture");
+    gitAt(source, "config", "user.email", "publisher@example.invalid");
     gitAt(source, "remote", "add", "origin", remote);
     gitAt(source, "branch", "-M", "main");
     execFileSync("/usr/bin/git", ["clone", "--quiet", source, guestRepo]);
@@ -149,6 +151,14 @@ test("main snapshots survive interrupted delivery, conflicts preserve both paren
       signal,
       log,
       commands,
+    );
+    assert.equal(
+      gitAt(guestRepo, "show", "-s", "--format=%an <%ae>|%cn <%ce>", merged),
+      "Publisher Fixture <publisher@example.invalid>|Publisher Fixture <publisher@example.invalid>",
+    );
+    assert.equal(
+      gitAt(guestRepo, "show", "-s", "--format=%s", merged),
+      `feat(${run.identifier.toLowerCase()}): ${run.title}`,
     );
     assert.equal(
       gitAt(guestRepo, "show", "-s", "--format=%P", merged),

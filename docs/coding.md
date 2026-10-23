@@ -22,6 +22,31 @@ Linear's `updatedAt` timestamp alone does not change discovery inputs. PR integr
 
 ## Execution and Evidence
 
+### External Publication Privacy
+
+PR templates omit Code Assist links, plan-version references and model attribution.
+Revision descriptions no longer copy private Request Changes text verbatim; they
+record the updated candidates and completed checks. GitHub and Windmill evidence
+links remain available where relevant. Neutral publication/revision markers retain
+ownership and recovery checks; older branded markers are accepted and converted,
+and the old generated internal links are removed when an owned PR is next updated
+or reconciled. This does not bulk-edit existing PRs.
+
+New checkpoint commits use the publisher host's Git `user.name` and `user.email`
+for the selected source repository, including updates in previously created guests.
+Commit messages describe the ticket rather than an internal plan version. Existing
+commits and published history are retained. New Windmill fork names omit the tool
+name, and adopted native PRs receive the normal feature/fix title. Saved older fork
+intents remain usable without creating another fork.
+
+The [Global prompt](prompts.md) supplies the matching instruction for agent-written
+content. Linear intake remains read-only. Optional optimizations and controls:
+Tim requested this privacy policy on October 22, 2026; it deliberately omits private
+workflow links, agent attribution and raw revision instructions from external
+publication, while preserving validation and publication integrity checks.
+
+### Workspace Execution
+
 Each ticket run uses one isolated OrbStack workspace with a private container engine and repository-owned local services. Candidate checkouts live together at `/work/<repository>`, allowing paired acceptance tests. Repository commands run through `/work/run.mjs --repo <repository>`, which loads only the repository's mapped and attempt-owned environment. The source is restored from the approved commit into an independent Git repository. Synced clones are read-only inputs. Provider credentials arrive through stdin, not command arguments or the controller's environment. GitHub and notification credentials are not copied into the guest.
 
 New steps ensure the guest runtime matches the deployed worker release, including its frozen SDK dependencies. Running steps keep their existing runtime.

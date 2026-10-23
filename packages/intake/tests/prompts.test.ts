@@ -9,6 +9,7 @@ import {
 } from "../src/prompt-settings.ts";
 import {
   composeInstructions,
+  privateWorkflowInstructions,
   promptText,
   type PromptSettings,
 } from "../src/prompt-defaults.ts";
@@ -24,6 +25,7 @@ test("prompt edits persist independently, blank overrides are deliberate, and re
   try {
     const initial = readPromptSettings(dir);
     assert.match(promptText(initial, "global"), /Status and Evidence/);
+    assert(promptText(initial, "global").includes(privateWorkflowInstructions));
     writePromptSetting(dir, "global", "Operator's global instructions");
     writePromptSetting(dir, "planning", "Planning guidance");
     writePromptSetting(dir, "coding", "Coding guidance", "/repos/api");
@@ -147,4 +149,10 @@ test("discovery, Codex drafts and Claude reviews receive configured prompts whil
   }
   assert.match(planningPrompt(step), /Status and Evidence/);
   assert.match(discoveryPrompt(discovery, snapshots, []), /Title Case/);
+  assert(planningPrompt(step).includes(privateWorkflowInstructions));
+  assert(
+    discoveryPrompt(discovery, snapshots, []).includes(
+      privateWorkflowInstructions,
+    ),
+  );
 });
