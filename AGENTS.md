@@ -43,6 +43,12 @@ and approval, as with any repository. Tim reviews and merges PRs; agents never
 merge, enable auto-merge, run Terraform apply, or initiate infrastructure deployment.
 Human-initiated applies use the established deployment workflow.
 
+## Guest Browser Readiness
+
+- Setup tests and coding use the shared runtime installer in `packages/intake/src/workspace-runtime.ts`. It supplies the agent's Chromium system libraries, browser binary, and native MCP readiness probe; repositories do not need a special system installer for the agent's browser.
+- **Save and Test Setup** verifies real MCP navigation/click/screenshot as the workspace user, including each repository's configured environment. Repository-owned browser suites and authenticated application acceptance remain separate. Readiness files under `/work/runtime-readiness` are not feature acceptance evidence.
+- For provisioning changes, the fresh-guest success/missing-browser/validation-failure regression is documented in `docs/repository-setup.md`; normal `make verify` does not run OrbStack guests. See `docs/browser-testing.md` for runtime ownership and diagnostics.
+
 ## Temporary testing files
 
 Keep ad hoc test scripts, probes, logs, screenshots, and other temporary testing artifacts in a task-specific directory under the repository's gitignored `.tmp/` folder. Configure temporary tooling to write generated files and caches there as well; do not leave them in the repository root. Keep permanent tests in their established source directories and use the normal Makefile targets for project validation.

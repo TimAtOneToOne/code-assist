@@ -151,6 +151,10 @@
 					<Card.Root class="panel">
 						<h2>Application and Browser Checks</h2>
 						<p class="muted">
+							The agent's Chromium browser is installed and tested automatically. These fields
+							configure your application's own browser tests.
+						</p>
+						<p class="muted">
 							Optional for repositories without a web app. A readiness check does not prove sign-in
 							works; use a smoke test that exercises the real local authentication flow.
 						</p>
@@ -286,11 +290,12 @@
 								{(
 									{
 										validation: 'Validation',
+										'shared browser readiness': 'Shared Browser Readiness',
 										'app startup': 'App Startup',
 										'app readiness': 'App Readiness',
 										'browser/authentication smoke test': 'Browser / Sign-In Smoke Test'
 									} as Record<string, string>
-								)[check.name] ?? check.name}
+								)[check.name] ?? check.name.replace(/^browser readiness \(/, 'Browser Readiness (')}
 							</p>{/each}
 						{#if !test.configuration.startScript}<p class="muted">
 								App startup: not configured.

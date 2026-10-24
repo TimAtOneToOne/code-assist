@@ -20,7 +20,7 @@ import {
 import { readWorkspace } from "../src/workspace.ts";
 
 test(
-  "OrbStack setup runs system/user commands, starts and checks an app, records failures, and removes both machines",
+  "OrbStack setup runs system/user commands, starts and checks an app, checks native browser readiness and failures, and removes its machines",
   { skip: process.env.TEST_ORBSTACK !== "1" },
   async () => {
     const adminUrl = process.env.TEST_DATABASE_URL;
@@ -86,16 +86,25 @@ test(
     try {
       await boss.start();
       await initializeIntake(boss);
-      for (const shouldFail of [false, true]) {
+      for (const failure of [null, "validation", "browser"] as const) {
+        const shouldFail = failure !== null;
         writeRepositorySetup(
           directory,
           repo,
-          shouldFail
+          failure === "validation"
             ? {
                 ...config,
                 validationScript: "echo deliberate-validation-failure; exit 37",
               }
-            : config,
+            : failure === "browser"
+              ? {
+                  ...config,
+                  environment: {
+                    ...config.environment,
+                    PLAYWRIGHT_BROWSERS_PATH: "/tmp/missing-browser",
+                  },
+                }
+              : config,
         );
         const id = await requestSetupTest(boss, directory, repo);
         await boss.fetch(setupTestQueue);
@@ -112,11 +121,24 @@ test(
         assert.equal(result.status, shouldFail ? "failed" : "passed");
         assert.ok(result.cleaned_at);
         assert.equal(result.cleanup_error, null);
-        assert.equal(result.checks[0].status, shouldFail ? "failed" : "passed");
+        assert.equal(
+          result.checks.find((c) => c.name === "shared browser readiness")
+            ?.status,
+          "passed",
+        );
+        assert.equal(
+          result.checks.find((c) => c.name === "browser readiness (fixture)")
+            ?.status,
+          failure === "browser" ? "failed" : "passed",
+        );
+        assert.equal(
+          result.checks.find((c) => c.name === "validation")?.status,
+          failure === "browser" ? undefined : shouldFail ? "failed" : "passed",
+        );
         if (!shouldFail)
           assert.deepEqual(
             result.checks.map((c) => c.status),
-            ["passed", "passed", "passed", "passed"],
+            ["passed", "passed", "passed", "passed", "passed", "passed"],
           );
         const workspace = await readWorkspace(directory, result.workspace_id!);
         assert.equal(workspace.state, "destroyed");
@@ -127,7 +149,7 @@ test(
               "utf8",
             ),
           ).profiles.fixture.configuration.validationScript,
-          shouldFail
+          failure === "validation"
             ? "echo deliberate-validation-failure; exit 37"
             : config.validationScript,
         );

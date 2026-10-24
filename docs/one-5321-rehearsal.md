@@ -79,3 +79,30 @@ production-deployment, infrastructure, or failure-recovery path.
 
 Optional optimizations and controls: none. Game legality checks enforce the game
 rules; Action SHA pins satisfy the existing organization policy.
+
+## Shared Runtime Follow-Up
+
+On October 23, Tim authorized replacing the temporary installer above with shared
+Linux runtime provisioning and native MCP readiness. The shared implementation
+installs Chromium libraries as root, browser binaries as the workspace user, and
+verifies navigation, a click, changed DOM and a screenshot through actual MCP.
+Setup tests use this same path and also verify the repository's environment;
+implementation/review steps repeat readiness. Readiness evidence does not count as
+feature acceptance.
+
+The pre-deployment candidate passed three fresh OrbStack regression cases on Mia:
+
+- `ffbe7839-6729-4777-9537-bb4c3d4f2651`: native MCP readiness, validation, app
+  startup/readiness and synthetic HTTP checks passed without a custom browser
+  installer in the fixture profile.
+- `1c5b6621-5704-46f6-88ba-c8485b1c4fdd`: native readiness passed; deliberate
+  validation failure was recorded as failed.
+- `e625253e-9a0b-4200-ae4e-a3c35742a594`: base readiness passed, but the repository's
+  nonexistent `PLAYWRIGHT_BROWSERS_PATH` failed native browser readiness before
+  validation could run.
+
+All three guests were removed automatically. The suite took about 259 seconds.
+Local lint/type/build and 79 unit tests passed, as did nine PostgreSQL integration
+tests. Local operator evidence is under `.tmp/2026-10-23-guest-readiness/`.
+These candidate results do not yet establish live deployment or removal of the
+saved test-repository workaround.

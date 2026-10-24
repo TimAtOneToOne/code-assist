@@ -11,6 +11,7 @@ import { resolveRepositoryEnvironment } from "@code-assist/secrets";
 import type { RepositorySnapshot } from "./discovery.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { bootstrap, environmentLauncher } from "./workspace-bootstrap.ts";
+import { ensureGuestRuntime, verifyGuestBrowser } from "./workspace-runtime.ts";
 import { bundleGitDependency } from "./workspace-git-dependencies.ts";
 
 import { snapshots } from "./coding-repositories.ts";
@@ -455,25 +456,52 @@ export async function provisionWorkspace<T extends WorkspaceSources>(
         ]);
         await run(profile.browserInstall);
       }
+    }
+    workspace.checks ??= [];
+    async function check(name: string, action: () => Promise<void>) {
+      const result = {
+        name,
+        status: "running" as "running" | "passed" | "failed",
+      };
+      workspace.checks!.push(result);
+      await stage(name);
+      try {
+        await action();
+        result.status = "passed";
+      } catch (error) {
+        result.status = "failed";
+        throw error;
+      } finally {
+        await save(directory, workspace);
+      }
+    }
+    await check("shared browser readiness", () =>
+      ensureGuestRuntime(
+        folder(directory, id),
+        guest,
+        (args, content) =>
+          orb(["-m", workspace.machine, "-u", "workspace", ...args], content),
+        signal,
+      ).then(() => {}),
+    );
+    for (const source of sources) {
+      const profile = profiles[source.name];
+      const run = (args: string[]) =>
+        orb([
+          "-m",
+          workspace.machine,
+          "-u",
+          "workspace",
+          "node",
+          "/work/run.mjs",
+          "--repo",
+          source.name,
+          ...args,
+        ]);
+      await check(`browser readiness (${source.name})`, () =>
+        verifyGuestBrowser(run),
+      );
       if (testSetup) {
-        workspace.checks ??= [];
-        async function check(name: string, action: () => Promise<void>) {
-          const result = {
-            name,
-            status: "running" as "running" | "passed" | "failed",
-          };
-          workspace.checks!.push(result);
-          await stage(name);
-          try {
-            await action();
-            result.status = "passed";
-          } catch (error) {
-            result.status = "failed";
-            throw error;
-          } finally {
-            await save(directory, workspace);
-          }
-        }
         await check("validation", async () => {
           for (const args of profile.validation) await run(args);
         });

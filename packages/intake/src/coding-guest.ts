@@ -1,9 +1,9 @@
+import { browserServer } from "../../browser-mcp/src/server.ts";
 import { writeReceipt } from "./coding-receipt.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 // Executed only inside the attempt's OrbStack guest, under an owned systemd unit.
 import { readFileSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { createRequire } from "node:module";
+import { join } from "node:path";
 import { Codex } from "@openai/codex-sdk";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { createLogger } from "@code-assist/observability";
@@ -100,25 +100,7 @@ process.on("SIGTERM", () => {
   terminateOwnedProcesses();
   abort.abort();
 });
-const require = createRequire(
-  new URL("../../browser-mcp/package.json", import.meta.url),
-);
-const browserCli = join(
-  dirname(require.resolve("@playwright/mcp/package.json")),
-  "cli.js",
-);
-const mcp = {
-  command: "/usr/local/bin/node",
-  args: [
-    browserCli,
-    "--headless",
-    "--isolated",
-    "--browser",
-    "chromium",
-    "--output-dir",
-    "/work/evidence",
-  ],
-};
+const mcp = browserServer("/work/evidence");
 const shell = {
   PATH: "/usr/local/bin:/usr/bin:/bin",
   HOME: home,

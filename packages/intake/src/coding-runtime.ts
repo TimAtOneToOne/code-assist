@@ -7,8 +7,8 @@ import {
   type AgentReceipt,
 } from "./coding-receipt.ts";
 import { mkdir, writeFile, rm, rename } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { ensureGuestRuntime } from "./workspace-runtime.ts";
 import type { Readable } from "node:stream";
 import { readWorkspace, type Workspace } from "./workspace.ts";
 import type { CodingRun, CodingStep } from "./coding-types.ts";
@@ -318,57 +318,17 @@ export async function ensureCodingRuntime(
     await root(["bash", "-c", "cat > /work/run.mjs"], environmentLauncher);
     await root(["chown", "-R", "workspace:workspace", "/work/environments"]);
   }
-  const release = process.env.CODE_ASSIST_COMMIT ?? "development";
-  const installed = await root([
-    "bash",
-    "-c",
-    "if test -f /opt/code-assist/release; then cat /opt/code-assist/release; fi",
-  ]);
-  if (installed === release) return;
-  const local = codingDirectory(directory, run.id);
-  const runtime = join(local, "runtime.tar"),
-    source = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-  await executeCoding(
-    "/usr/bin/tar",
-    [
-      "--exclude=node_modules",
-      "--exclude=.tmp",
-      "-cf",
-      runtime,
-      "-C",
-      source,
-      "packages",
-      "package.json",
-      "pnpm-lock.yaml",
-      "pnpm-workspace.yaml",
-    ],
+  const installed = await ensureGuestRuntime(
+    codingDirectory(directory, run.id),
+    root,
+    guest,
     signal,
-    log,
   );
-  await root(["mkdir", "-p", "/opt/code-assist"]);
-  await root(
-    ["tar", "-xf", "-", "-C", "/opt/code-assist"],
-    createReadStream(runtime),
-  );
-  await rm(runtime);
-  await root([
-    "bash",
-    "-c",
-    "cd /opt/code-assist && pnpm install --frozen-lockfile --filter @code-assist/intake... --filter @code-assist/browser-mcp",
-  ]);
-  await guest([
-    "bash",
-    "-c",
-    "cd /opt/code-assist/packages/browser-mcp && pnpm exec playwright-mcp install-browser chromium",
-  ]);
-  await guest(["mkdir", "-p", "/work/evidence", "/work/logs"]);
-  await root(["bash", "-c", "cat > /opt/code-assist/release"], release);
-  log.event(
-    "info",
-    "coding.runtime",
-    "Guest runtime matches the worker release",
-    { runtime_release: release },
-  );
+  if (installed)
+    log.event("info", "coding.runtime", "Guest runtime and browser verified", {
+      runtime_release: process.env.CODE_ASSIST_COMMIT ?? "development",
+    });
+  return installed;
 }
 async function configureCommitIdentity(
   run: CodingRun,

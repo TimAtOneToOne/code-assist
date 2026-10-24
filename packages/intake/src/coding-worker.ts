@@ -1,3 +1,4 @@
+import { verifyGuestBrowser } from "./workspace-runtime.ts";
 import {
   snapshots,
   repositories,
@@ -301,6 +302,9 @@ export async function registerCodingWorker(
           log,
           activeSnapshot(run).name,
         );
+        if (step.kind === "implement" || step.kind === "review") {
+          await verifyGuestBrowser(commands.run);
+        }
         const environment: Record<string, string> = {};
         for (const snapshot of snapshots(run.input)) {
           let environmentText = "";

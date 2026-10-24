@@ -1,6 +1,6 @@
 # Current Status
 
-Updated October 23, 2026 against the source tree, including deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
+Updated October 23, 2026 against the source tree, including shared Linux browser provisioning and native MCP readiness, deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
 
 ## Product and Runtime
 
@@ -42,6 +42,19 @@ durable jobs, workflow steps, host/guest processes, actual service releases, upd
 state, and web health. A temporary live collector passed against Mia in 484 ms;
 permanent command availability depends on deployment. See [Deployment Status](deployment.md#deployment-status)
 and the repository's `AGENTS.md`. Optional optimizations and controls: none.
+
+The October 23 guest-readiness change makes setup tests and coding use one runtime
+installer, including Chromium OS libraries and workspace-owned browser binaries.
+It verifies native MCP navigation, a click, DOM changes and a screenshot before
+readiness, repeats that check with each repository's environment, and checks again
+before implementation/review. Synthetic readiness evidence is separate from
+feature acceptance. See [Browser Testing](browser-testing.md#guest-provisioning-and-readiness)
+and [Repository Setup](repository-setup.md). Before deployment, the candidate passed
+`make verify` (79 unit tests), nine PostgreSQL integration tests, and three fresh
+OrbStack scenarios on Mia: successful native browser/app checks, deliberate
+validation failure, and a missing-browser override rejected before validation.
+All three disposable guests were removed. The live setup proof is recorded in
+[the rehearsal follow-up](one-5321-rehearsal.md#shared-runtime-follow-up).
 
 ## Code Map
 

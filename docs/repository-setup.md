@@ -5,7 +5,7 @@ Open **Configuration → Repository Setup** to search synced repositories and ed
 ## Fields
 
 - **Working Directory:** relative to the repository; use `.` for its root.
-- **Additional System Dependencies:** optional installation script, run as root inside the isolated OrbStack guest. The shared bootstrap already installs Node, pnpm, Git, Make, a PostgreSQL client, and a private container engine.
+- **Additional System Dependencies:** optional installation script, run as root inside the isolated OrbStack guest. The shared bootstrap already installs Node, pnpm, Git, Make, a PostgreSQL client, a private container engine, and the agent MCP browser with its Chromium system libraries.
 - **Pinned Git Dependencies:** a JSON array of synced repository names and full commit hashes, for example `[{"repository":"gitops","commits":["41f4871cc6820b2f33b1c5d2089aae557779b541"]}]`. The controller exports Git bundles from sibling synced clones. Native Git URL rewriting lets tools such as Terraform clone the pinned modules locally without guest GitHub credentials. Bundles include the requested commits and their Git history, not untracked files, host Git configuration, hooks, or credentials. The guest copies are root-owned under `/opt/code-assist/dependencies`; they are dependency sources, not approved coding targets. When multiple selected repositories need the same dependency, its requested commits share one bundle. Missing commits fail setup explicitly; sync the source clone and update the pins when requirements change.
 - **Install and Service Setup:** install locked dependencies, start private services, apply local migrations, and prepare synthetic fixtures using repository-owned commands.
 - **Validation Commands:** the repository's lint, type, test, and build checks. Required before the profile can be saved.
@@ -20,9 +20,9 @@ Scripts run through Bash with error/unset-variable checking. Additional System D
 
 ## Test Setup
 
-**Save and Test Setup** saves the form and queues a durable pg-boss job. It pins the saved profile and the synced repository's current HEAD, creates a disposable OrbStack machine, runs setup/browser installation and validation, then configured startup/readiness/smoke checks. It does not need a ticket plan approval, modify the host checkout, create a feature branch, run an agent, or publish a PR.
+**Save and Test Setup** saves the form and queues a durable pg-boss job. It pins the saved profile and the synced repository's current HEAD, creates a disposable OrbStack machine, runs repository setup and the shared coding-runtime/browser installation, verifies real MCP navigation/click/screenshot as the workspace user (also with each repository’s environment), runs validation, then configured startup/readiness/smoke checks. It does not need a ticket plan approval, modify the host checkout, create a feature branch, run an agent, or publish a PR.
 
-Results show the tested commit, whether the profile matches the current saved setup, each executed check, omitted app/browser checks, failure stage, and a link to central workspace logs. **Refresh Results** fetches progress. The machine is deleted after success or failure; logs, profile snapshots, and result history remain. Guest-local files are removed with the machine. Cleanup failures have a **Retry Cleanup** action.
+Results show the tested commit, whether the profile matches the current saved setup, each executed check (including shared and repository-environment browser readiness), omitted app/browser checks, failure stage, and a link to central workspace logs. **Refresh Results** fetches progress. The machine is deleted after success or failure; logs, profile snapshots, and result history remain. Guest-local files are removed with the machine. Cleanup failures have a **Retry Cleanup** action.
 
 Tests use the coding workflow's one-hour job expiration and explicit retry approach. Worker interruption marks an active test failed, preserves its result, and cleans up its machine on restart. Select **Save and Test Setup** again to repeat a test using the saved form values. A passing result means the configured checks passed; it does not certify an omitted authentication flow or feature-specific acceptance tests.
 
@@ -67,7 +67,7 @@ A separate disposable [runtime probe](http://100.91.0.83:3000/logs?attempt=54999
 
 ## Verification
 
-`make verify` runs normal validation. Database integration coverage lives in `repository-setup.integration.ts`. To exercise real OrbStack provisioning, app startup, validation failure, and machine cleanup on Mia:
+`make verify` runs normal validation. Database integration coverage lives in `repository-setup.integration.ts`. To exercise fresh OrbStack provisioning without a repository-specific browser installer, real MCP interaction, app startup, validation failure, a missing-browser failure caused by an environment override, and machine cleanup on Mia:
 
 ```sh
 TEST_ORBSTACK=1 TEST_DATABASE_URL=<disposable-database-admin-url> \

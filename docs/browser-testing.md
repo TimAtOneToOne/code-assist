@@ -12,6 +12,35 @@ Each client starts its own server over stdio when needed. There is no listening 
 
 Before release activation, `ops/install-browser.ts` runs the native `install-browser chromium --no-remove` command. Browser binaries live in `~/Library/Caches/ms-playwright`; installed revisions are reused. Older revisions remain available because managed repositories may require their own locked Playwright versions. This consumes additional disk space; no automatic browser cleanup is configured. Do not upgrade a managed repository's test tooling to match this MCP package.
 
+## Guest Provisioning and Readiness
+
+Setup tests and coding workspaces use `packages/intake/src/workspace-runtime.ts`
+to install the same locked SDK/MCP runtime. The native `playwright install-deps
+chromium` command installs Linux libraries as root; `playwright-mcp install-browser
+chromium` installs the browser as the unprivileged workspace user. A repository
+does not need a custom system installer for the agent's browser. Repository-owned
+browser suites can still install their own locked versions through their profile.
+
+Before writing the runtime release marker, the provisioner runs
+`packages/browser-mcp/src/readiness.ts` as the workspace user. It starts the actual
+stdio Playwright MCP server with the same Chromium/headless/isolated configuration
+used by both coding SDKs, navigates to a synthetic loopback page, clicks a button,
+verifies the changed DOM, and captures a PNG. It closes the browser, MCP client and
+synthetic server. Failure fails preparation; neither an installed executable nor
+an HTTP response is sufficient.
+
+Every selected repository also runs this probe through its environment launcher,
+so a bad browser-path override cannot be hidden by a passing base environment.
+Implementation and review steps repeat the probe with the active repository's
+environment, including when an existing guest already has the current runtime.
+
+Diagnostics, MCP transcripts and screenshots are under `/work/runtime-readiness`
+inside the guest, outside `/work/evidence`. They cannot satisfy feature browser
+acceptance or increment the agent's browser-tool count. Setup results record each
+readiness check and retain central command/failure logs after the disposable guest
+is removed; guest-local screenshots follow the guest's lifetime. Application
+behavior and authenticated workflows still require their own acceptance tests.
+
 ## Client registration
 
 Run on Mia as `miasocci`. The stable active-release path gives new sessions the deployed version:
