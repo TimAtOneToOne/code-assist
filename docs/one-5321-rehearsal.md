@@ -46,6 +46,8 @@ the final observation.
 
 ## Setup Lessons
 
+This records the original workaround. The shared-runtime follow-up below supersedes it.
+
 Installing the MCP browser binary does not install Linux browser system libraries.
 The test repo's saved system setup now uses the native command:
 
@@ -104,5 +106,22 @@ The pre-deployment candidate passed three fresh OrbStack regression cases on Mia
 All three guests were removed automatically. The suite took about 259 seconds.
 Local lint/type/build and 79 unit tests passed, as did nine PostgreSQL integration
 tests. Local operator evidence is under `.tmp/2026-10-23-guest-readiness/`.
-These candidate results do not yet establish live deployment or removal of the
-saved test-repository workaround.
+Release `315411484defc551f914d5debc5172d48689a791` was observed in the selected
+release, web, worker and HTTP health at 9:54 PM EDT. Through the deployed UI, the
+operator removed the temporary Additional System Dependencies command and updated
+the test repository's agent instructions to describe the shared runtime. Other
+profile commands were preserved; both repository-specific browser fields remain
+empty.
+
+Live **Save and Test Setup** job `0aa3de82-92ae-45da-9dad-218682fa5f5d` passed on
+merged commit `ac94e3dc5c4f0a282ea2a3508db96420dc8a99ee`: Shared Browser Readiness,
+Browser Readiness (web-app-test-repo), validation (19 tests/lint/type/build), app
+startup, app readiness, and its existing HTTP smoke script. Guest
+`5ee4c30e-5843-4dab-a4f5-a9d51fb0f0d2` was removed automatically. The passing UI was
+visually checked and captured locally as `setup-proof.jpg` in the evidence folder.
+See [the live setup logs](http://100.91.0.83:3000/logs?attempt=5ee4c30e-5843-4dab-a4f5-a9d51fb0f0d2).
+
+The new browser checks prove native MCP runtime readiness with synthetic data;
+they do not turn the existing HTTP smoke script into feature browser coverage.
+The complete model-driven feature/PR lifecycle was not repeated for this runtime
+change. Optional optimizations and controls: none.

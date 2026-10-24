@@ -53,8 +53,11 @@ and [Repository Setup](repository-setup.md). Before deployment, the candidate pa
 `make verify` (79 unit tests), nine PostgreSQL integration tests, and three fresh
 OrbStack scenarios on Mia: successful native browser/app checks, deliberate
 validation failure, and a missing-browser override rejected before validation.
-All three disposable guests were removed. The live setup proof is recorded in
-[the rehearsal follow-up](one-5321-rehearsal.md#shared-runtime-follow-up).
+All three disposable guests were removed. Release `3154114` was observed running in
+web/worker/health at 9:54 PM EDT. Live Save and Test Setup
+`0aa3de82-92ae-45da-9dad-218682fa5f5d` then passed all six checks on the merged test
+repository without its temporary Chromium installer; its guest was removed.
+See [the rehearsal follow-up](one-5321-rehearsal.md#shared-runtime-follow-up).
 
 ## Code Map
 
@@ -76,6 +79,7 @@ All three disposable guests were removed. The live setup proof is recorded in
   the exact merge commit, and observed Done. Fresh setup and merged-commit browser
   checks also passed. It exposed missing guest Chromium OS dependencies and the
   organization's full-SHA Action policy; the test profile and PR were corrected.
+  The later shared-runtime fix above replaces that temporary browser installer.
   See [the rehearsal record](one-5321-rehearsal.md) for scope and evidence limits.
 - Automatic ingestion of GitHub review comments and automatic rebase/revalidation are not implemented. Request Code Changes and Bring In Main are explicit user actions.
 - The latest native Windmill fork publisher has local Git tests with synthetic service responses and documented live read-only configuration inspection. Its first real approved controller-driven fork publication remains unverified in the checked-in record. Git Sync success proves source synchronization, not feature acceptance or provisioning of excluded resources, triggers, variables, or datatables.
