@@ -291,7 +291,13 @@ export async function finishPlanningStep(
   step: PlanningStep,
   value: unknown,
 ) {
-  const result = step.kind === "draft" ? parsePlan(value) : parseReview(value);
+  const result =
+    step.kind === "draft"
+      ? parsePlan(
+          value,
+          step.input.discovery.snapshots?.map((s) => s.name) ?? [],
+        )
+      : parseReview(value);
   return transaction(boss, async (db) => {
     let run: PlanningRun;
     try {

@@ -1,6 +1,6 @@
 # Current Status
 
-Updated October 23, 2026 against the source tree, including automatic repository setup during intake, shared Linux browser provisioning and native MCP readiness, deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
+Updated October 24, 2026 against the source tree, including approved additional validation commands, automatic repository setup during intake, shared Linux browser provisioning and native MCP readiness, deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
 
 ## Product and Runtime
 
@@ -83,6 +83,17 @@ tests. The [onboarding rehearsal](repository-onboarding-rehearsal.md) records th
 browser-driven acceptance, the discovered noninteractive migration false positive,
 and its correction. Repository workflows remain repository-specific; this does
 not create GitHub CI or automatically revise an existing workspace's contract.
+Optional optimizations and controls: none.
+
+Approved plans now carry repository-scoped additional validation commands. They
+are displayed, compared, exported and included in the approval hash; controller
+validation runs them after pinned checks without editing saved profiles. The
+candidate passed 90 unit tests, ten PostgreSQL integration tests, a fresh Linux
+guest regression and a browser/controller rehearsal using the test web app. The
+new test failed while existing checks passed, then passed on a corrected commit.
+See [the regression record](plan-validation-rehearsal.md) for fixture boundaries,
+browser-download verification limits and repeatable tests. Verify the deployed
+release with `make deploy-status` before relying on live availability.
 Optional optimizations and controls: none.
 
 ## Code Map

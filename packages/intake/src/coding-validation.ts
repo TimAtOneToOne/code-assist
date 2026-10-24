@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createLogger } from "@code-assist/observability";
 import { artifactPath } from "@code-assist/observability/artifacts";
+import { additionalValidationCommands } from "./plan-validation.ts";
 const id = process.argv[2];
 if (!/^[a-f0-9-]{36}$/.test(id))
   throw new Error("A coding step ID is required.");
@@ -31,8 +32,16 @@ const log = createLogger(
   { attempt_id: id },
 );
 const results: Record<string, number> = {};
-for (const args of profile.validation) {
-  const task = args.join(" ");
+const additional = process.argv.find((arg) =>
+  arg.startsWith("--plan-validation="),
+);
+const commands = [
+  ...profile.validation.map((args) => ({ task: args.join(" "), args })),
+  ...additionalValidationCommands(
+    additional ? JSON.parse(additional.slice("--plan-validation=".length)) : [],
+  ),
+];
+for (const { task, args } of commands) {
   results[task] = await new Promise<number>((resolve, reject) => {
     const child = spawn(
       "/usr/local/bin/node",

@@ -117,7 +117,12 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     });
     await answerDiscovery(boss, ticket.id, d.id, [], "");
     for (const result of [
-      { markdown: "# Plan", changeSummary: "Initial", responses: [] },
+      {
+        markdown: "# Plan",
+        changeSummary: "Initial",
+        responses: [],
+        additionalValidation: [{ repository: source.name, script: "npm test" }],
+      },
       {
         summary: "Ready",
         disposition: "ready",
@@ -144,6 +149,9 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     await syncApprovedCoding(boss);
     const runs = await readCoding(boss.getDb(), ticket.id);
     assert.equal(runs.length, 1);
+    assert.deepEqual(runs[0].plan.additionalValidation, [
+      { repository: source.name, script: "npm test" },
+    ]);
     assert.equal(runs[0].steps.length, 1);
     assert.equal(runs[0].branch, "feature/one-999999");
     async function next() {

@@ -8,6 +8,25 @@ Each run is bound to the approved plan version, plan hash, requirements hash and
 
 The ticket page shows these steps, summaries, findings, validation results and log links. Failed steps have a Retry action and a deliberate Use Branch and Retry form when a fresh branch is needed. A publication already in flight must be reconciled before its branch can change. A changed ticket, removed Plan label, changed repository selection or revised plan prevents obsolete attempts from advancing. A revised approved plan starts a separate run; previously used branches are not silently reused.
 
+### Approved Plan Validation
+
+Controller validation runs the workspace's pinned checks followed by the approved
+plan's `additionalValidation` scripts for that repository. All commands use the
+same configured working directory and environment. Each addition has a separate
+result (for example, `Plan 1: npm test`), including repeated scripts. Existing
+checks remain required. Any nonzero exit follows the existing implementation-repair
+path; missing additional-command results fail the validation step. The candidate
+must remain clean at the same commit. Publication still requires successful
+validation and independent review of that exact candidate.
+
+The plan UI, comparisons and downloads show the executable additions before
+approval. Commands are part of the plan hash and copied into the coding run;
+implementation responses cannot change controller commands. Old plans keep their
+pinned checks. Updating shared profiles or preparing new system dependencies
+remains a separate setup change.
+
+See [Additional Plan Validation Rehearsal](plan-validation-rehearsal.md) for regression instructions and evidence.
+
 ### Repeated Validation Failures
 
 A first failed validation returns to implementation. If a completed implementation attempt leaves the candidate commits unchanged and validation again returns the same command/exit-code results, the controller pauses in **Your Direction Needed** instead of repeating. It preserves both validation results, identifies the previous step, and uses the existing **Reply and Continue** flow. This compares command outcomes, not individual test identities or log text; inspect the logs to diagnose the actual failure.

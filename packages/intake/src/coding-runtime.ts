@@ -1,4 +1,8 @@
 import { repositorySetupContext } from "./repository-settings.ts";
+import {
+  planValidationScripts,
+  assertPlanValidationResults,
+} from "./plan-validation.ts";
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
@@ -532,7 +536,7 @@ ${snapshots(run.input)
       (profiles?.[s.name] ?? repositoryProfile(s.name)).instructions,
   )
   .join("\n")}
-Pinned repository setup and validation commands (environment values withheld): ${JSON.stringify(Object.fromEntries(Object.entries(profiles ?? {}).map(([name, profile]) => [name, repositorySetupContext(profile.configuration)])))}. These are the controller's actual validation commands; also run any additional acceptance checks required by the approved plan.
+Pinned repository setup and validation commands (environment values withheld): ${JSON.stringify(Object.fromEntries(Object.entries(profiles ?? {}).map(([name, profile]) => [name, repositorySetupContext(profile.configuration)])))}. The controller runs these pinned checks followed by this plan’s repository-scoped additionalValidation scripts. Implement any new test scripts those commands require, and run the approved acceptance checks. Do not edit saved profiles or substitute commands to avoid failures. Changing the approved commands requires a revised plan.
 Playwright MCP is registered as playwright in this guest. Exercise the approved UI behavior using real local/synthetic fixtures, inspect rendering and browser errors. Save screenshots and full evidence to /work/evidence. The final implementation must include browser evidence for the combined feature. Controller validation runs each repository's established checks; also implement and run all acceptance tests required by the plan, including paired tests. Explain unavailable external integration tests honestly.
 Each implementation attempt for the final repository must run Playwright MCP in this attempt and save its browser evidence, even when no source changes are needed or Tim withdraws a requested change. Earlier screenshots alone do not satisfy this check. If the previous collection failed because browser checks were missing, preserve the saved code, perform the missing browser checks, and return their evidence paths. Do not invent code changes merely to complete this step.
 Central logging: every SDK event and tool result is captured. Your workspace's redacted log mirror is /work/logs/structured/coding.jsonl with full JSON payloads in /work/logs/artifacts; use normal read/search tools to investigate previous failures. The same events are indexed in the main Logs UI under this coding step. Test/app output may be saved under /work/evidence for diagnosis.
@@ -641,6 +645,11 @@ export async function validation(
   signal: AbortSignal,
   log: Log,
 ) {
+  const additional = planValidationScripts(
+    run.plan,
+    snapshots(run.input).map((s) => s.name),
+    activeSnapshot(run).name,
+  );
   const command = guestCommands(
     workspace,
     signal,
@@ -649,6 +658,7 @@ export async function validation(
   );
   await command.root([
     "systemd-run",
+    "--expand-environment=no",
     "--quiet",
     "--wait",
     "--pipe",
@@ -660,11 +670,13 @@ export async function validation(
     "/opt/code-assist/packages/intake/src/coding-validation.ts",
     step.id,
     activeSnapshot(run).name,
+    `--plan-validation=${JSON.stringify(additional)}`,
     ...(workspace.environments ? ["--environments"] : []),
   ]);
   const results = JSON.parse(
     await command.guest(["cat", `/work/evidence/${step.id}-validation.json`]),
   ) as Record<string, number>;
+  assertPlanValidationResults(additional, results);
   const commit = await command.git("rev-parse", "HEAD");
   const dirty = await command.git("status", "--porcelain");
   if (commit !== run.commit || dirty)

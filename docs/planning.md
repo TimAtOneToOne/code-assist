@@ -8,6 +8,24 @@ The ticket page shows the current plan, findings, agent activity, previous versi
 
 ## Human Approval
 
+New plan outputs include an `additionalValidation` array of repository names and
+shell scripts for acceptance checks beyond the saved profile. Codex proposes them
+and Claude reviews their coverage, feasibility and effects. Use exact confirmed
+repository names and an empty array when existing commands cover the work.
+Commands for unselected repositories are rejected before saving the plan.
+
+The controller renders these commands in **Additional Controller Validation**,
+includes them in version comparisons and Markdown downloads, and hashes them
+with the entire plan. Changing commands requires a new reviewed, approved version.
+Historical documents without this field retain their content and behavior.
+
+Each script runs after that repository's pinned checks, through the existing
+environment launcher in its configured working directory, using `bash -euc`
+without stdin. These are acceptance checks, not setup, publication or deployment
+commands. Do not embed secret values. Failed checks follow the existing repair
+flow; missing command results cannot count as success. Saved profiles and workspace
+configuration are not rewritten. See [the regression record](plan-validation-rehearsal.md).
+
 Critical/high findings block approval, even if the reviewer incorrectly labels the plan ready. A ready review may retain medium concerns; Tim must explicitly check each one before approving that exact version. The server validates the current version, plan hash, current discovery and repository scope, review disposition and complete set of accepted medium finding IDs. Approval records the authenticated Tailscale owner, input hash, plan hash, version and accepted concerns.
 
 Feedback on a reviewed plan creates the next version and another independent review. A previous approval remains in history but is no longer current. Changes to ticket inputs or repository selection supersede planning with the discovery baseline. Removing Plan hides the ticket and prevents acceptance of pending results or approvals.

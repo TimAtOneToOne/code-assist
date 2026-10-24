@@ -4,6 +4,7 @@ export type PlanDocument = {
   markdown: string;
   changeSummary: string;
   responses: { findingId: string; response: string }[];
+  additionalValidation?: { repository: string; script: string }[];
 };
 export type PlanReview = {
   summary: string;
@@ -81,8 +82,20 @@ export type PlanningDetail = PlanningRun & {
 export const planSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["markdown", "changeSummary", "responses"],
+  required: ["markdown", "changeSummary", "responses", "additionalValidation"],
   properties: {
+    additionalValidation: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["repository", "script"],
+        properties: {
+          repository: { type: "string" },
+          script: { type: "string" },
+        },
+      },
+    },
     markdown: { type: "string" },
     changeSummary: { type: "string" },
     responses: {
@@ -133,17 +146,39 @@ export const reviewSchema = {
 function text(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
-export function parsePlan(value: unknown): PlanDocument {
+export function parsePlan(
+  value: unknown,
+  repositories?: string[],
+): PlanDocument {
   const p = value as PlanDocument;
   if (
     !p ||
     !text(p.markdown) ||
     !text(p.changeSummary) ||
     !Array.isArray(p.responses) ||
-    p.responses.some((r) => !text(r?.findingId) || !text(r?.response))
+    p.responses.some((r) => !text(r?.findingId) || !text(r?.response)) ||
+    (p.additionalValidation !== undefined &&
+      (!Array.isArray(p.additionalValidation) ||
+        p.additionalValidation.some(
+          (check) =>
+            !text(check?.repository) ||
+            !text(check?.script) ||
+            check.script.includes("\0") ||
+            (repositories && !repositories.includes(check.repository)),
+        )))
   )
     throw new Error("Codex returned an invalid plan.");
   return p;
+}
+export function planMarkdown(plan: PlanDocument): string {
+  if (plan.additionalValidation === undefined) return plan.markdown;
+  const checks = plan.additionalValidation.map(({ repository, script }) => {
+    const fence = "`".repeat(
+      Math.max(3, ...[...script.matchAll(/`+/g)].map((m) => m[0].length + 1)),
+    );
+    return `### ${repository}\n\n${fence}bash\n${script}\n${fence}`;
+  });
+  return `${plan.markdown}\n\n## Additional Controller Validation\n\nThese commands run after the repository's pinned checks, in its configured working directory and environment. Approval covers these exact commands.\n\n${checks.length ? checks.join("\n\n") : "No additional commands. The repository's pinned checks still run."}\n`;
 }
 export function parseReview(value: unknown): PlanReview {
   const r = value as PlanReview;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
 import {
@@ -64,6 +64,9 @@ test("adversarial planning preserves versions, checkpoints, exact approvals and 
     markdown: `# Plan v${number}\n\nCheck ownership and soft delete.`,
     changeSummary: `Version ${number}`,
     responses: [],
+    additionalValidation: [
+      { repository: "web", script: `npm run test:v${number}` },
+    ],
   });
   const review = (
     severity: "high" | "medium" | "low" | null,
@@ -171,9 +174,37 @@ test("adversarial planning preserves versions, checkpoints, exact approvals and 
       .executeSql(
         "ALTER TABLE code_assist.intake_event DROP CONSTRAINT fixture_reject",
       );
+    await assert.rejects(
+      finishPlanningStep(boss, step, {
+        ...plan(1),
+        additionalValidation: [
+          { repository: "unselected", script: "npm test" },
+        ],
+      }),
+      /invalid plan/,
+    );
     await complete(step, plan(1));
     assert.equal(await finishPlanningStep(boss, step, plan(1)), false);
     const v1 = (await current()).versions[0];
+    const inputHash = (await current()).input_hash;
+    assert.equal(
+      v1.hash,
+      createHash("sha256")
+        .update(JSON.stringify({ input: inputHash, version: 1, plan: plan(1) }))
+        .digest("hex"),
+    );
+    assert.notEqual(
+      v1.hash,
+      createHash("sha256")
+        .update(
+          JSON.stringify({
+            input: inputHash,
+            version: 1,
+            plan: { ...plan(1), additionalValidation: [] },
+          }),
+        )
+        .digest("hex"),
+    );
     step = await next();
     assert.equal(step.kind, "review");
     assert.equal(step.input.versions[0].hash, v1.hash);

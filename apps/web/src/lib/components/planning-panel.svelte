@@ -82,6 +82,7 @@
 			{#if version}<Button
 					size="sm"
 					variant="outline"
+					download={`plan_v${version.number}.md`}
 					href={resolve('/tickets/[id]/plans/[run]/[version]', {
 						id: run.issue_id,
 						run: run.id,

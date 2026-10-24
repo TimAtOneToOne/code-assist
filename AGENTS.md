@@ -47,6 +47,10 @@ Human-initiated applies use the established deployment workflow.
 
 - Repository confirmation now gathers missing setups before ticket discovery: Codex scans pinned source, the controller runs a disposable setup test, and only passing proposals are saved. Existing saved/built-in profiles are reused. Read the ticket's Repository Setup status and linked test history; answer setup questions or correct configuration and retry discovery when blocked. Never interpret setup completion as plan approval. Planning receives recorded setup commands; coding uses its workspace's pinned configuration. See `docs/repository-setup.md`.
 
+## Approved Plan Validation
+
+- New plan versions list repository-specific acceptance scripts in **Additional Controller Validation**. They are included in approval, version comparisons and downloads; the controller runs them after the workspace's pinned checks. Do not manually edit a saved profile merely to make newly planned tests run. Commands must be in the approved version; changes require a revised plan. Older plans keep their existing checks. See `docs/plan-validation-rehearsal.md` for the isolated failing-test and exact-commit regression.
+
 ## Guest Browser Readiness
 
 - Setup tests and coding use the shared runtime installer in `packages/intake/src/workspace-runtime.ts`. It supplies the agent's Chromium system libraries, browser binary, and native MCP readiness probe; repositories do not need a special system installer for the agent's browser.

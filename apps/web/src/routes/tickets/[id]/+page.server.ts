@@ -1,3 +1,4 @@
+import { planMarkdown } from '@code-assist/intake/planning';
 import {
 	retryCoding,
 	changeCodingBranch,
@@ -80,8 +81,8 @@ export const load: PageServerLoad = async (event) => {
 									{
 										previousVersion: run.versions[index - 1].number,
 										...renderPlanChanges(
-											run.versions[index - 1].document.markdown,
-											version.document.markdown
+											planMarkdown(run.versions[index - 1].document),
+											planMarkdown(version.document)
 										)
 									}
 								]
@@ -94,7 +95,7 @@ export const load: PageServerLoad = async (event) => {
 				run.versions.flatMap((v) => {
 					const key = `${run.id}:${v.number}`;
 					return [
-						[key, renderMarkdown(v.document.markdown)],
+						[key, renderMarkdown(planMarkdown(v.document))],
 						[`${key}:summary`, renderMarkdown(v.review?.summary ?? '')],
 						[`${key}:direction`, renderMarkdown(v.review?.directionQuestion ?? '')],
 						...v.document.responses.map((response, index) => [
