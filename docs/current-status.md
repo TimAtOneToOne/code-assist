@@ -67,7 +67,11 @@ failing PR was automatically repaired through native coding/browser checks,
 validation, independent review and publication; GitHub and the UI then showed
 green checks on the new head without an operator diagnosis or change request.
 See [the CI recovery rehearsal](pr-ci-recovery-rehearsal.md) for live acceptance
-and deployment evidence. Optional optimizations and controls: none.
+and deployment evidence. Release `e31c0c1` was verified at 11:02 PM EDT on
+October 23 across the selected release, web, worker and health endpoint, with
+zero queued/active jobs and no unfinished steps. The original ONE-5321 ticket
+still displayed its merged PR and successful exact-merge main CI in the deployed
+UI. Optional optimizations and controls: none.
 
 ## Code Map
 

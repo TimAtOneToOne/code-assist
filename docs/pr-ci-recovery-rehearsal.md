@@ -87,7 +87,13 @@ launchd job and test web server were removed. This is explicit test cleanup,
 not evidence of automatic Done cleanup for an open PR.
 
 The operator then updated the test PR description with the verified result.
-PR #2 remains open and unmerged. Production deployment verification is recorded
-separately after the normal idle check.
+PR #2 remains open and unmerged. Production release
+`e31c0c1e5d37ae96d7fa77260ebcd1a3ed191811` was pushed only after an immediate Idle
+report. At 11:02 PM EDT, `make deploy-status EXPECTED_COMMIT=<that SHA>` returned
+Idle and confirmed the selected release, actual web/worker releases and health
+endpoint all matched, with zero queued/active jobs and no unfinished steps.
+The deployed browser UI still showed the original ONE-5321 run's merged PR #1,
+merge `ac94e3d`, successful main CI and Done cleanup eligibility. No historical
+run or branch was repurposed for the fixture.
 
 Optional optimizations and controls: none.
