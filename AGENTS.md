@@ -49,6 +49,12 @@ Human-initiated applies use the established deployment workflow.
 - **Save and Test Setup** verifies real MCP navigation/click/screenshot as the workspace user, including each repository's configured environment. Repository-owned browser suites and authenticated application acceptance remain separate. Readiness files under `/work/runtime-readiness` are not feature acceptance evidence.
 - For provisioning changes, the fresh-guest success/missing-browser/validation-failure regression is documented in `docs/repository-setup.md`; normal `make verify` does not run OrbStack guests. See `docs/browser-testing.md` for runtime ownership and diagnostics.
 
+## Open-PR CI Recovery
+
+- The existing GitHub monitor also observes current-head PR checks and queues a scoped repair through the existing coding/validation/review/publication workflow. Use the ticket's **Check GitHub** to request an immediate observation; do not diagnose and submit **Request Code Changes** merely to connect CI to the worker.
+- Inspect **PR Checks**, its commit and failure evidence, the saved automatic change request and any blocker. Green PR checks are not Done. Missing diagnostics/ownership or an out-of-scope environmental/policy problem requires resolution or direction; agents never merge or rerun deployment workflows.
+- For verification, use the saved [CI regression record](docs/pr-ci-recovery-rehearsal.md). Disposable fixture setup is separate from an unattended repair. Keep the original ONE-5321 run and merged branch unchanged, and never present fixture approvals as live owner actions.
+
 ## Temporary testing files
 
 Keep ad hoc test scripts, probes, logs, screenshots, and other temporary testing artifacts in a task-specific directory under the repository's gitignored `.tmp/` folder. Configure temporary tooling to write generated files and caches there as well; do not leave them in the repository root. Keep permanent tests in their established source directories and use the normal Makefile targets for project validation.

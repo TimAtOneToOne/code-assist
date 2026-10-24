@@ -24,6 +24,7 @@ export function repositories(run: CodingRun): CodingRepository[] {
         merge_commit: run.merge_commit,
         pr_closed_at: run.pr_closed_at,
         main_workflows: run.main_workflows,
+        pr_checks: run.pr_checks,
       },
     ]
   );
@@ -39,6 +40,11 @@ export function repositoryDirectory(directory: string, run: CodingRun) {
   return run.repositories ? join(path, activeSnapshot(run).name) : path;
 }
 export function codingIndexes(run: CodingRun) {
+  const request = run.change_requests?.at(-1);
+  if (request)
+    return snapshots(run.input).flatMap((s, index) =>
+      Object.hasOwn(request.baseCommits, s.name) ? [index] : [],
+    );
   return run.repair?.repository
     ? [snapshots(run.input).findIndex((s) => s.name === run.repair!.repository)]
     : snapshots(run.input).map((_, index) => index);

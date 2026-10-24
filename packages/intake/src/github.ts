@@ -1,3 +1,5 @@
+import { readPrChecks, type PrChecks } from "./github-pr-checks.ts";
+import { queuePrRepair } from "./coding-pr-repair.ts";
 import { repositories } from "./coding-repositories.ts";
 import { recordRepositoryObservation } from "./github-repositories.ts";
 import {
@@ -22,6 +24,10 @@ import { recordIntakeEvent } from "./intake-events.ts";
 export const githubQueue = "github-pr-refresh";
 type RefreshRequest = { runId?: string };
 export type PullRequestState = {
+  headRefOid?: string;
+  headRefName?: string;
+  isCrossRepository?: boolean;
+  body?: string;
   url: string;
   baseRefName: string;
   state: "OPEN" | "CLOSED" | "MERGED";
@@ -86,10 +92,17 @@ export async function recordGitHubObservation(
   run: CodingRun,
   checkedAt: Date,
   observation:
-    { pr: PullRequestState; main?: MainWorkflows } | { error: string },
+    | { pr: PullRequestState; main?: MainWorkflows; checks?: PrChecks }
+    | { error: string },
 ) {
   if ("pr" in observation) {
     parsePullRequest(observation.pr, run.pr_url!);
+    if (
+      observation.checks &&
+      (observation.pr.state !== "OPEN" ||
+        observation.checks.commit !== observation.pr.headRefOid)
+    )
+      throw new Error("PR checks require the observed open PR head.");
     if (observation.main) {
       if (
         observation.pr.state !== "MERGED" ||
@@ -211,6 +224,29 @@ export async function recordGitHubObservation(
       "UPDATE code_assist.coding_run SET status='superseded' WHERE parent_run_id=$1 AND pr_url IS NULL AND status<>'superseded' AND ($2::text IS NULL OR repair_key<>$2)",
       [run.id, observation.main ? mainFailureKey(observation.main) : null],
     );
+    if (observation.checks) {
+      const error = await queuePrRepair(
+        boss,
+        db,
+        await codingRun(db, run.id),
+        run,
+        pr,
+        observation.checks,
+      );
+      await db.executeSql(
+        "UPDATE code_assist.coding_run SET pr_checks=$2,github_error=$3 WHERE id=$1",
+        [run.id, JSON.stringify(observation.checks), error],
+      );
+      if (error && error !== current.github_error)
+        await recordIntakeEvent(
+          boss,
+          db,
+          run.issue_id,
+          "coding_pr_checks_blocked",
+          { codingId: run.id, prUrl: pr.url, reason: error },
+          true,
+        );
+    }
     await queueMainRepair(boss, db, await codingRun(db, run.id));
     return true;
   });
@@ -221,7 +257,7 @@ type Reader = (
   signal: AbortSignal,
   log: ReturnType<typeof createLogger>,
 ) => Promise<PullRequestState>;
-const readGitHub: Reader = async (run, signal, log) => {
+export const readGitHub: Reader = async (run, signal, log) => {
   const url = run.pr_url!;
   if (
     !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*$/.test(
@@ -238,7 +274,7 @@ const readGitHub: Reader = async (run, signal, log) => {
           "view",
           url,
           "--json",
-          "url,baseRefName,state,mergedAt,mergeCommit,closedAt",
+          "url,baseRefName,state,mergedAt,mergeCommit,closedAt,headRefOid,headRefName,isCrossRepository,body",
         ],
         signal,
         log,
@@ -338,6 +374,7 @@ export async function refreshGitHub(
   jobId: string,
   read: Reader = readGitHub,
   readWorkflows: MainReader = readMain,
+  readChecks: typeof readPrChecks = readPrChecks,
 ) {
   const { rows } = await boss
     .getDb()
@@ -384,10 +421,24 @@ export async function refreshGitHub(
       const checkedAt = new Date();
       let pr: PullRequestState;
       let main: MainWorkflows | undefined;
+      let checks: PrChecks | undefined;
       try {
         pr = await read(run, signal, log);
         if (pr.state === "MERGED" && pr.baseRefName === "main")
           main = await readWorkflows(run, pr, signal, log);
+        if (pr.state === "OPEN" && pr.headRefOid) {
+          checks = await readChecks(run, pr, signal, log);
+          const after = await read(run, signal, log);
+          if (
+            after.state !== "OPEN" ||
+            after.headRefOid !== pr.headRefOid ||
+            after.headRefName !== pr.headRefName ||
+            after.body !== pr.body ||
+            after.isCrossRepository !== pr.isCrossRepository ||
+            after.baseRefName !== pr.baseRefName
+          )
+            continue;
+        }
       } catch {
         signal.throwIfAborted();
         const error =
@@ -399,7 +450,7 @@ export async function refreshGitHub(
         failures++;
         continue;
       }
-      await recordGitHubObservation(boss, run, checkedAt, { pr, main });
+      await recordGitHubObservation(boss, run, checkedAt, { pr, main, checks });
       log.event("info", "github.refreshed", "Pull request state checked", {
         coding_id: run.id,
         pr_state: pr.state,

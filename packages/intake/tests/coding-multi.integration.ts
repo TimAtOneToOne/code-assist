@@ -1,3 +1,4 @@
+import { exercisePrChecks } from "./coding-pr-checks-fixture.ts";
 import {
   commitSet,
   publicationReady,
@@ -291,6 +292,7 @@ test("multi-repository coding persists sequential checkpoints, combined review, 
       { repositories: states, index: 1 },
     );
     await exerciseCodeChanges(boss, ticket.id, next);
+    await exercisePrChecks(boss, ticket.id, next);
     const published = (await readCoding(boss.getDb(), ticket.id))[0];
     const observed = (index: number) => ({
       ...repositoryRun(published, index),

@@ -32,6 +32,8 @@
 			issue_completed_by_owner: 'Marked Done at your request; original evidence retained',
 			coding_direction_answered: 'You replied to the coding agent and continued the work',
 			coding_changes_requested: 'You requested code changes on the existing PR',
+			coding_pr_repair_requested: 'Failed PR checks triggered a scoped code revision',
+			coding_pr_checks_blocked: 'PR check recovery needs attention',
 			repository_needed: 'Waiting for repository selection',
 			issue_removed: 'Removed: Plan label removed in Linear',
 			issue_restored: 'Restored: Plan label added in Linear',

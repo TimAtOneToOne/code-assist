@@ -1,3 +1,4 @@
+import { exercisePrChecks } from "./coding-pr-checks-fixture.ts";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -399,6 +400,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       "pr_open",
     );
     await exerciseCodeChanges(boss, ticket.id, next);
+    await exercisePrChecks(boss, ticket.id, next);
     const published = (await readCoding(boss.getDb(), ticket.id))[0];
     const pr: PullRequestState = {
       url: published.pr_url!,

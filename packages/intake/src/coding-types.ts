@@ -1,3 +1,4 @@
+import type { PrChecks } from "./github-pr-checks.ts";
 import type { MainWorkflows } from "./github-workflows.ts";
 import type { WorkspaceInput } from "./workspace.ts";
 import type { PlanDocument, PlanReview } from "./planning-types.ts";
@@ -10,6 +11,7 @@ export type CodingKind =
   | "review"
   | "publish";
 export type CodingRepository = {
+  pr_checks?: PrChecks | null;
   name: string;
   commit: string | null;
   baseCommit?: string;
@@ -23,6 +25,7 @@ export type CodingRepository = {
   main_workflows?: MainWorkflows | null;
 };
 export type CodingRun = {
+  pr_checks?: PrChecks | null;
   direction_responses?: CodingDirectionResponse[];
   change_requests?: CodingChangeRequest[];
   workspace_cleaned_at?: Date | null;
@@ -78,7 +81,8 @@ export type CodingDirectionResponse = {
   createdAt: string;
 };
 export type CodingChangeRequest = {
-  kind?: "bring_in_main";
+  kind?: "bring_in_main" | "pr_ci";
+  prCi?: { repository: string; commit: string; key: string; artifact: string };
   id: string;
   text: string;
   requestedBy: string;
@@ -130,11 +134,14 @@ export function hasBrowserEvidence(paths: string[], completedTools: string[]) {
 export function missingBrowserEvidence(run: CodingRun, step?: CodingStep) {
   const saved = step?.continuation;
   const snapshots = run.input.snapshots ?? [run.input.snapshot];
-  const finalIndex = run.repair?.repository
-    ? snapshots.findIndex(
-        (snapshot) => snapshot.name === run.repair!.repository,
-      )
-    : snapshots.length - 1;
+  const request = run.change_requests?.at(-1);
+  const finalIndex = request
+    ? snapshots.findLastIndex((s) => Object.hasOwn(request.baseCommits, s.name))
+    : run.repair?.repository
+      ? snapshots.findIndex(
+          (snapshot) => snapshot.name === run.repair!.repository,
+        )
+      : snapshots.length - 1;
   return (
     step?.kind === "collect" &&
     step.error === browserEvidenceRequiredMessage &&

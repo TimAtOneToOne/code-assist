@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PrChecks from './pr-checks.svelte';
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -189,6 +190,10 @@
 						{/if}
 					</div>
 					{#if repository.github_error}<p role="alert">{repository.github_error}</p>{/if}
+					{#if repository.pr_checks}<PrChecks
+							checks={repository.pr_checks}
+							currentCommit={repository.commit}
+						/>{/if}
 					{#each repository.main_workflows?.runs ?? [] as workflow (workflow.id)}
 						<div>
 							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Validated GitHub workflow URL. -->
@@ -257,6 +262,10 @@
 			</p>
 		{/if}
 	{/if}
+	{#if !run.repositories && run.pr_checks}<PrChecks
+			checks={run.pr_checks}
+			currentCommit={run.commit}
+		/>{/if}
 	{#if run.main_workflows}
 		<div class="space-y-2 text-sm">
 			<h3 class="font-medium">Main Workflows</h3>
@@ -410,7 +419,9 @@
 					{#each run.change_requests as request, index (request.id)}
 						<div>
 							<p class="text-sm text-muted-foreground">
-								Revision {index + 1} · {new Date(request.createdAt).toLocaleString()}
+								{request.kind === 'pr_ci' ? 'Automatic CI Repair' : `Revision ${index + 1}`} · {new Date(
+									request.createdAt
+								).toLocaleString()}
 							</p>
 							<p class="text-sm whitespace-pre-wrap">{request.text}</p>
 						</div>

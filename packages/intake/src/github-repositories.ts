@@ -1,3 +1,5 @@
+import type { PrChecks } from "./github-pr-checks.ts";
+import { queuePrRepair } from "./coding-pr-repair.ts";
 import type { Db, PgBoss } from "pg-boss";
 import type { CodingRun } from "./coding-types.ts";
 import type { PullRequestState } from "./github.ts";
@@ -21,7 +23,8 @@ export async function recordRepositoryObservation(
   run: CodingRun,
   checkedAt: Date,
   observation:
-    { pr: PullRequestState; main?: MainWorkflows } | { error: string },
+    | { pr: PullRequestState; main?: MainWorkflows; checks?: PrChecks }
+    | { error: string },
 ) {
   const states = repositories(current).map((r) => ({ ...r }));
   const state = states[repositoryIndex(run)];
@@ -88,6 +91,47 @@ export async function recordRepositoryObservation(
       { codingId: run.id, repository: state.name, prUrl: state.pr_url },
       ["done", "main_failed", "pr_closed"].includes(status),
     );
+  if ("pr" in observation && observation.checks) {
+    state.pr_checks = observation.checks;
+    const error = await queuePrRepair(
+      boss,
+      db,
+      await codingRun(db, run.id),
+      run,
+      observation.pr,
+      observation.checks,
+    );
+    state.github_error = error;
+    // Queuing a revision changes run status/index; only replace the observation fields here.
+    await db.executeSql(
+      "UPDATE code_assist.coding_run SET repositories=$2,github_error=$3 WHERE id=$1",
+      [
+        run.id,
+        JSON.stringify(states),
+        states
+          .map((r) => (r.github_error ? r.name + ": " + r.github_error : ""))
+          .filter(Boolean)
+          .join("\n") || null,
+      ],
+    );
+    if (
+      error &&
+      error !== repositories(current)[repositoryIndex(run)].github_error
+    )
+      await recordIntakeEvent(
+        boss,
+        db,
+        run.issue_id,
+        "coding_pr_checks_blocked",
+        {
+          codingId: run.id,
+          repository: state.name,
+          prUrl: state.pr_url,
+          reason: error,
+        },
+        true,
+      );
+  }
   await queueMainRepair(boss, db, await codingRun(db, run.id));
   return true;
 }

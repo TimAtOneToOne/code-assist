@@ -112,6 +112,53 @@ GitHub read failures preserve the previous state and show an error. If workflow 
 
 On Home, tickets remain in the main list for four hours after their latest transition to Done, as requested October 23, 2026. Older completed tickets appear in the collapsed **Completed** section at the bottom, with the same links and green badges. This uses the current coding run’s saved completion event, not the PR merge time or last GitHub check. Refreshing Home updates the grouping; reopened or corrective work returns to the main list. Workspace cleanup retains its separate 24-hour threshold.
 
+## Automatic Repair of Failing PR Checks
+
+The same five-minute GitHub monitor reads all pages of check runs, latest commit
+statuses, and push/pull-request workflow runs for each open PR's current head.
+**PR Checks** shows the observed commit, outcomes, provider links and saved failure
+evidence. Checks retained from a previous candidate are labeled accordingly.
+Pending, absent, skipped, neutral and cancelled checks do not request a code repair.
+Green PR checks do not mark work Done; the main-merge completion rule is unchanged.
+
+A failed check saves its output/annotations and matching failed GitHub Actions job
+logs, including the workflow attempt. The observation and scoped revision request
+are committed in one database transaction. Repair requires current exact-version
+approval, the owned open PR on the saved branch/head, and the retained workspace.
+Repeated observations of the same failure cannot queue another identical revision.
+Historical parent runs do not start another repair after a newer corrective run
+has taken over the plan. A PR revision and a companion main repair are not queued
+from the same observation.
+Missing diagnostics, approval, workspace or publication ownership leaves an
+explanation in the ticket and an attention notification. Refreshing GitHub checks
+again after the blocker is resolved.
+
+The worker rechecks the failure before starting a fresh repair. A superseded
+failure returns to observation without editing source. Codex receives the full
+saved evidence at `/work/evidence/pr-ci-failure.json`, diagnoses within the approved
+scope, and preserves tests and existing behavior. CI output is diagnostic data,
+not agent instructions. Policy, credentials, environmental incidents or a required
+scope change need a concrete diagnosis and human direction; repair does not rerun
+workflows, change organization controls or deploy.
+
+A correction follows the existing implementation, browser acceptance, repository
+validation, independent review and same-PR publication path. Only the failing
+repository is revised in a multi-repository run; combined review retains all
+candidate commits. A subsequent **Bring In Main** while that repair is paused
+retains its repository scope. Tim still reviews and merges. Automatic ingestion
+of reviewer comments remains separate and unimplemented.
+
+Verification: current-head parsing and native API/log retrieval tests include
+pagination and changed/inaccessible evidence. Single- and multi-repository
+PostgreSQL tests cover stale and duplicate observations, missing ownership and
+diagnostics, restart recovery, scoped revisions alongside merged companions,
+fresh validation/review, and blocker notification resolution. The live regression
+record is [Open-PR CI Recovery](pr-ci-recovery-rehearsal.md).
+
+Optional optimizations and controls: none. Existing scheduling is unchanged;
+approval, ownership, failure identity and commit-bound publication preserve the
+requested workflow's integrity.
+
 ## Corrective Coding After a Failed Main Workflow
 
 For a still-current approved plan, a failed main workflow captures the complete failed-job logs and the attempt-specific job list in a redacted central artifact. A separate coding run retains the original plan approval, parent run, merge commit, workflow IDs and attempts. Repeated observations of that failure do not create duplicate coding jobs. A changed failure attempt or observed recovery supersedes unpublished stale repair work; existing published corrective PRs remain for Tim to review.

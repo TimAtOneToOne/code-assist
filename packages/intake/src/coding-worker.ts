@@ -1,3 +1,5 @@
+import { readGitHub, recordGitHubObservation } from "./github.ts";
+import { readPrChecks, prFailureKey } from "./github-pr-checks.ts";
 import { verifyGuestBrowser } from "./workspace-runtime.ts";
 import {
   snapshots,
@@ -305,6 +307,17 @@ export async function registerCodingWorker(
         if (step.kind === "implement" || step.kind === "review") {
           await verifyGuestBrowser(commands.run);
         }
+        const ci = run.change_requests?.at(-1)?.prCi;
+        if (ci && (step.kind === "implement" || step.kind === "review")) {
+          const evidence = await readFile(
+            artifactPath(process.env.CODE_ASSIST_ARTIFACT_DIR!, ci.artifact),
+            "utf8",
+          );
+          await commands.guest(
+            ["bash", "-c", "cat > /work/evidence/pr-ci-failure.json"],
+            evidence,
+          );
+        }
         const environment: Record<string, string> = {};
         for (const snapshot of snapshots(run.input)) {
           let environmentText = "";
@@ -408,6 +421,49 @@ export async function registerCodingWorker(
               throw new Error(
                 "Working tree differs from its saved checkpoint; preserved for inspection.",
               );
+          }
+          if (ci && step.input_commit === ci.commit && !step.recovery_step_id) {
+            const target = {
+              ...run,
+              pr_url: repositories(run)[repositoryIndex(run)].pr_url,
+            };
+            const pr = await readGitHub(target, signal, log);
+            if (pr.state !== "OPEN" || pr.headRefOid !== ci.commit)
+              throw new CodingBranchConflict(
+                "The PR changed before CI repair could start. Saved work is preserved.",
+              );
+            const checkedAt = new Date();
+            const checks = await readPrChecks(target, pr, signal, log);
+            if (checks.error) throw new Error(checks.error);
+            const after = await readGitHub(target, signal, log);
+            if (
+              after.state !== pr.state ||
+              after.headRefOid !== pr.headRefOid ||
+              after.headRefName !== pr.headRefName ||
+              after.body !== pr.body ||
+              after.isCrossRepository !== pr.isCrossRepository ||
+              after.baseRefName !== pr.baseRefName
+            )
+              throw new CodingBranchConflict(
+                "The PR changed during CI evidence collection. Saved work is preserved.",
+              );
+            if (prFailureKey(checks) !== ci.key) {
+              await finishCoding(
+                boss,
+                run,
+                step,
+                {
+                  summary:
+                    "The queued PR failure was superseded before coding; no source changes were made.",
+                },
+                "pr_open",
+              );
+              await recordGitHubObservation(boss, target, checkedAt, {
+                pr,
+                checks,
+              });
+              return;
+            }
           }
           await supplyMain(directory, run, workspace, signal, log);
         }

@@ -49,6 +49,11 @@ export function attentionMessage(
       "A workflow for the merged commit did not succeed. Failure evidence is saved; when the original approved scope is still current, Codex investigates in a separate corrective run with validation and Claude review before a new PR.",
       "Review the main workflow and any repair progress on the ticket page.",
     ],
+    coding_pr_checks_blocked: [
+      "⚠️ Blocked · PR check repair needs attention",
+      "The PR has failing checks, but automatic repair cannot proceed. The ticket retains the current checks and the specific evidence, ownership or approval blocker.",
+      "Review the PR Checks and GitHub error on the ticket. Resolve the reported blocker, then refresh GitHub status.",
+    ],
     coding_pr_closed: [
       "🔎 Ready for review · Pull request closed without merge",
       "GitHub reports the pull request was closed without merging. The implementation and evidence are preserved.",

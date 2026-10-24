@@ -20,7 +20,7 @@ Discovery and planning use recorded source snapshots and read-only agent access.
 | Human Follow-Up   | Replies to coding questions, requested changes to owned open PRs, explicit Bring In Main, fresh evidence for revisions, and Run Browser Checks recovery                                                                                       | [Coding](coding.md)                                                     |
 | Publication       | Exact-commit validation/review checks, durable publication intents, remote-head checks and retry reconciliation, separate PRs for selected repositories; private-tool links and attribution omitted from external templates                   | [Coding](coding.md#external-publication-privacy)                        |
 | Windmill Work     | Controller-owned native production-workspace fork creation, ticket fork branches, exact-commit Git Sync evidence, and native PR adoption; latest addition in `f21c951`                                                                        | [Windmill Publication](coding.md#windmill-production-fork-publication)  |
-| GitHub Completion | PR/merge monitoring; every repository needs observed successful push-to-main workflows for its exact merge commit; scoped corrective coding for failed main workflows                                                                         | [Coding](coding.md#github-pr-and-main-workflow-tracking)                |
+| GitHub Completion | Current-head PR-check monitoring and scoped same-PR repair; every repository needs successful push-to-main workflows for its exact merge; corrective coding for failed main workflows                                                                         | [Coding](coding.md#github-pr-and-main-workflow-tracking)                |
 | Operations        | Owner-only Tailscale access, Home updates through PostgreSQL notifications/SSE, central logs/artifacts, Teams attention outbox, automatic main deployment, and completed-workspace cleanup after 24 hours with retained evidence              | [Deployment](deployment.md), [Worker](worker.md), [Logging](logging.md) |
 
 Exact-version approval authorizes implementation and publication for the confirmed scope, including described GitOps work inside Code Assist. Changed scope requires a revised approved plan. Agents never merge PRs, enable auto-merge, apply Terraform, or initiate managed infrastructure deployment. Windmill test-fork publication is distinct from parent production publication.
@@ -58,6 +58,16 @@ web/worker/health at 9:54 PM EDT. Live Save and Test Setup
 `0aa3de82-92ae-45da-9dad-218682fa5f5d` then passed all six checks on the merged test
 repository without its temporary Chromium installer; its guest was removed.
 See [the rehearsal follow-up](one-5321-rehearsal.md#shared-runtime-follow-up).
+
+The open-PR CI recovery change extends the existing GitHub monitor and revision
+workflow with current-head check/status/workflow evidence, atomic repair requests,
+independent validation/review and same-PR updates. Missing evidence or ownership
+is visible in PR Checks and attention notifications. All 81 unit tests and nine PostgreSQL integration tests passed. A real deliberately
+failing PR was automatically repaired through native coding/browser checks,
+validation, independent review and publication; GitHub and the UI then showed
+green checks on the new head without an operator diagnosis or change request.
+See [the CI recovery rehearsal](pr-ci-recovery-rehearsal.md) for live acceptance
+and deployment evidence. Optional optimizations and controls: none.
 
 ## Code Map
 

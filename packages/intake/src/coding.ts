@@ -22,6 +22,7 @@ import type {
   CodingKind,
   CodingDetail,
   CodingContinuation,
+  CodingChangeRequest,
 } from "./coding-types.ts";
 import { missingBrowserEvidence } from "./coding-types.ts";
 export * from "./coding-types.ts";
@@ -56,6 +57,7 @@ export async function initializeCoding(boss: PgBoss) {
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS merge_commit text;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS pr_closed_at timestamptz;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS main_workflows jsonb;
+ ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS pr_checks jsonb;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS parent_run_id uuid REFERENCES code_assist.coding_run(id);
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repair_key text;
  ALTER TABLE code_assist.coding_run ADD COLUMN IF NOT EXISTS repair jsonb;
@@ -230,6 +232,7 @@ export async function syncCoding(boss: PgBoss, db: Db, issueId: string) {
   await enqueue(boss, db, await codingRun(db, id), "prepare");
 }
 export async function queueMainRepair(boss: PgBoss, db: Db, run: CodingRun) {
+  if (run.status !== "main_failed") return;
   if (run.repositories) return queueRepositoryRepair(boss, db, run);
   if (
     !run.main_workflows?.failureArtifact ||
@@ -489,72 +492,111 @@ export async function requestCodingChanges(
   requestedBy: string,
   kind?: "bring_in_main",
 ) {
+  return codingTransaction(boss, (db) =>
+    queueCodingChanges(
+      boss,
+      db,
+      issueId,
+      runId,
+      stepId,
+      text,
+      requestedBy,
+      kind,
+    ),
+  );
+}
+
+export async function queueCodingChanges(
+  boss: PgBoss,
+  db: Db,
+  issueId: string,
+  runId: string,
+  stepId: string,
+  text: string,
+  requestedBy: string,
+  kind?: CodingChangeRequest["kind"],
+  prCi?: CodingChangeRequest["prCi"],
+) {
   if (!text.trim())
     throw new CodingConflict("Describe the code changes you want.");
-  return codingTransaction(boss, async (db) => {
-    await db.executeSql(
-      "SELECT id FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE",
-      [issueId],
-    );
-    const run = await codingRun(db, runId);
-    const states = repositories(run);
-    const indexes = codingIndexes(run);
-    const resuming =
-      kind === "bring_in_main" &&
-      run.status === "needs_direction" &&
-      !!run.change_requests?.length;
-    if (
-      run.issue_id !== issueId ||
-      !(await currentCoding(db, run)) ||
-      (run.status !== "pr_open" && !resuming) ||
-      run.current_step_id !== stepId ||
-      !run.workspace_id ||
-      run.workspace_cleaned_at ||
-      indexes.some(
-        (index) =>
-          !states[index].pr_url ||
-          !states[index].commit ||
-          states[index].merged_at ||
-          states[index].pr_closed_at ||
-          (!resuming && states[index].status !== "pr_open"),
-      )
+  await db.executeSql(
+    "SELECT id FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE",
+    [issueId],
+  );
+  const run = await codingRun(db, runId);
+  const states = repositories(run);
+  const resuming =
+    kind === "bring_in_main" &&
+    run.status === "needs_direction" &&
+    !!run.change_requests?.length;
+  const indexes = prCi
+    ? [snapshots(run.input).findIndex((s) => s.name === prCi.repository)]
+    : resuming
+      ? codingIndexes(run)
+      : codingIndexes({ ...run, change_requests: [] });
+  if (
+    run.issue_id !== issueId ||
+    !(await currentCoding(db, run)) ||
+    (run.status !== "pr_open" &&
+      !(
+        prCi &&
+        ["pr_closed", "awaiting_main", "main_running", "main_failed"].includes(
+          run.status,
+        )
+      ) &&
+      !resuming) ||
+    run.current_step_id !== stepId ||
+    indexes.some((i) => i < 0) ||
+    !run.workspace_id ||
+    run.workspace_cleaned_at ||
+    indexes.some(
+      (index) =>
+        !states[index].pr_url ||
+        !states[index].commit ||
+        states[index].merged_at ||
+        states[index].pr_closed_at ||
+        (!resuming && states[index].status !== "pr_open"),
     )
-      throw new CodingConflict(
-        "Code changes require the current open, unmerged PR and its saved workspace. Refresh the ticket before trying again.",
-      );
-    const request = {
-      ...(kind ? { kind } : {}),
-      id: randomUUID(),
-      text: text.trim(),
-      requestedBy,
-      createdAt: new Date().toISOString(),
-      baseCommits: Object.fromEntries(
-        indexes.map((i) => [
-          states[i].name,
-          resuming
-            ? run.change_requests!.at(-1)!.baseCommits[states[i].name]
-            : states[i].commit!,
-        ]),
-      ),
-      pullRequests: Object.fromEntries(
-        indexes.map((i) => [states[i].name, states[i].pr_url!]),
-      ),
-    };
-    await db.executeSql(
-      "UPDATE code_assist.coding_run SET change_requests=change_requests || $2::jsonb,repository_index=$3,commit=$4 WHERE id=$1",
-      [
-        run.id,
-        JSON.stringify([request]),
-        indexes[0],
-        states[indexes[0]].commit,
-      ],
+  )
+    throw new CodingConflict(
+      "Code changes require the current open, unmerged PR and its saved workspace. Refresh the ticket before trying again.",
     );
-    await recordIntakeEvent(boss, db, issueId, "coding_changes_requested", {
+  const request = {
+    ...(kind ? { kind } : {}),
+    ...(prCi ? { prCi } : {}),
+    id: randomUUID(),
+    text: text.trim(),
+    requestedBy,
+    createdAt: new Date().toISOString(),
+    baseCommits: Object.fromEntries(
+      indexes.map((i) => [
+        states[i].name,
+        resuming
+          ? run.change_requests!.at(-1)!.baseCommits[states[i].name]
+          : states[i].commit!,
+      ]),
+    ),
+    pullRequests: Object.fromEntries(
+      indexes.map((i) => [states[i].name, states[i].pr_url!]),
+    ),
+  };
+  await db.executeSql(
+    "UPDATE code_assist.coding_run SET change_requests=change_requests || $2::jsonb,repository_index=$3,commit=$4 WHERE id=$1",
+    [run.id, JSON.stringify([request]), indexes[0], states[indexes[0]].commit],
+  );
+  await recordIntakeEvent(
+    boss,
+    db,
+    issueId,
+    kind === "pr_ci"
+      ? "coding_pr_repair_requested"
+      : "coding_changes_requested",
+    {
       codingId: run.id,
       request,
-    });
-    return enqueue(boss, db, await codingRun(db, run.id), "implement");
-  });
+    },
+  );
+  return enqueue(boss, db, await codingRun(db, run.id), "implement");
 }
 
 export async function answerCodingDirection(
