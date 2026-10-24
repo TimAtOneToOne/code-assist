@@ -1,3 +1,4 @@
+import type { RepositorySetupContext } from "./repository-settings.ts";
 import { recordIntakeEvent } from "./intake-events.ts";
 import {
   initializePlanning,
@@ -7,6 +8,7 @@ import {
 import { createHash, randomUUID } from "node:crypto";
 import type { Db, PgBoss } from "pg-boss";
 import type { Ticket } from "./linear.ts";
+import type { SetupProgress } from "./repository-setup-discovery.ts";
 
 export const discoveryQueue = "initial-discovery";
 export const currentAttention = `(NOT EXISTS (SELECT 1 FROM code_assist.intake_event completion WHERE completion.issue_id=i.id AND completion.type='issue_completed_by_owner') AND (e.type='repository_needed' OR
@@ -53,6 +55,9 @@ export type DiscoveryRun = {
   worker_pid: number | null;
   created_at: Date;
   finished_at: Date | null;
+  setup_pending?: boolean;
+  setup_progress?: SetupProgress[];
+  repository_setups?: Record<string, RepositorySetupContext>;
 };
 
 export async function initializeDiscovery(boss: PgBoss) {
@@ -65,6 +70,9 @@ export async function initializeDiscovery(boss: PgBoss) {
       thread_id text, error text, worker_pid integer,
       created_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz
     );
+    ALTER TABLE code_assist.discovery_run ADD COLUMN IF NOT EXISTS setup_pending boolean NOT NULL DEFAULT false;
+    ALTER TABLE code_assist.discovery_run ADD COLUMN IF NOT EXISTS setup_progress jsonb NOT NULL DEFAULT '[]';
+    ALTER TABLE code_assist.discovery_run ADD COLUMN IF NOT EXISTS repository_setups jsonb NOT NULL DEFAULT '{}';
   `);
   await boss.createQueue(discoveryQueue, { retryLimit: 0 });
   await initializePlanning(boss);
@@ -373,7 +381,8 @@ export async function answerDiscovery(
     await recordIntakeEvent(boss, tx.db, issueId, "discovery_answered", {
       runId,
     });
-    await syncPlanning(boss, tx.db, runId);
+    if (run.setup_pending) await syncDiscovery(boss, tx.db, issueId, true);
+    else await syncPlanning(boss, tx.db, runId);
     await tx.commit();
   } catch (error) {
     await tx.rollback();

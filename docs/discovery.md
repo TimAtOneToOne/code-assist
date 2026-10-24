@@ -8,6 +8,8 @@ The UI provides discovery status, a scope-and-questions checkpoint, saved answer
 
 Confirming repository selection atomically queues `initial-discovery`. Worker startup also picks up previously selected, eligible tickets. Subsequent Linear checks reconcile changed inputs. `Plan` without `Code` is required. Removed tickets stay hidden and cannot accept answers or publish a current discovery result.
 
+Before ticket investigation, the worker reuses configured repositories and gathers/tests missing repository setups with Codex. See [Automatic Setup During Intake](repository-setup.md#automatic-setup-during-intake). Setup progress and test links appear on the ticket. Setup questions use the existing questions/answers checkpoint with `setup_pending=true`; answering them queues another discovery attempt instead of planning. Normal scope confirmation occurs after setup completes. Recorded repository setup commands and hashes accompany discovery into planning, without environment values.
+
 `queued → running → questions → ready`
 
 - `questions` means findings are ready for human review. Codex may return zero questions when the evidence is sufficient; Tim still confirms scope.

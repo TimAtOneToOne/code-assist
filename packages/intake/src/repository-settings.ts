@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
+import type { Db } from "pg-boss";
 import {
   repositoryProfile,
   repositoryEnvironment,
@@ -240,6 +241,24 @@ export function profileHash(configuration: RepositorySetup) {
     .update(JSON.stringify(validateRepositorySetup(configuration)))
     .digest("hex");
 }
+
+// Caller owns the transaction. Web edits and background setup share this file.
+export async function writeRepositorySetupLocked(
+  db: Db,
+  directory: string,
+  repository: string,
+  value: unknown,
+  onlyIfMissing = false,
+) {
+  await db.executeSql("SELECT pg_advisory_xact_lock(hashtext($1))", [
+    join(directory, "repository-setups.json"),
+  ]);
+  return (
+    (onlyIfMissing
+      ? readRepositorySetup(directory, repository).configuration
+      : null) ?? writeRepositorySetup(directory, repository, value)
+  );
+}
 export function compileRepositoryProfile(
   name: string,
   configuration: RepositorySetup,
@@ -291,5 +310,22 @@ export function profileEnvironment(
         randomBytes(32).toString("hex"),
       ]),
     ),
+  };
+}
+
+export type RepositorySetupContext = {
+  hash: string;
+  configuration: Omit<RepositorySetup, "environment">;
+  environmentVariables: string[];
+};
+
+export function repositorySetupContext(
+  configuration: RepositorySetup,
+): RepositorySetupContext {
+  const { environment, ...commands } = configuration;
+  return {
+    hash: profileHash(configuration),
+    configuration: commands,
+    environmentVariables: Object.keys(environment),
   };
 }

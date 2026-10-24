@@ -275,7 +275,9 @@
 						<p class="muted">
 							Commit {test.commit.slice(0, 10)} · {test.profile_hash === data.hash
 								? 'Current Setup'
-								: 'Earlier Setup'}
+								: data.configured
+									? 'Earlier Setup'
+									: 'Proposed Setup'}
 						</p>
 						{#if test.status === 'running' || test.status === 'queued'}<p>{test.stage}</p>{/if}
 						{#if test.error}<p role="alert">{test.error}</p>{/if}

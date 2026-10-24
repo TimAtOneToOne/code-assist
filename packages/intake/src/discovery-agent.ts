@@ -159,7 +159,11 @@ Full Linear ticket:
 ${JSON.stringify(run.ticket)}
 
 Previously saved discovery answers:
-${JSON.stringify(priorAnswers)}`;
+${JSON.stringify(priorAnswers)}
+
+Saved repository setup (environment values withheld):
+${JSON.stringify(run.repository_setups ?? {})}
+Use these repository-specific setup and validation commands as evidence alongside the source. Identify any changes the requested feature will require; do not assume these commands run newly added tests automatically.`;
 }
 
 export type AgentEvent = {

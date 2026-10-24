@@ -43,6 +43,10 @@ and approval, as with any repository. Tim reviews and merges PRs; agents never
 merge, enable auto-merge, run Terraform apply, or initiate infrastructure deployment.
 Human-initiated applies use the established deployment workflow.
 
+## Automatic Repository Setup
+
+- Repository confirmation now gathers missing setups before ticket discovery: Codex scans pinned source, the controller runs a disposable setup test, and only passing proposals are saved. Existing saved/built-in profiles are reused. Read the ticket's Repository Setup status and linked test history; answer setup questions or correct configuration and retry discovery when blocked. Never interpret setup completion as plan approval. Planning receives recorded setup commands; coding uses its workspace's pinned configuration. See `docs/repository-setup.md`.
+
 ## Guest Browser Readiness
 
 - Setup tests and coding use the shared runtime installer in `packages/intake/src/workspace-runtime.ts`. It supplies the agent's Chromium system libraries, browser binary, and native MCP readiness probe; repositories do not need a special system installer for the agent's browser.

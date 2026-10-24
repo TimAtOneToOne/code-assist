@@ -2,6 +2,8 @@
 
 After Tim confirms discovery answers, Code Assist queues Codex to draft a plan from the full ticket, answers and recorded repository snapshots. Claude independently reviews the plan against those same snapshots. A review requesting changes queues another Codex version and another Claude review. There is no application-imposed review-round quota. A review needing a product decision pauses for Tim's direction.
 
+New discovery baselines also include each repository's saved setup commands and configuration hash, with environment values withheld. Both planning agents receive this context and must reconcile validation with the source and proposed changes, including whether newly added tests will actually run. Missing repository setup is gathered and tested before normal discovery; setup answers resume intake rather than starting planning. Historical plans retain their original inputs.
+
 The ticket page shows the current plan, findings, agent activity, previous versions, feedback and approval history. Plans download as `plan_vN.md`; saved versions and reviews are never overwritten. Completed discovery is collapsed while planning is active. The original interactive reference is `docs/initial/index.html`.
 
 ## Human Approval

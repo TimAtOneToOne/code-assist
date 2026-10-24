@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { basename } from "node:path";
+import { randomUUID } from "node:crypto";
 import type { PgBoss } from "pg-boss";
 import {
   compileRepositoryProfile,
@@ -39,39 +40,57 @@ export async function initializeSetupTests(boss: PgBoss) {
     stage text NOT NULL DEFAULT 'queued', workspace_id uuid, error text, cleanup_error text,
     cleaned_at timestamptz, checks jsonb NOT NULL DEFAULT '[]', created_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz
   )`);
+  await boss
+    .getDb()
+    .executeSql(
+      "ALTER TABLE code_assist.repository_setup_test ADD COLUMN IF NOT EXISTS discovery_id uuid",
+    );
   await boss.createQueue(setupTestQueue, { retryLimit: 0 });
 }
 export async function requestSetupTest(
   boss: PgBoss,
   directory: string,
   repository: string,
+  candidate?: {
+    configuration: RepositorySetup;
+    commit: string;
+    discoveryId: string;
+  },
 ) {
-  const profile = loadRepositoryProfile(directory, repository);
-  const { stdout } = await promisify(execFile)("/usr/bin/git", [
-    "-C",
-    repository,
-    "rev-parse",
-    "HEAD",
-  ]);
+  const profile = candidate
+    ? compileRepositoryProfile(basename(repository), candidate.configuration)
+    : loadRepositoryProfile(directory, repository);
+  const { stdout } = candidate
+    ? { stdout: candidate.commit }
+    : await promisify(execFile)("/usr/bin/git", [
+        "-C",
+        repository,
+        "rev-parse",
+        "HEAD",
+      ]);
   const commit = stdout.trim();
   if (!/^[a-f0-9]{40,64}$/.test(commit))
     throw new Error("Could not resolve the repository's source commit.");
   const tx = await boss.getDb().beginTransaction!();
   try {
-    const id = await boss.send(
-      setupTestQueue,
-      {},
-      { db: tx.db, expireInSeconds: 60 * 60 },
-    );
+    // Intake owns candidate tests inline under its durable discovery job.
+    const id = candidate
+      ? randomUUID()
+      : await boss.send(
+          setupTestQueue,
+          {},
+          { db: tx.db, expireInSeconds: 60 * 60 },
+        );
     if (!id) throw new Error("Could not queue setup test.");
     await tx.db.executeSql(
-      "INSERT INTO code_assist.repository_setup_test(job_id,repository,commit,configuration,profile_hash) VALUES($1,$2,$3,$4,$5)",
+      "INSERT INTO code_assist.repository_setup_test(job_id,repository,commit,configuration,profile_hash,discovery_id) VALUES($1,$2,$3,$4,$5,$6)",
       [
         id,
         repository,
         commit,
         JSON.stringify(profile.configuration),
         profile.hash,
+        candidate?.discoveryId ?? null,
       ],
     );
     await tx.commit();
@@ -208,7 +227,7 @@ export async function registerSetupTestWorker(
   const { rows } = await boss
     .getDb()
     .executeSql(
-      "UPDATE code_assist.repository_setup_test SET status='failed',error='Worker restarted during setup test. Select Save and Test Setup again.',finished_at=now() WHERE status='running' RETURNING job_id",
+      "UPDATE code_assist.repository_setup_test SET status='failed',error='Worker restarted during setup test. Retry discovery or select Save and Test Setup again.',finished_at=now() WHERE status='running' OR (status='queued' AND discovery_id IS NOT NULL) RETURNING job_id",
     );
   for (const row of rows) {
     await boss.fail(setupTestQueue, row.job_id, {

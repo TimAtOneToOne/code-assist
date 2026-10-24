@@ -4,7 +4,7 @@ import {
 	profileHash,
 	readRepositorySetup,
 	RepositorySettingsError,
-	writeRepositorySetup
+	writeRepositorySetupLocked
 } from '@code-assist/intake/repository-settings';
 import {
 	cleanupSetupTest,
@@ -77,7 +77,16 @@ export const actions = {
 				)
 			)
 				return fail(400, { error: 'Choose synced repositories for Git dependencies.' });
-			writeRepositorySetup(dataDirectory(), repository, configuration);
+			await withController(async (boss) => {
+				const tx = await boss.getDb().beginTransaction!();
+				try {
+					await writeRepositorySetupLocked(tx.db, dataDirectory(), repository, configuration);
+					await tx.commit();
+				} catch (cause) {
+					await tx.rollback();
+					throw cause;
+				}
+			});
 		} catch (err) {
 			if (err instanceof RepositorySettingsError || err instanceof SyntaxError)
 				return fail(400, {

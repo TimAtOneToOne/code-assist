@@ -1,6 +1,6 @@
 # Current Status
 
-Updated October 23, 2026 against the source tree, including shared Linux browser provisioning and native MCP readiness, deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
+Updated October 23, 2026 against the source tree, including automatic repository setup during intake, shared Linux browser provisioning and native MCP readiness, deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
 
 ## Product and Runtime
 
@@ -15,7 +15,7 @@ Discovery and planning use recorded source snapshots and read-only agent access.
 | Intake            | Paginated Linear discovery for Plan without Code; saved multi-repository selection; removal/restoration preserves history; no automatic Linear writes                                                                                         | [Intake](intake.md)                                                     |
 | Discovery         | Codex reads pinned snapshots; findings, questions, answers, explicit scope confirmation, retries, and stale-attempt rejection                                                                                                                 | [Discovery](discovery.md)                                               |
 | Planning          | Codex drafts/revises; Claude reviews; immutable plan versions; feedback, direction, plan comparisons, and exact-version approval with explicit acceptance of remaining medium findings                                                        | [Planning](planning.md)                                                 |
-| Repository Setup  | Editable runtime profiles, secret mappings, pinned local Git dependencies, and disposable setup/validation/browser tests; three built-in defaults plus saved profiles                                                                         | [Repository Setup](repository-setup.md), [Secrets](secrets.md)          |
+| Repository Setup  | Intake automatically scans/tests missing profiles with Codex before discovery; saved profiles are reused; setup questions remain on the ticket; editable profiles, secret mappings, pinned Git dependencies and disposable tests | [Repository Setup](repository-setup.md), [Secrets](secrets.md)          |
 | Coding            | Sequential multi-repository implementation; saved checkpoints and evidence; repository validation; unchanged repeated validation failures pause for direction; combined Claude review; critical/high/medium findings return to implementation | [Coding](coding.md)                                                     |
 | Human Follow-Up   | Replies to coding questions, requested changes to owned open PRs, explicit Bring In Main, fresh evidence for revisions, and Run Browser Checks recovery                                                                                       | [Coding](coding.md)                                                     |
 | Publication       | Exact-commit validation/review checks, durable publication intents, remote-head checks and retry reconciliation, separate PRs for selected repositories; private-tool links and attribution omitted from external templates                   | [Coding](coding.md#external-publication-privacy)                        |
@@ -72,6 +72,18 @@ October 23 across the selected release, web, worker and health endpoint, with
 zero queued/active jobs and no unfinished steps. The original ONE-5321 ticket
 still displayed its merged PR and successful exact-merge main CI in the deployed
 UI. Optional optimizations and controls: none.
+
+Automatic repository onboarding now precedes ticket discovery for repositories
+without a saved or built-in profile. Native Codex proposes repository-specific
+commands; the existing disposable test runs them before the profile is saved.
+Missing information becomes setup questions on the ticket. Existing profiles and
+owner edits are preserved, and both planning and coding receive setup context.
+The change passed `make verify` (86 unit tests) and ten PostgreSQL integration
+tests. The [onboarding rehearsal](repository-onboarding-rehearsal.md) records the
+browser-driven acceptance, the discovered noninteractive migration false positive,
+and its correction. Repository workflows remain repository-specific; this does
+not create GitHub CI or automatically revise an existing workspace's contract.
+Optional optimizations and controls: none.
 
 ## Code Map
 

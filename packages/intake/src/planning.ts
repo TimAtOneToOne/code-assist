@@ -163,7 +163,7 @@ export async function syncPlanning(boss: PgBoss, db: Db, discoveryId: string) {
     [discoveryId],
   );
   const discovery = rows[0] as DiscoveryRun | undefined;
-  if (!discovery) return;
+  if (!discovery || discovery.setup_pending) return;
   const existing = (
     await db.executeSql(
       "SELECT id FROM code_assist.planning_run WHERE discovery_id=$1",
@@ -181,6 +181,7 @@ export async function syncPlanning(boss: PgBoss, db: Db, discoveryId: string) {
       answers: discovery.answers,
       notes: discovery.notes,
       snapshots: discovery.snapshots,
+      repository_setups: discovery.repository_setups,
     });
   await db.executeSql(
     "INSERT INTO code_assist.planning_run(id,issue_id,discovery_id,input_hash,status) VALUES($1,$2,$3,$4,'drafting')",

@@ -3,7 +3,19 @@ import { readModelSettings } from "./model-settings.ts";
 import { dirname, join } from "node:path";
 import type { PgBoss } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
-import { findSecretByName, revealSecret } from "@code-assist/secrets";
+import {
+  findSecretByName,
+  revealSecret,
+  listConfiguration,
+} from "@code-assist/secrets";
+import {
+  parseSetupScan,
+  prepareRepositorySetups,
+  setupScanPrompt,
+  setupScanSchema,
+} from "./repository-setup-discovery.ts";
+import { requestSetupTest, runSetupTest } from "./repository-setup-tests.ts";
+import { writeRepositorySetupLocked } from "./repository-settings.ts";
 import { discoverRepositories } from "./repositories.ts";
 import {
   discoveryQueue,
@@ -92,6 +104,139 @@ export async function registerDiscoveryWorker(
           "SELECT ticket->>'updatedAt' AS ticket_updated_at,repositories,result,answers,notes FROM code_assist.discovery_run WHERE issue_id=$1 AND answers IS NOT NULL ORDER BY created_at",
           [run.issue_id],
         );
+      stage = "repository setup";
+      const current = async () => {
+        signal.throwIfAborted();
+        if (!(await isCurrentDiscovery(boss.getDb(), run)))
+          throw new Error("Repository setup inputs were superseded.");
+      };
+      const preparedSetups = await prepareRepositorySetups(
+        directory,
+        run.snapshots,
+        {
+          current,
+          progress: async (entries) => {
+            await current();
+            run.setup_progress = structuredClone(entries);
+            await boss
+              .getDb()
+              .executeSql(
+                "UPDATE code_assist.discovery_run SET setup_progress=$2 WHERE id=$1",
+                [run.id, JSON.stringify(entries)],
+              );
+          },
+          scan: async (snapshot) => {
+            stage = `repository setup scan for ${snapshot.name}`;
+            const mapped = listConfiguration(directory)
+              .mappings.filter(
+                (mapping) => mapping.repository === snapshot.source,
+              )
+              .map((mapping) => mapping.variable);
+            const setupPrompt = setupScanPrompt(
+              snapshot,
+              priorAnswers,
+              mapped,
+              available.map((repo) => repo.name),
+              readPromptSettings(directory),
+            );
+            log.payload("repository_setup.input", "Repository setup scan", {
+              snapshot,
+              prompt: setupPrompt,
+              model,
+            });
+            const scan = await runAgentProcess(
+              {
+                apiKey,
+                model,
+                workspace: snapshot.directory,
+                home: join(
+                  directory,
+                  "discovery",
+                  run.id,
+                  "setup",
+                  snapshot.name,
+                ),
+                prompt: setupPrompt,
+                outputSchema: setupScanSchema,
+              },
+              signal,
+              (event) => {
+                log.payload("codex.setup.event", event.type, event);
+                pending = pending
+                  .then(current)
+                  .catch((error) => cancelled.abort(error));
+              },
+            );
+            await pending;
+            await current();
+            const result = parseSetupScan(scan);
+            log.payload(
+              "repository_setup.result",
+              "Repository setup findings and proposed configuration",
+              result,
+            );
+            return result;
+          },
+          test: async (snapshot, configuration, onCreated) => {
+            stage = `repository setup test for ${snapshot.name}`;
+            const id = await requestSetupTest(
+              boss,
+              directory,
+              snapshot.source,
+              { configuration, commit: snapshot.commit, discoveryId: run.id },
+            );
+            try {
+              await onCreated(id);
+              await current();
+              await runSetupTest(boss, directory, id, signal);
+            } finally {
+              await boss
+                .getDb()
+                .executeSql(
+                  "UPDATE code_assist.repository_setup_test SET status='failed',error='Discovery ended before the setup test started.',finished_at=now() WHERE job_id=$1 AND status='queued'",
+                  [id],
+                );
+            }
+          },
+          publish: async (snapshot, configuration) => {
+            const tx = await boss.getDb().beginTransaction!();
+            try {
+              await tx.db.executeSql(
+                "SELECT id FROM code_assist.intake_issue WHERE id=$1 FOR UPDATE",
+                [run.issue_id],
+              );
+              signal.throwIfAborted();
+              if (!(await isCurrentDiscovery(tx.db, run)))
+                throw new Error("Repository setup inputs were superseded.");
+              const saved = await writeRepositorySetupLocked(
+                tx.db,
+                directory,
+                snapshot.source,
+                configuration,
+                true,
+              );
+              await tx.commit();
+              return saved;
+            } catch (error) {
+              await tx.rollback();
+              throw error;
+            }
+          },
+        },
+      );
+      run.repository_setups = preparedSetups.contexts;
+      run.setup_pending = !!preparedSetups.questions;
+      await current();
+      await boss
+        .getDb()
+        .executeSql(
+          "UPDATE code_assist.discovery_run SET repository_setups=$2,setup_pending=$3 WHERE id=$1",
+          [run.id, JSON.stringify(run.repository_setups), run.setup_pending],
+        );
+      if (preparedSetups.questions) {
+        await finishDiscovery(boss, run, preparedSetups.questions);
+        return;
+      }
       const prompt = discoveryPrompt(
         run,
         run.snapshots,

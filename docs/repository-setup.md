@@ -2,6 +2,18 @@
 
 Open **Configuration → Repository Setup** to search synced repositories and edit their runtime profiles. The existing ICU, Workplace Agents, and Elation Companion profiles appear as built-in defaults until saved. Other repositories require their own commands; mapping secrets alone does not configure a repository.
 
+## Automatic Setup During Intake
+
+Confirming repositories on an eligible ticket starts setup gathering before ticket discovery. Each repository with an existing saved or built-in configuration is reused, including intentionally blank optional fields. For an unconfigured repository, a read-only Codex session inspects its pinned source snapshot, instructions, manifests, Makefiles, tests, and GitHub workflows and returns structured setup fields with supporting findings. It follows that repository's conventions rather than creating a common CI pipeline.
+
+The controller tests the proposed configuration against the same pinned commit in a disposable guest using the existing setup-test implementation. Only a passing proposal is saved for future tickets. The ticket shows Scanning Repository, Testing Setup, and Tested and Saved, with a link to the existing configuration and test history. A configuration saved by the owner during scanning or testing takes precedence. Failed proposals remain in test history and do not become the saved setup; inspect their logs, correct settings if needed, and retry discovery.
+
+Missing essential information appears as setup questions on the ticket. **Save Answers and Continue Setup** starts another discovery attempt with those answers; it does not start planning or approve implementation. Add external credentials through Secrets and repository mappings, never in ticket answers. The scanning agent receives mapped variable names, not values. After setup succeeds, normal ticket discovery and explicit scope confirmation continue.
+
+Discovery records the effective configuration and its hash, withholding local environment values. Planning receives that recorded context and must reconcile the commands with the source, GitHub workflows, and proposed tests. Coding receives its workspace's actual pinned setup and validation commands. Later settings edits affect new workspaces, not existing ones; recorded planning context remains historical evidence, not a claim that a later configuration or candidate passed.
+
+Automatic candidate tests run within the existing durable discovery job, with `discovery_id` on their test records; manual **Save and Test Setup** keeps its separate job. Worker restart marks interrupted candidate tests failed and cleans up their guests. Current-attempt checks prevent superseded discovery from accepting a proposal. There is no additional approval page, automatic workflow creation, or automatic retry loop for failed setup tests.
+
 ## Fields
 
 - **Working Directory:** relative to the repository; use `.` for its root.

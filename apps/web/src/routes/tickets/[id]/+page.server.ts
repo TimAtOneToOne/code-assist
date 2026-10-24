@@ -285,7 +285,7 @@ export const actions = {
 					answerDiscovery(boss, id, runId, answers as string[], notes)
 				);
 				return {
-					message: 'Scope and answers saved. Adversarial planning is queued.'
+					message: 'Answers saved. Repository setup or planning will continue as appropriate.'
 				};
 			} catch (cause) {
 				if (cause instanceof DiscoveryConflict) return fail(409, { error: cause.message });

@@ -1,3 +1,4 @@
+import { repositorySetupContext } from "./repository-settings.ts";
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
@@ -531,6 +532,7 @@ ${snapshots(run.input)
       (profiles?.[s.name] ?? repositoryProfile(s.name)).instructions,
   )
   .join("\n")}
+Pinned repository setup and validation commands (environment values withheld): ${JSON.stringify(Object.fromEntries(Object.entries(profiles ?? {}).map(([name, profile]) => [name, repositorySetupContext(profile.configuration)])))}. These are the controller's actual validation commands; also run any additional acceptance checks required by the approved plan.
 Playwright MCP is registered as playwright in this guest. Exercise the approved UI behavior using real local/synthetic fixtures, inspect rendering and browser errors. Save screenshots and full evidence to /work/evidence. The final implementation must include browser evidence for the combined feature. Controller validation runs each repository's established checks; also implement and run all acceptance tests required by the plan, including paired tests. Explain unavailable external integration tests honestly.
 Each implementation attempt for the final repository must run Playwright MCP in this attempt and save its browser evidence, even when no source changes are needed or Tim withdraws a requested change. Earlier screenshots alone do not satisfy this check. If the previous collection failed because browser checks were missing, preserve the saved code, perform the missing browser checks, and return their evidence paths. Do not invent code changes merely to complete this step.
 Central logging: every SDK event and tool result is captured. Your workspace's redacted log mirror is /work/logs/structured/coding.jsonl with full JSON payloads in /work/logs/artifacts; use normal read/search tools to investigate previous failures. The same events are indexed in the main Logs UI under this coding step. Test/app output may be saved under /work/evidence for diagnosis.

@@ -41,8 +41,8 @@
 	{/snippet}
 	{#if ['queued', 'running'].includes(run.status)}
 		<p>
-			Codex will inspect the selected repositories and return findings and any questions needed
-			before planning. You can close this page.
+			Codex will prepare any unconfigured repositories, then return findings and any questions
+			needed before planning. You can close this page.
 		</p>
 	{:else if run.status === 'failed'}
 		<p role="alert" class="text-destructive">{run.error}</p>
@@ -54,6 +54,33 @@
 				/>
 				<Button type="submit">Retry discovery</Button>
 			</form>{/if}
+	{/if}
+	{#if run.setup_progress?.length}
+		<div class="space-y-2">
+			<h3 class="font-medium">Repository Setup</h3>
+			{#each run.setup_progress as setup (setup.repository)}
+				<div class="text-sm">
+					<a
+						class="underline"
+						href={resolve(
+							`/configuration/repositories?repository=${encodeURIComponent(setup.repository)}`
+						)}>{setup.name}</a
+					>
+					· {{
+						scanning: 'Scanning Repository',
+						testing: 'Testing Setup',
+						questions: 'Needs Your Input',
+						failed: 'Setup Test Failed',
+						saved: 'Tested and Saved',
+						reused: 'Using Existing Setup'
+					}[setup.status]}
+					{#if setup.summary}<p>{setup.summary}</p>{/if}
+					{#if setup.testId}<p class="text-muted-foreground">
+							Setup test results and logs are available from the repository link above.
+						</p>{/if}
+				</div>
+			{/each}
+		</div>
 	{/if}
 	{#if run.result}
 		<Markdown html={summaryHtml} />
@@ -77,7 +104,11 @@
 					<h3 class="font-medium">Additional Direction</h3>
 					<p class="whitespace-pre-wrap">{run.notes}</p>
 				</div>{/if}
-			<p>These answers form the saved planning baseline.</p>
+			<p>
+				{run.setup_pending
+					? 'These answers guide repository setup.'
+					: 'These answers form the saved planning baseline.'}
+			</p>
 		{:else if run.status === 'questions' && editable}
 			<form method="POST" use:enhance class="space-y-6">
 				<input type="hidden" name="intent" value="answers" /><input
@@ -122,17 +153,28 @@
 						placeholder="Anything else the planning cycle should know?"
 					/>
 				</div>
-				<label class="flex items-start gap-2 text-sm"
-					><input class="mt-1" type="checkbox" name="scope" value="confirmed" required /><span
-						>I confirm the repository scope: {run.repositories
-							.map((path) => path.split('/').at(-1))
-							.join(', ')}.</span
-					></label
-				>
+				{#if run.setup_pending}
+					<input type="hidden" name="scope" value="confirmed" />
+					<p class="text-sm text-muted-foreground">
+						Add credentials in Secrets and map them to the repository. Do not paste secret values
+						here.
+					</p>
+				{:else}<label class="flex items-start gap-2 text-sm"
+						><input class="mt-1" type="checkbox" name="scope" value="confirmed" required /><span
+							>I confirm the repository scope: {run.repositories
+								.map((path) => path.split('/').at(-1))
+								.join(', ')}.</span
+						></label
+					>{/if}
 				<div class="flex flex-wrap items-center gap-3">
-					<Button type="submit">Confirm scope & save answers</Button><span
-						class="text-sm text-muted-foreground"
-						>No plan yet. Your answers become the planning baseline.</span
+					<Button type="submit"
+						>{run.setup_pending
+							? 'Save Answers and Continue Setup'
+							: 'Confirm scope & save answers'}</Button
+					><span class="text-sm text-muted-foreground"
+						>{run.setup_pending
+							? 'Setup must finish before ticket discovery and planning.'
+							: 'No plan yet. Your answers become the planning baseline.'}</span
 					>
 				</div>
 			</form>
