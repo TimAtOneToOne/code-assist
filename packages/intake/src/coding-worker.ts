@@ -1,3 +1,7 @@
+import { finishAcceptance } from "./acceptance-outcome.ts";
+import { acceptancePrompt } from "./acceptance-prompt.ts";
+import { assessAcceptance } from "./acceptance.ts";
+import { acceptanceResultSchema } from "./acceptance-types.ts";
 import { readGitHub, recordGitHubObservation } from "./github.ts";
 import { readPrChecks, prFailureKey } from "./github-pr-checks.ts";
 import { verifyGuestBrowser } from "./workspace-runtime.ts";
@@ -63,6 +67,7 @@ import {
   recoverAgentResult,
   agentReceiptPath,
   verifyBrowserEvidence,
+  acceptanceArtifactIssues,
   validation,
   stopCodingUnit,
 } from "./coding-runtime.ts";
@@ -99,7 +104,7 @@ export async function reconcileCodingFailures(
       if (
         run.workspace_id &&
         directory &&
-        ["implement", "review", "validate"].includes(step.kind)
+        ["implement", "accept", "review", "validate"].includes(step.kind)
       )
         await stopCodingUnit(
           await readWorkspace(directory, run.workspace_id),
@@ -133,7 +138,9 @@ export async function reconcileCodingFailures(
       if (
         directory &&
         run.workspace_id &&
-        (step.kind === "implement" || step.kind === "review")
+        (step.kind === "implement" ||
+          step.kind === "accept" ||
+          step.kind === "review")
       ) {
         try {
           receipt = await recoverAgentResult(
@@ -304,11 +311,20 @@ export async function registerCodingWorker(
           log,
           activeSnapshot(run).name,
         );
-        if (step.kind === "implement" || step.kind === "review") {
+        if (
+          step.kind === "implement" ||
+          step.kind === "accept" ||
+          step.kind === "review"
+        ) {
           await verifyGuestBrowser(commands.run);
         }
         const ci = run.change_requests?.at(-1)?.prCi;
-        if (ci && (step.kind === "implement" || step.kind === "review")) {
+        if (
+          ci &&
+          (step.kind === "implement" ||
+            step.kind === "accept" ||
+            step.kind === "review")
+        ) {
           const evidence = await readFile(
             artifactPath(process.env.CODE_ASSIST_ARTIFACT_DIR!, ci.artifact),
             "utf8",
@@ -383,7 +399,9 @@ export async function registerCodingWorker(
           },
         );
         const receipt =
-          step.kind === "implement" || step.kind === "review"
+          step.kind === "implement" ||
+          step.kind === "accept" ||
+          step.kind === "review"
             ? await recoverAgentResult(
                 directory,
                 run,
@@ -393,6 +411,7 @@ export async function registerCodingWorker(
                 log,
               )
             : null;
+        if (step.kind === "accept") await unchanged();
         if (step.kind === "implement" && !receipt) {
           // A failed attempt may have useful uncheckpointed work. Never erase it on retry.
           if (
@@ -467,10 +486,14 @@ export async function registerCodingWorker(
           }
           await supplyMain(directory, run, workspace, signal, log);
         }
-        if (step.kind === "implement" || step.kind === "review") {
+        if (
+          step.kind === "implement" ||
+          step.kind === "accept" ||
+          step.kind === "review"
+        ) {
           let completed = receipt;
           if (!completed) {
-            const provider = step.kind === "implement" ? "codex" : "claude",
+            const provider = step.kind === "review" ? "claude" : "codex",
               name =
                 provider === "codex" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
             const secret = findSecretByName(directory, name);
@@ -500,7 +523,10 @@ export async function registerCodingWorker(
               history = (await readCoding(boss.getDb(), run.issue_id)).find(
                 (r) => r.id === run.id,
               )!.steps;
-            const prompt = await codingPrompt(directory, run, step, history);
+            const prompt =
+              step.kind === "accept"
+                ? await acceptancePrompt(directory, run, step, history)
+                : await codingPrompt(directory, run, step, history);
             log.payload("coding.input", `${provider} ${step.kind}`, {
               model,
               prompt,
@@ -515,14 +541,17 @@ export async function registerCodingWorker(
                 repository: activeSnapshot(run).name,
                 repositories: snapshots(run.input).map((s) => s.name),
                 environments: workspace.environments,
+                acceptance: step.kind === "accept",
                 provider,
                 apiKey,
                 model,
                 prompt,
                 schema:
-                  step.kind === "implement"
-                    ? implementationSchema
-                    : reviewSchema,
+                  step.kind === "accept"
+                    ? acceptanceResultSchema
+                    : step.kind === "implement"
+                      ? implementationSchema
+                      : reviewSchema,
                 anthropicWorkspaceId: workspaceSecret
                   ? revealSecret(directory, workspaceSecret.id)
                   : undefined,
@@ -545,7 +574,7 @@ export async function registerCodingWorker(
           await assertCurrent();
           if (!completed)
             throw new Error("Agent did not return a saved result.");
-          const { result: value, browserCalls } = completed;
+          const { result: value, browserCalls, tools } = completed;
           const reference = log.payload(
             "coding.output",
             `${step.kind} completed`,
@@ -564,7 +593,7 @@ export async function registerCodingWorker(
             boss,
             run,
             step,
-            { ...safe, browserCalls },
+            { ...safe, browserCalls, tools },
             "checkpoint",
             undefined,
             undefined,
@@ -575,6 +604,7 @@ export async function registerCodingWorker(
               kind: step.kind,
               result: safe,
               browserCalls,
+              tools,
             },
           );
         } else if (step.kind === "checkpoint") {
@@ -633,19 +663,52 @@ export async function registerCodingWorker(
               );
               return;
             }
-            if (repositoryIndex(run) === codingIndexes(run).at(-1))
+            if (
+              run.plan.acceptanceScenarios === undefined &&
+              repositoryIndex(run) === codingIndexes(run).at(-1)
+            )
               requireBrowserEvidence(
                 result.browserEvidence,
                 saved.browserCalls,
               );
             stage = "verifying browser evidence (implementation is saved)";
-            await verifyBrowserEvidence(
-              workspace,
-              step,
-              result.browserEvidence,
-              signal,
-              log,
-            );
+            if (run.plan.acceptanceScenarios !== undefined) {
+              const issues = await acceptanceArtifactIssues(
+                workspace,
+                step,
+                result.browserEvidence,
+                signal,
+                log,
+              );
+              if (issues.length) {
+                await finishCoding(
+                  boss,
+                  run,
+                  step,
+                  {
+                    ...result,
+                    evidence,
+                    issues,
+                    summary:
+                      "Implementation is saved, but its cited evidence is missing or outside the evidence directory. Correct the evidence paths without inventing source changes.",
+                  },
+                  "implement",
+                  undefined,
+                  undefined,
+                  undefined,
+                  progress(repositoryIndex(run), undefined, "implement"),
+                );
+                return;
+              }
+            } else {
+              await verifyBrowserEvidence(
+                workspace,
+                step,
+                result.browserEvidence,
+                signal,
+                log,
+              );
+            }
             await finishCoding(
               boss,
               run,
@@ -662,6 +725,29 @@ export async function registerCodingWorker(
               undefined,
               progress(repositoryIndex(run), undefined, "validate"),
             );
+          } else if (saved.kind === "accept") {
+            const report = assessAcceptance(
+              run,
+              saved.agentStepId,
+              saved.result,
+              saved.tools ?? [],
+            );
+            const paths = report.scenarios.flatMap((s) => s.artifacts);
+            if (
+              !report.issues.some((issue) => issue.includes("artifact belongs"))
+            ) {
+              report.issues.push(
+                ...(await acceptanceArtifactIssues(
+                  workspace,
+                  step,
+                  paths,
+                  signal,
+                  log,
+                )),
+              );
+              report.passed = report.issues.length === 0;
+            }
+            await finishAcceptance(boss, run, step, report, evidence);
           } else {
             const result = parseReview(saved.result);
             await finishCoding(
@@ -704,7 +790,7 @@ export async function registerCodingWorker(
             !codeReviewReady(parseReview(review?.result))
           )
             throw new Error(
-              "Publication requires passing validation and review of this exact commit.",
+              "Publication requires passing validation, required acceptance evidence and independent review of the current candidate commits.",
             );
           await unchanged();
           const url = await publishCoding(
@@ -761,7 +847,7 @@ export async function registerCodingWorker(
         await pending;
         if (
           workspace &&
-          ["implement", "review", "validate"].includes(step.kind)
+          ["implement", "accept", "review", "validate"].includes(step.kind)
         )
           await stopCodingUnit(workspace, step.id, log);
         log.payload("coding.failure", message, { error }, "error");
@@ -786,7 +872,9 @@ export async function registerCodingWorker(
           await failCoding(boss, run, step, message);
           if (
             shutdown.aborted &&
-            (step.kind === "implement" || step.kind === "review") &&
+            (step.kind === "implement" ||
+              step.kind === "accept" ||
+              step.kind === "review") &&
             (await currentCoding(boss.getDb(), run)) &&
             readReceipt(
               agentReceiptPath(

@@ -1,6 +1,12 @@
+import {
+  acceptanceScenariosSchema,
+  validAcceptanceScenarios,
+  type AcceptanceScenario,
+} from "./acceptance-types.ts";
 import type { DiscoveryRun } from "./discovery.ts";
 
 export type PlanDocument = {
+  acceptanceScenarios?: AcceptanceScenario[];
   markdown: string;
   changeSummary: string;
   responses: { findingId: string; response: string }[];
@@ -82,8 +88,15 @@ export type PlanningDetail = PlanningRun & {
 export const planSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["markdown", "changeSummary", "responses", "additionalValidation"],
+  required: [
+    "markdown",
+    "changeSummary",
+    "responses",
+    "additionalValidation",
+    "acceptanceScenarios",
+  ],
   properties: {
+    acceptanceScenarios: acceptanceScenariosSchema,
     additionalValidation: {
       type: "array",
       items: {
@@ -153,6 +166,8 @@ export function parsePlan(
   const p = value as PlanDocument;
   if (
     !p ||
+    (p.acceptanceScenarios !== undefined &&
+      !validAcceptanceScenarios(p.acceptanceScenarios, repositories)) ||
     !text(p.markdown) ||
     !text(p.changeSummary) ||
     !Array.isArray(p.responses) ||
@@ -171,14 +186,24 @@ export function parsePlan(
   return p;
 }
 export function planMarkdown(plan: PlanDocument): string {
-  if (plan.additionalValidation === undefined) return plan.markdown;
+  const scenarios =
+    plan.acceptanceScenarios === undefined
+      ? ""
+      : "\n\n## Acceptance Scenarios\n\n" +
+        plan.acceptanceScenarios
+          .map(
+            (s) =>
+              `### ${s.id}: ${s.title}\n\nRepositories: ${s.repositories.join(", ")} · Method: ${s.method}\n\nProcedure: ${s.procedure}\n\nExpected: ${s.expectedOutcome}`,
+          )
+          .join("\n\n");
+  if (plan.additionalValidation === undefined) return plan.markdown + scenarios;
   const checks = plan.additionalValidation.map(({ repository, script }) => {
     const fence = "`".repeat(
       Math.max(3, ...[...script.matchAll(/`+/g)].map((m) => m[0].length + 1)),
     );
     return `### ${repository}\n\n${fence}bash\n${script}\n${fence}`;
   });
-  return `${plan.markdown}\n\n## Additional Controller Validation\n\nThese commands run after the repository's pinned checks, in its configured working directory and environment. Approval covers these exact commands.\n\n${checks.length ? checks.join("\n\n") : "No additional commands. The repository's pinned checks still run."}\n`;
+  return `${plan.markdown}${scenarios}\n\n## Additional Controller Validation\n\nThese commands run after the repository's pinned checks, in its configured working directory and environment. Approval covers these exact commands.\n\n${checks.length ? checks.join("\n\n") : "No additional commands. The repository's pinned checks still run."}\n`;
 }
 export function parseReview(value: unknown): PlanReview {
   const r = value as PlanReview;

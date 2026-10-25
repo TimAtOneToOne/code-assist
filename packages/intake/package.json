@@ -20,6 +20,7 @@
     "./planning-aws": "./src/planning-aws.ts",
     "./workspace": "./src/workspace.ts",
     "./coding": "./src/coding.ts",
+    "./acceptance-types": "./src/acceptance-types.ts",
     "./coding-types": "./src/coding-types.ts",
     "./coding-worker": "./src/coding-worker.ts",
     "./github": "./src/github.ts",

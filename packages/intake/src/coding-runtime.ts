@@ -1,3 +1,5 @@
+import { toolEvidenceCollector } from "./tool-evidence.ts";
+import { planMarkdown } from "./planning-types.ts";
 import { repositorySetupContext } from "./repository-settings.ts";
 import {
   planValidationScripts,
@@ -510,6 +512,24 @@ export async function verifyBrowserEvidence(
   ]);
 }
 
+export async function acceptanceArtifactIssues(
+  workspace: Workspace,
+  step: CodingStep,
+  paths: string[],
+  signal: AbortSignal,
+  log: Log,
+): Promise<string[]> {
+  return JSON.parse(
+    await guestCommands(workspace, signal, log).guest([
+      "node",
+      "/opt/code-assist/packages/intake/src/coding-evidence.ts",
+      "inspect",
+      step.continuation!.agentStepId,
+      JSON.stringify(paths),
+    ]),
+  );
+}
+
 export async function codingPrompt(
   directory: string,
   run: CodingRun,
@@ -537,13 +557,12 @@ ${snapshots(run.input)
   )
   .join("\n")}
 Pinned repository setup and validation commands (environment values withheld): ${JSON.stringify(Object.fromEntries(Object.entries(profiles ?? {}).map(([name, profile]) => [name, repositorySetupContext(profile.configuration)])))}. The controller runs these pinned checks followed by this plan’s repository-scoped additionalValidation scripts. Implement any new test scripts those commands require, and run the approved acceptance checks. Do not edit saved profiles or substitute commands to avoid failures. Changing the approved commands requires a revised plan.
-Playwright MCP is registered as playwright in this guest. Exercise the approved UI behavior using real local/synthetic fixtures, inspect rendering and browser errors. Save screenshots and full evidence to /work/evidence. The final implementation must include browser evidence for the combined feature. Controller validation runs each repository's established checks; also implement and run all acceptance tests required by the plan, including paired tests. Explain unavailable external integration tests honestly.
-Each implementation attempt for the final repository must run Playwright MCP in this attempt and save its browser evidence, even when no source changes are needed or Tim withdraws a requested change. Earlier screenshots alone do not satisfy this check. If the previous collection failed because browser checks were missing, preserve the saved code, perform the missing browser checks, and return their evidence paths. Do not invent code changes merely to complete this step.
+${run.plan.acceptanceScenarios === undefined ? "Playwright MCP is registered as playwright in this guest. Exercise the approved UI behavior using real local/synthetic fixtures, inspect rendering and browser errors. Save screenshots and full evidence to /work/evidence. The final implementation must include browser evidence for the combined feature. Controller validation runs each repository's established checks; also implement and run all acceptance tests required by the plan, including paired tests. Explain unavailable external integration tests honestly.\nEach implementation attempt for the final repository must run Playwright MCP in this attempt and save its browser evidence, even when no source changes are needed or Tim withdraws a requested change. Earlier screenshots alone do not satisfy this check. If the previous collection failed because browser checks were missing, preserve the saved code, perform the missing browser checks, and return their evidence paths. Do not invent code changes merely to complete this step.\n" : "This plan has structured acceptance scenarios. Implement their required tests and fixtures using the repository’s own tools; report your available checks honestly. The controller runs a separate acceptance attempt after all repositories pass command validation. Browser checks belong to scenarios that actually need a browser; non-UI work uses the approved command or inspection method. Implementation browserEvidence may be empty when no browser checks were performed. If you do cite browser artifacts, save them under /work/evidence and return those actual paths, never repository .tmp paths or earlier evidence."}
 Central logging: every SDK event and tool result is captured. Your workspace's redacted log mirror is /work/logs/structured/coding.jsonl with full JSON payloads in /work/logs/artifacts; use normal read/search tools to investigate previous failures. The same events are indexed in the main Logs UI under this coding step. Test/app output may be saved under /work/evidence for diagnosis.
-${step.kind === "review" ? "Review the actual git diff from the Diff base and the saved validation/browser evidence. Do not edit source or commit. Re-run targeted checks where useful. Return only unresolved findings, with file evidence and actionable recommendations. Any critical/high/medium finding requires revise; low findings may remain. Use needs_direction for a real unresolved human decision. Verify prior fixes independently." : "Implement or revise the approved feature. Read prior code reviews and failures below. Return implemented after this repository’s approved work and its available checks are complete; the final repository must complete combined acceptance. Return browserEvidence as the paths to evidence you actually saved."}
+${step.kind === "review" ? "Review the actual git diff from the Diff base and the saved validation/acceptance evidence. For structured acceptance, inspect the latest report, each approved scenario’s expected result and its cited native tool outputs. Check that the tools exercised the intended behavior against the candidate application, not just a navigation/read or a previous server/build. Re-run targeted scenarios when the evidence does not establish their outcome. A complete report is not semantic proof by itself; raise a finding for unsupported passes. Do not edit source or commit. Re-run targeted checks where useful. Return only unresolved findings, with file evidence and actionable recommendations. Any critical/high/medium finding requires revise; low findings may remain. Use needs_direction for a real unresolved human decision. Verify prior fixes independently." : "Implement or revise the approved feature. Read prior code reviews and failures below. Return implemented after this repository’s approved work and its available checks are complete. Follow the acceptance workflow described above. Return browserEvidence as the paths to evidence you actually saved."}
 ${composeInstructions(readPromptSettings(directory), "coding", null, snapshots(run.input))}
 Approved Plan v${run.version} (${run.input.planHash}):
-${run.plan.markdown}
+${planMarkdown(run.plan)}
 ${
   run.change_requests?.length
     ? `Saved Code Change Requests (chronological; requestedBy identifies owner input or the GitHub check monitor; the last request is this revision):
@@ -571,7 +590,11 @@ export async function runGuestAgent(
   receiptPath: string,
 ) {
   let result: unknown;
-  const browserCalls: string[] = [];
+  const evidence = toolEvidenceCollector();
+  const browserCalls = () =>
+    evidence.completed
+      .filter((t) => t.kind === "browser" && t.succeeded)
+      .map((t) => t.name.replace("mcp__playwright__", ""));
   try {
     // systemd owns all SDK/browser/shell descendants and receives no secrets in its arguments.
     await executeCoding(
@@ -607,32 +630,20 @@ export async function runGuestAgent(
           result = message.value;
           writeReceipt(receiptPath, {
             result: result as Record<string, unknown>,
-            browserCalls: [...browserCalls],
+            browserCalls: browserCalls(),
+            tools: evidence.completed,
           });
         }
-        const event = message.value as {
-          type?: string;
-          item?: {
-            type?: string;
-            server?: string;
-            tool?: string;
-            status?: string;
-          };
-        };
-        if (
-          message.type === "event" &&
-          event.type === "item.completed" &&
-          event.item?.type === "mcp_tool_call" &&
-          event.item.server === "playwright" &&
-          event.item.status === "completed" &&
-          event.item.tool
-        )
-          browserCalls.push(event.item.tool);
+        if (message.type === "event") evidence.observe(message.value);
         onEvent();
       },
     );
     if (!result) throw new Error("Agent finished without a saved result.");
-    return { result: result as Record<string, unknown>, browserCalls };
+    return {
+      result: result as Record<string, unknown>,
+      browserCalls: browserCalls(),
+      tools: evidence.completed,
+    };
   } finally {
     if (signal.aborted) await stopCodingUnit(workspace, step.id, log);
   }

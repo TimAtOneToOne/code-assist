@@ -14,6 +14,7 @@ import {
   freezeEvidence,
   verifyEvidence,
   requireBrowserEvidence,
+  evidenceIssues,
 } from "../src/coding-evidence.ts";
 import { readReceipt, writeReceipt } from "../src/coding-receipt.ts";
 import { executeCoding } from "../src/coding-runtime.ts";
@@ -86,6 +87,13 @@ test("evidence replay uses a complete frozen snapshot and accepts real directori
     );
     assert.throws(() =>
       verifyEvidence(work, origin, ["/work/evidence/missing"]),
+    );
+    assert.deepEqual(evidenceIssues(work, origin, ["/work/evidence/missing"]), [
+      "Missing or invalid saved artifact: /work/evidence/missing",
+    ]);
+    assert.deepEqual(
+      evidenceIssues(work, origin, ["/work/evidence/browser/screen.png"]),
+      [],
     );
     assert.throws(() =>
       verifyEvidence(work, origin, ["/work/evidence/../logs"]),

@@ -28,6 +28,7 @@ export function workflowBadgeVariant(status: WorkflowStatus, current = true) {
 		case 'checkpoint':
 		case 'collect':
 		case 'validate':
+		case 'accept':
 		case 'review':
 		case 'publish':
 		case 'awaiting_main':

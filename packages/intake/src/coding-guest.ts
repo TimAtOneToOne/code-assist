@@ -1,8 +1,9 @@
+import { toolEvidenceCollector } from "./tool-evidence.ts";
 import { browserServer } from "../../browser-mcp/src/server.ts";
 import { writeReceipt } from "./coding-receipt.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 // Executed only inside the attempt's OrbStack guest, under an owned systemd unit.
-import { readFileSync, mkdirSync } from "node:fs";
+import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Codex } from "@openai/codex-sdk";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -17,6 +18,7 @@ const input = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
   repository?: string;
   repositories?: string[];
   environments?: boolean;
+  acceptance?: boolean;
   provider: "codex" | "claude";
   apiKey: string;
   model: string;
@@ -73,25 +75,35 @@ const log = createLogger(
   },
   { attempt_id: input.id },
 );
-const browserCalls: string[] = [];
+const evidence = toolEvidenceCollector();
+const evidenceDirectory = input.acceptance
+  ? `/work/evidence/${input.receiptId ?? input.id}`
+  : "/work/evidence";
+mkdirSync(evidenceDirectory, { recursive: true });
+const journal = () => {
+  if (input.acceptance)
+    writeFileSync(
+      join(evidenceDirectory, "tool-events.json"),
+      JSON.stringify(evidence.completed, null, 2),
+    );
+};
+journal();
 const emit = (type: string, value: unknown) => {
   const reference = log.payload(`coding.${type}`, type, value);
   const safe = JSON.parse(
     readFileSync(artifactPath(artifacts, reference.artifact_id), "utf8"),
   );
-  if (
-    type === "event" &&
-    safe.type === "item.completed" &&
-    safe.item?.type === "mcp_tool_call" &&
-    safe.item.server === "playwright" &&
-    safe.item.status === "completed" &&
-    safe.item.tool
-  )
-    browserCalls.push(safe.item.tool);
+  if (type === "event") {
+    evidence.observe(safe);
+    journal();
+  }
   if (type === "result")
     writeReceipt("/work/results/" + (input.receiptId ?? input.id) + ".json", {
       result: safe,
-      browserCalls,
+      browserCalls: evidence.completed
+        .filter((t) => t.kind === "browser" && t.succeeded)
+        .map((t) => t.name.replace("mcp__playwright__", "")),
+      tools: evidence.completed,
     });
   process.stdout.write(JSON.stringify({ type, value: safe }) + "\n");
 };
@@ -100,7 +112,7 @@ process.on("SIGTERM", () => {
   terminateOwnedProcesses();
   abort.abort();
 });
-const mcp = browserServer("/work/evidence");
+const mcp = browserServer(evidenceDirectory);
 const shell = {
   PATH: "/usr/local/bin:/usr/bin:/bin",
   HOME: home,

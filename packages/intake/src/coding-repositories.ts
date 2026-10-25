@@ -1,3 +1,4 @@
+import { acceptanceReady, currentAcceptance } from "./acceptance.ts";
 import { isDeepStrictEqual } from "node:util";
 import { join } from "node:path";
 import type {
@@ -57,6 +58,7 @@ export function repositoryRun(run: CodingRun, index: number): CodingRun {
   return { ...run, repository_index: index, commit: state.commit };
 }
 export function publicationReady(run: CodingRun, steps: CodingStep[]) {
+  if (!acceptanceReady(run, steps)) return false;
   steps = steps.filter(
     (step) =>
       (step.change_request_id ?? null) ===
@@ -68,6 +70,11 @@ export function publicationReady(run: CodingRun, steps: CodingStep[]) {
     (s) => s.kind === "review" && s.status === "completed",
   );
   if (!review) return false;
+  if (
+    run.plan.acceptanceScenarios !== undefined &&
+    steps.indexOf(review) <= steps.indexOf(currentAcceptance(run, steps)!)
+  )
+    return false;
   if (run.repositories) {
     if (!isDeepStrictEqual(review.input_commits, commitSet(run))) return false;
     return codingIndexes(run).every((index) => {

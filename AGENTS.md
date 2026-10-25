@@ -51,6 +51,13 @@ Human-initiated applies use the established deployment workflow.
 
 - New plan versions list repository-specific acceptance scripts in **Additional Controller Validation**. They are included in approval, version comparisons and downloads; the controller runs them after the workspace's pinned checks. Do not manually edit a saved profile merely to make newly planned tests run. Commands must be in the approved version; changes require a revised plan. Older plans keep their existing checks. See `docs/plan-validation-rehearsal.md` for the isolated failing-test and exact-commit regression.
 
+## Acceptance Evidence
+
+- New approved plans require repository-specific scenarios with IDs, scopes, procedures, expected outcomes and browser/command/inspection methods. Use the actual repo's workflow; do not make browser/game/npm assumptions for backend or configuration work.
+- **Verifying Acceptance** runs after command validation and before Claude review. Inspect **Acceptance Results**, tested commits, current-attempt tool IDs, observations and artifacts. Missing or failed proof returns to implementation; unavailable prerequisites need direction. Historical plans retain their existing behavior.
+- Native tool activity proves execution, not semantic adequacy. Claude must assess each expected outcome. Do not cite runtime readiness, an earlier candidate, a local mock, or inspection as deployed production proof. See `docs/acceptance-rehearsal.md`.
+- Mia's desktop/login-session worker can access its GitHub keychain while an SSH session may report the same account invalid. Tim reconfirmed `ms-mia-socci` works through the desktop keyring on October 24, 2026. An SSH-only `gh` HTTP 401 does not establish expired credentials or a broken production worker. Do not ask for reauthentication based on that alone or alter the saved login to fix the SSH context. For an isolated operator rehearsal, a task-specific temporary LaunchAgent in the existing `gui/<uid>` domain can run the same CLI in its authorized desktop session; keep its script/logs under `.tmp`, verify the account with `gh api user --jq .login`, and boot out that temporary job after use. Do not restart production services to solve an operator-session mismatch.
+
 ## Guest Browser Readiness
 
 - Setup tests and coding use the shared runtime installer in `packages/intake/src/workspace-runtime.ts`. It supplies the agent's Chromium system libraries, browser binary, and native MCP readiness probe; repositories do not need a special system installer for the agent's browser.

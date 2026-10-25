@@ -68,7 +68,9 @@ export async function finishValidation(
   const next = previousValidationStepId
     ? "needs_direction"
     : result.passed && following === undefined
-      ? "review"
+      ? run.plan.acceptanceScenarios === undefined
+        ? "review"
+        : "accept"
       : "implement";
   const outcome = previousValidationStepId
     ? {

@@ -35,7 +35,7 @@ export async function deploymentActivity(connectionString: string) {
       SELECT 'coding',s.id,s.status,s.worker_pid
       FROM code_assist.coding_step s JOIN code_assist.coding_run r ON r.id=s.run_id
       WHERE s.status IN ('queued','running') AND r.current_step_id=s.id
-        AND r.status IN ('prepare','implement','checkpoint','collect','validate','review','publish')
+        AND r.status IN ('prepare','implement','checkpoint','collect','validate','accept','review','publish')
       UNION ALL
       SELECT 'setup',job_id,status,NULL::integer
       FROM code_assist.repository_setup_test WHERE status IN ('queued','running')

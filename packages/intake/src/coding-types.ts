@@ -8,6 +8,7 @@ export type CodingKind =
   | "checkpoint"
   | "collect"
   | "validate"
+  | "accept"
   | "review"
   | "publish";
 export type CodingRepository = {
@@ -92,7 +93,8 @@ export type CodingChangeRequest = {
 };
 export type CodingContinuation = {
   agentStepId: string;
-  kind: "implement" | "review";
+  kind: "implement" | "accept" | "review";
+  tools?: import("./acceptance-types.ts").ToolEvidence[];
   result: Record<string, unknown>;
   browserCalls: string[];
 };

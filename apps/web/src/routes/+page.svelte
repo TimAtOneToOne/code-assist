@@ -98,6 +98,7 @@
 		checkpoint: 'Saving Code Checkpoint',
 		collect: 'Collecting Saved Evidence',
 		validate: 'Running Validation',
+		accept: 'Verifying Acceptance',
 		review: 'Claude Reviewing',
 		publish: 'Publishing PR',
 		failed: 'Coding Needs Attention',

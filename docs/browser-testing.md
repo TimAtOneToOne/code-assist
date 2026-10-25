@@ -31,7 +31,7 @@ an HTTP response is sufficient.
 
 Every selected repository also runs this probe through its environment launcher,
 so a bad browser-path override cannot be hidden by a passing base environment.
-Implementation and review steps repeat the probe with the active repository's
+Implementation, acceptance and review steps repeat the probe with the active repository's
 environment, including when an existing guest already has the current runtime.
 
 Diagnostics, MCP transcripts and screenshots are under `/work/runtime-readiness`

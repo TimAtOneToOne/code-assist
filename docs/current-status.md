@@ -1,10 +1,10 @@
 # Current Status
 
-Updated October 24, 2026 against the source tree, including approved additional validation commands, automatic repository setup during intake, shared Linux browser provisioning and native MCP readiness, deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
+Updated October 24, 2026 against the source tree, including structured acceptance scenarios and current-attempt evidence, approved additional validation commands, automatic repository setup during intake, shared Linux browser provisioning and native MCP readiness, deployment-status inspection, the four-hour Completed display window, and the checked-in workflow/evidence documentation. This is the starting point for a new session. It summarizes implementation and dated evidence, not live ticket or deployment status. Check live state before claiming a deployment, ticket outcome, or acceptance result is current.
 
 ## Product and Runtime
 
-Code Assist moves Linear tickets through repository confirmation, discovery, adversarial planning, exact-version approval, implementation, validation, review, and PR publication. Tim approves plans and merges PRs. The SvelteKit UI, supervised worker, PostgreSQL/pg-boss, SDKs, source snapshots, coding guests, browsers, and evidence live on Mia, reachable over Tailscale at `http://100.91.0.83:3000`.
+Code Assist moves Linear tickets through repository confirmation, discovery, adversarial planning, exact-version approval, implementation, validation, scenario acceptance, review, and PR publication. Tim approves plans and merges PRs. The SvelteKit UI, supervised worker, PostgreSQL/pg-boss, SDKs, source snapshots, coding guests, browsers, and evidence live on Mia, reachable over Tailscale at `http://100.91.0.83:3000`.
 
 Discovery and planning use recorded source snapshots and read-only agent access. Planning can use the configured temporary AWS staging read-only role for evidence. Coding uses a separate OrbStack guest per ticket run, with selected repositories together for paired tests. Controller-owned publication keeps GitHub and Windmill publication credentials out of agent guests.
 
@@ -17,6 +17,7 @@ Discovery and planning use recorded source snapshots and read-only agent access.
 | Planning          | Codex drafts/revises; Claude reviews; immutable plan versions; feedback, direction, plan comparisons, and exact-version approval with explicit acceptance of remaining medium findings                                                        | [Planning](planning.md)                                                 |
 | Repository Setup  | Intake automatically scans/tests missing profiles with Codex before discovery; saved profiles are reused; setup questions remain on the ticket; editable profiles, secret mappings, pinned Git dependencies and disposable tests | [Repository Setup](repository-setup.md), [Secrets](secrets.md)          |
 | Coding            | Sequential multi-repository implementation; saved checkpoints and evidence; repository validation; unchanged repeated validation failures pause for direction; combined Claude review; critical/high/medium findings return to implementation | [Coding](coding.md)                                                     |
+| Acceptance | New plans require scenario outcomes and current native tool evidence for the approved plan, all candidate commits and latest request; browser, command/API and inspection methods; missing proof repairs, unavailable prerequisites pause | [Acceptance Rehearsal](acceptance-rehearsal.md), [Coding](coding.md#scenario-acceptance) |
 | Human Follow-Up   | Replies to coding questions, requested changes to owned open PRs, explicit Bring In Main, fresh evidence for revisions, and Run Browser Checks recovery                                                                                       | [Coding](coding.md)                                                     |
 | Publication       | Exact-commit validation/review checks, durable publication intents, remote-head checks and retry reconciliation, separate PRs for selected repositories; private-tool links and attribution omitted from external templates                   | [Coding](coding.md#external-publication-privacy)                        |
 | Windmill Work     | Controller-owned native production-workspace fork creation, ticket fork branches, exact-commit Git Sync evidence, and native PR adoption; latest addition in `f21c951`                                                                        | [Windmill Publication](coding.md#windmill-production-fork-publication)  |
@@ -95,6 +96,10 @@ See [the regression record](plan-validation-rehearsal.md) for fixture boundaries
 browser-download verification limits and repeatable tests. Verify the deployed
 release with `make deploy-status` before relying on live availability.
 Optional optimizations and controls: none.
+
+## Acceptance Evidence Delivery
+
+New plans include scenario coverage and current native evidence before independent review. A local API/configuration/browser rehearsal passed through real Codex implementation, controller validation, Codex acceptance and native Claude review at fixture commit `d0d230e`, stopping before publication. A misleading pass citing a failed inspection command was rejected and corrected automatically without another source change. Both SDKs also correctly recorded deliberate browser errors. Local verification passed 94 unit tests, 11 PostgreSQL integration tests, lint/types and build; the DB target skipped its two optional OrbStack suites. See [the delivery record](acceptance-rehearsal.md) for synthetic setup, operator interventions and evidence limits. Use `make deploy-status` for the current deployed release; the dated activation check is retained under `.tmp/2026-10-24-acceptance/`.
 
 ## Code Map
 

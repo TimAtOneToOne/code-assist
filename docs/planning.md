@@ -6,6 +6,12 @@ New discovery baselines also include each repository's saved setup commands and 
 
 The ticket page shows the current plan, findings, agent activity, previous versions, feedback and approval history. Plans download as `plan_vN.md`; saved versions and reviews are never overwritten. Completed discovery is collapsed while planning is active. The original interactive reference is `docs/initial/index.html`.
 
+## Acceptance Scenarios
+
+New model outputs require a nonempty `acceptanceScenarios` array. Each scenario defines a unique stable ID, title, confirmed repository names, procedure, expected outcome and method (`browser`, `command` or `inspection`). Derive these from the actual work: do not assume a game, frontend, JavaScript toolchain or shared CI convention. Review prerequisites and authorization during planning; missing services or credentials must not become an invented pass.
+
+The generated **Acceptance Scenarios** section appears in reviews, version comparisons and Markdown exports and is part of the exact approved plan hash. The verifier runs these scenarios after controller command validation. Additional validation commands complement the behavioral scenarios. Existing approved plans are not retrofitted.
+
 ## Human Approval
 
 New plan outputs include an `additionalValidation` array of repository names and

@@ -4,7 +4,7 @@ Approved plans enter the `approved-coding` pg-boss queue. [Repository Setup](rep
 
 ## Lifecycle
 
-Each run is bound to the approved plan version, plan hash, requirements hash and source commit. Each step has a separate ID, job, input commit, result and logs. The stages are workspace preparation, Codex implementation, saving the code checkpoint, collecting evidence, repository validation, Claude adversarial review, preserving the review result/evidence, and controller-owned GitHub publication. Findings of critical, high or medium severity return to implementation; a material decision pauses for Tim. There is no review-round budget or provider fallback.
+Each run is bound to the approved plan version, plan hash, requirements hash and source commit. Each step has a separate ID, job, input commit, result and logs. The stages are workspace preparation, Codex implementation, saving the code checkpoint, collecting evidence, repository validation, scenario acceptance for structured plans, Claude adversarial review, preserving the review result/evidence, and controller-owned GitHub publication. Findings of critical, high or medium severity return to implementation; a material decision pauses for Tim. There is no review-round budget or provider fallback.
 
 The ticket page shows these steps, summaries, findings, validation results and log links. Failed steps have a Retry action and a deliberate Use Branch and Retry form when a fresh branch is needed. A publication already in flight must be reconciled before its branch can change. A changed ticket, removed Plan label, changed repository selection or revised plan prevents obsolete attempts from advancing. A revised approved plan starts a separate run; previously used branches are not silently reused.
 
@@ -26,6 +26,20 @@ pinned checks. Updating shared profiles or preparing new system dependencies
 remains a separate setup change.
 
 See [Additional Plan Validation Rehearsal](plan-validation-rehearsal.md) for regression instructions and evidence.
+
+### Scenario Acceptance
+
+New plans define stable scenario IDs, repository scopes, procedures, expected outcomes and a verification method: browser, command or inspection. API, service, database, configuration, infrastructure and documentation work use their appropriate tests or inspection; browser checks are required only where the approved scenario calls for them. Scenarios can span multiple repositories. This adds no production access or deployment authorization.
+
+After every affected repository passes command validation, a separate Codex acceptance step executes the approved scenarios against the saved candidates. It cannot edit tracked source. It reports each scenario as passed, failed or blocked, with observations, native tool IDs and optional artifact paths. Native SDK events are recorded for both providers, and a guest journal makes the current attempt's IDs available to the verifier. Navigation alone cannot satisfy a browser scenario.
+
+The controller checks coverage, tool completion/method, attempt-specific artifact scope and saved artifact existence. Missing, invalid or failed proof returns to implementation; missing prerequisites pause with a concrete direction question. Infrastructure failures during preservation retain the existing collection retry behavior. Saved receipts preserve native IDs across recovery.
+
+Publication additionally requires a complete record for the approved plan hash, full candidate commit set and latest request/reply, followed by independent review. New attempts or validation invalidate earlier acceptance for that cycle. Claude evaluates whether the actual observations prove the criteria; mechanical coverage is not semantic proof. The ticket's **Acceptance Results** table links scenario observations to logs and records tested commits and artifact paths. Earlier candidate evidence remains visible. Existing plans without structured scenarios retain their prior behavior.
+
+Evidence is not a hostile-agent attestation: copying old content into a current artifact cannot be disproved by a pathname alone. Current native execution, exact-source checks and independent semantic review remain complementary. No test here establishes deployed production behavior unless that authorized workflow was actually exercised.
+
+See [Acceptance Evidence Rehearsal](acceptance-rehearsal.md) for verified scope and limitations.
 
 ### Repeated Validation Failures
 

@@ -68,7 +68,9 @@ export function assertCleanupEvidence(run: CodingRun, steps: CodingStep[]) {
       "Every repository must have successful main workflow evidence for its merge commit.",
     );
   for (const step of steps.filter(
-    (s) => s.status === "completed" && ["implement", "review"].includes(s.kind),
+    (s) =>
+      s.status === "completed" &&
+      ["implement", "accept", "review"].includes(s.kind),
   )) {
     const evidence =
       step.result?.evidence ??

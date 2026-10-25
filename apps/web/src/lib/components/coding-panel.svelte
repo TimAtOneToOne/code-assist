@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AcceptanceResults from './acceptance-results.svelte';
 	import PrChecks from './pr-checks.svelte';
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
@@ -31,6 +32,7 @@
 		checkpoint: 'Saving Code Checkpoint',
 		collect: 'Collecting Saved Evidence',
 		validate: 'Running Validation',
+		accept: 'Verifying Acceptance',
 		review: 'Claude Reviewing',
 		publish: 'Publishing Pull Request',
 		failed: 'Needs Attention',
@@ -107,6 +109,7 @@
 			onreveal={(target) => reveal(target, expand)}
 		/>
 	{/snippet}
+	<AcceptanceResults {run} />
 	{#if run.status === 'needs_direction'}
 		<section
 			aria-labelledby={'coding-question-' + run.id}
@@ -171,6 +174,7 @@
 								'checkpoint',
 								'collect',
 								'validate',
+								'accept',
 								'review',
 								'publish',
 								'failed',

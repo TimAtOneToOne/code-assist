@@ -364,7 +364,7 @@ export async function completeWorkItem(
       const { rows: active } = await tx.db.executeSql(
         `SELECT id FROM code_assist.discovery_run WHERE issue_id=$1 AND status IN ('queued','running')
          UNION ALL SELECT id FROM code_assist.planning_run WHERE issue_id=$1 AND status IN ('queued','drafting','reviewing','revising')
-         UNION ALL SELECT id FROM code_assist.coding_run WHERE issue_id=$1 AND status IN ('prepare','implement','checkpoint','collect','validate','review','publish')`,
+         UNION ALL SELECT id FROM code_assist.coding_run WHERE issue_id=$1 AND status IN ('prepare','implement','checkpoint','collect','validate','accept','review','publish')`,
         [issueId],
       );
       if (active.length)
