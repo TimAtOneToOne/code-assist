@@ -11,7 +11,7 @@ an explicit alternative. See [Repository Setup](repository-setup.md) and
 
 ## Verified Evidence
 
-- `make verify` passed: lint, formatting, type checks, unit tests, and build.
+- `make verify` passed: lint, formatting, type checks, 96 unit tests, and build.
 - `make test-intake` against local PostgreSQL passed 11 integration tests; the two
   optional OrbStack tests were skipped. Coverage includes legacy behavior, explicit
   merge-only completion without Actions access, rejecting a merge into prod, mixed
@@ -30,8 +30,12 @@ an explicit alternative. See [Repository Setup](repository-setup.md) and
 
 ## Delivery Status
 
-The Code Assist source change passed local verification; deployment and live
-configuration verification are pending. ONE-5347 was already marked Done by Tim
+Release `5803812e891e654b393041e74e0bcf62cb66e15c` was observed selected and running
+in Mia’s web and worker, with matching health, at 00:37:15 EDT. The live browser
+saved Successful Main Workflows for `web-app-test-repo` and confirmed it after
+reload. The existing ONE-5347 ticket still showed Tim’s owner-completed status.
+A subsequent notification-text correction uses rule-neutral Done wording, so
+merge-only completion does not claim workflow success. ONE-5347 was already marked Done by Tim
 through the owner action, so this follow-up does not claim that old ticket
 completed automatically. The next fresh exercise will verify the entire live
 workflow through automatic Done. No new live merge-only ticket or induced failed

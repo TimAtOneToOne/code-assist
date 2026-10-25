@@ -40,8 +40,8 @@ export function attentionMessage(
   }).format(date);
   const planningMessages: Record<string, string[]> = {
     coding_done: [
-      "✅ Complete · Main workflows succeeded",
-      "The pull request merged into main and all observed push-to-main workflows for its exact merge commit succeeded. Code Assist marked the work Done. Separate production promotions do not affect this status.",
+      "✅ Complete · Repository requirements satisfied",
+      "Every repository's pull request merged into main and satisfied its recorded completion rule, including successful main workflows where required. Code Assist marked the work Done. Separate production promotions do not affect this status.",
       "",
     ],
     coding_main_failed: [

@@ -10,7 +10,7 @@ and plan approvals, including an automatic review repair and fresh browser
 acceptance for the revised commit. Tim merged it; the monitor detected the exact
 merge automatically. It then waited for a main workflow that the restored baseline
 did not have. Tim subsequently used the owner completion action. The follow-up adds
-an explicit per-repository completion rule and restores minimal CI in the test
+an explicit per-repository completion rule (observed deployed at `5803812`) and restores minimal CI in the test
 repository. [Completion verification](repository-completion.md) separates local
 regression evidence, observed GitHub CI, and deployment status.
 
