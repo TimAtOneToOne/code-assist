@@ -29,7 +29,21 @@ test("cleanup requires the final reviewed checkpoints and every repository's suc
           { ...f.run, merge_commit: "b".repeat(40) },
           f.steps,
         ),
-      /main workflow/,
+      /completion rule/,
+    );
+    const mergeOnly = {
+      ...f.run,
+      input: {
+        ...f.run.input,
+        completionRules: { [f.run.input.snapshot.name]: "merge" as const },
+      },
+      main_workflows: null,
+    };
+    assertCleanupEvidence(mergeOnly, f.steps);
+    assert.throws(
+      () =>
+        assertCleanupEvidence({ ...mergeOnly, merge_commit: null }, f.steps),
+      /merge evidence/,
     );
     assert.throws(
       () =>

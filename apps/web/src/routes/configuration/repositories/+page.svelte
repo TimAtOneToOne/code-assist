@@ -9,6 +9,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	let { data }: PageProps = $props();
 	let search = $state('');
 	let busy = $state(false);
@@ -89,6 +90,30 @@
 							Changes apply to new workspaces. Test Setup saves these fields, tests the synced HEAD
 							commit, and removes its disposable machine afterward.
 						</p>
+						<div class="space-y-2">
+							<label for="completionRule">Completion Rule</label>
+							<div class="relative">
+								<select
+									id="completionRule"
+									name="completionRule"
+									value={data.configuration.completionRule ?? 'main_workflows'}
+									aria-describedby="completion-help"
+									class="h-10 w-full appearance-none rounded-md border bg-background pr-10 pl-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+								>
+									<option value="main_workflows">Successful Main Workflows</option>
+									<option value="merge">Merged into Main</option>
+								</select>
+								<ChevronDown
+									class="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2"
+								/>
+							</div>
+							<p id="completion-help" class="field-help">
+								Both require a merge into main. Successful Main Workflows also requires successful
+								GitHub Actions push workflows for that exact merge. Choose Merged into Main when no
+								post-merge checks are required. Discovery records this choice for planning; existing
+								runs keep their recorded rule.
+							</p>
+						</div>
 						<label for="workingDirectory">Working Directory</label>
 						<Input
 							id="workingDirectory"

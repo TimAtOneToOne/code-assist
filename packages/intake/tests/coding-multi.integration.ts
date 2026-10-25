@@ -405,6 +405,56 @@ test("multi-repository coding persists sequential checkpoints, combined review, 
     );
     assert(!(await currentCoding(boss.getDb(), repair.run, repair.step)));
     assert.deepEqual(await completionCounts(), { events: 2, notifications: 2 });
+    const latest = (await readCoding(boss.getDb(), ticket.id))[0];
+    const mixedInput = {
+      ...latest.input,
+      completionRules: { [latest.repositories![0].name]: "merge" },
+    };
+    const mixedStates = latest.repositories!.map((r) => ({
+      ...r,
+      status: "pr_open",
+      merged_at: null,
+      merge_commit: null,
+      main_workflows: null,
+      github_checked_at: null,
+    }));
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.coding_run SET input=$2,repositories=$3,status='pr_open',github_checked_at=NULL WHERE id=$1",
+        [published.id, JSON.stringify(mixedInput), JSON.stringify(mixedStates)],
+      );
+    const mixed = (await readCoding(boss.getDb(), ticket.id))[0];
+    await recordGitHubObservation(
+      boss,
+      { ...repositoryRun(mixed, 0), pr_url: urls[0] },
+      new Date(),
+      { pr: merge(0) },
+    );
+    let mixedResult = (await readCoding(boss.getDb(), ticket.id))[0];
+    assert.equal(mixedResult.repositories![0].status, "done");
+    assert.equal(mixedResult.status, "pr_open");
+    await recordGitHubObservation(
+      boss,
+      { ...repositoryRun(mixedResult, 1), pr_url: urls[1] },
+      new Date(),
+      { pr: merge(1), main: { runs: [] } },
+    );
+    mixedResult = (await readCoding(boss.getDb(), ticket.id))[0];
+    assert.equal(
+      mixedResult.status,
+      "awaiting_main",
+      "The CI repository still needs its exact-merge workflow",
+    );
+    await recordGitHubObservation(
+      boss,
+      { ...repositoryRun(mixedResult, 1), pr_url: urls[1] },
+      new Date(Date.now() + 1),
+      { pr: merge(1), main: workflow(1) },
+    );
+    assert.equal((await readCoding(boss.getDb(), ticket.id))[0].status, "done");
+    await initializeCoding(boss);
+    assert.equal((await readCoding(boss.getDb(), ticket.id))[0].status, "done");
   } finally {
     await boss.stop({ graceful: false });
     await admin.query(`DROP DATABASE ${database} WITH (FORCE)`);

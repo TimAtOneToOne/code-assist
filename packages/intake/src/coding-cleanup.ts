@@ -13,6 +13,7 @@ import {
   repositoryRun,
   snapshots,
   publicationReady,
+  completionRule,
 } from "./coding-repositories.ts";
 import { mainWorkflowStatus } from "./github-workflows.ts";
 import {
@@ -59,13 +60,14 @@ export function assertCleanupEvidence(run: CodingRun, steps: CodingStep[]) {
         r.status !== "done" ||
         !r.commit ||
         !r.merge_commit ||
-        !r.main_workflows ||
-        mainWorkflowStatus(r.main_workflows) !== "done" ||
-        r.main_workflows.runs.some((w) => w.head_sha !== r.merge_commit),
+        (completionRule(run, r.name) === "main_workflows" &&
+          (!r.main_workflows ||
+            mainWorkflowStatus(r.main_workflows) !== "done" ||
+            r.main_workflows.runs.some((w) => w.head_sha !== r.merge_commit))),
     )
   )
     throw new CleanupBlocked(
-      "Every repository must have successful main workflow evidence for its merge commit.",
+      "Every repository must have merge evidence and satisfy its recorded completion rule.",
     );
   for (const step of steps.filter(
     (s) =>

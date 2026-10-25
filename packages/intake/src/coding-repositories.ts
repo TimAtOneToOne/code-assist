@@ -36,6 +36,12 @@ export function repositoryIndex(run: CodingRun) {
 export function activeSnapshot(run: CodingRun) {
   return snapshots(run.input)[repositoryIndex(run)];
 }
+export function completionRule(
+  run: CodingRun,
+  name = activeSnapshot(run).name,
+) {
+  return run.input.completionRules?.[name] ?? "main_workflows";
+}
 export function repositoryDirectory(directory: string, run: CodingRun) {
   const path = join(directory, "coding", run.id);
   return run.repositories ? join(path, activeSnapshot(run).name) : path;

@@ -19,7 +19,7 @@ Build the observability application in SvelteKit and serve it from the Mia Mac m
 5. Present the plan and receive feedback. Revise and review again until critical/high concerns are addressed. Tim approves the exact current plan version, bound to requirements and repository; stale approval must fail. Scope changes require new approval.
 6. Restore the recorded source commit into a separate working directory and implement the approved plan. Run the repository's own validation, including Docker-backed integration tests where required, plus browser checks for relevant user workflows. Do not upgrade Drizzle as part of this initiative.
 7. Alternate code review until critical/high/medium concerns are addressed. Evidence and review findings belong to the actual tested commit; further code changes require renewed validation and review.
-8. Publish the ticket branch and open a PR. Track feedback, checks, conflicts and the actual PR head. Tim reviews and merges; the agent never merges or enables auto-merge. Tim updated completion on October 20, 2026: Done requires an observed merge into main and successful GitHub Actions push-to-main workflows for that exact merge commit. Separate production promotions are not tracked. Failed main workflows feed a scoped corrective coding run and a new PR; Tim merges it.
+8. Publish the ticket branch and open a PR. Track feedback, checks, conflicts and the actual PR head. Tim reviews and merges; the agent never merges or enables auto-merge. Tim updated completion on October 20, 2026 to require main-workflow evidence. The October 25 follow-up makes this repository-specific: Done requires an observed merge into main, plus successful GitHub Actions push-to-main workflows for that exact merge commit when the recorded rule requires them. Existing configurations and approved runs keep the workflow requirement; an explicit merge-only rule applies to future discovery and approval. Separate production promotions are not tracked. Failed main workflows feed a scoped corrective coding run and a new PR; Tim merges it.
 
 Approval should clearly authorize implementation, branch creation and PR publication. Tim clarified on October 20, 2026 that within Code Assist this exact-version approval also satisfies prior approval for GitOps changes described in the plan, including commits, pushes and PR publication. Do not introduce a separate GitOps approval checkpoint or workarounds solely to avoid it. Scope changes require a revised plan and approval. Agents never merge PRs, enable auto-merge, run Terraform apply or initiate infrastructure deployment; humans perform those actions through the established workflow. Default branches use `feature/<lowercase-ticket-id>` and cannot be reused after merge or deployment. Tim has authorized rebasing bot-created branches, with ownership established and an explicit expected-head force-with-lease. Unexpected remote changes require attention. Other destructive Git operations retain their existing approval requirements.
 
@@ -43,18 +43,18 @@ Tim accepted at-least-once state-change notifications: save the event and notifi
 
 The original decision areas below now have implementations. Remaining operational proof is distinguished from the selected approach; see [Current Status](../current-status.md) and the linked guides for evidence boundaries.
 
-| Area | Current Implementation and Remaining Verification |
-| --- | --- |
-| Execution | Native Codex and Claude SDKs run repository tooling in isolated coding guests; validation and acceptance evidence are tied to candidate commits. |
-| Docker | OrbStack hosts ticket-local Ubuntu guests with private Docker engines; full unattended machine-reboot recovery remains unverified. |
+| Area                | Current Implementation and Remaining Verification                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Execution           | Native Codex and Claude SDKs run repository tooling in isolated coding guests; validation and acceptance evidence are tied to candidate commits.                                                       |
+| Docker              | OrbStack hosts ticket-local Ubuntu guests with private Docker engines; full unattended machine-reboot recovery remains unverified.                                                                     |
 | Workspace isolation | Separate ticket runs have separate guests, services, ports and browser profiles; selected repositories share one guest for paired acceptance. See [isolation proof](../concurrent-isolation-proof.md). |
-| Process supervision | launchd supervises host services; guest systemd units own coding processes. Step recovery is implemented; FileVault/pre-login recovery remains unverified. |
-| Storage | PostgreSQL, host Git checkpoints, logs and artifacts live outside releases. Completed guest cleanup preserves evidence. Backup/restore remains unproven. |
-| Credentials | Private host secret store, repository mappings and per-workspace environments are implemented. Publication credentials stay in the controller. |
-| Access | Direct Tailscale binding plus actual-peer owner checks; tailnet membership alone does not grant access. |
-| Publishing | Controller-owned GitHub writes require current approval, exact-commit evidence, publication intent and expected-head checks. |
-| UI stack | SvelteKit with shadcn-svelte components; TypeScript is the default language. |
-| Deployment | Main updater validates separate releases and preserves durable state. Agent operators must verify Mia is idle immediately before pushes or restarts; recovery does not waive that requirement. |
+| Process supervision | launchd supervises host services; guest systemd units own coding processes. Step recovery is implemented; FileVault/pre-login recovery remains unverified.                                             |
+| Storage             | PostgreSQL, host Git checkpoints, logs and artifacts live outside releases. Completed guest cleanup preserves evidence. Backup/restore remains unproven.                                               |
+| Credentials         | Private host secret store, repository mappings and per-workspace environments are implemented. Publication credentials stay in the controller.                                                         |
+| Access              | Direct Tailscale binding plus actual-peer owner checks; tailnet membership alone does not grant access.                                                                                                |
+| Publishing          | Controller-owned GitHub writes require current approval, exact-commit evidence, publication intent and expected-head checks.                                                                           |
+| UI stack            | SvelteKit with shadcn-svelte components; TypeScript is the default language.                                                                                                                           |
+| Deployment          | Main updater validates separate releases and preserves durable state. Agent operators must verify Mia is idle immediately before pushes or restarts; recovery does not waive that requirement.         |
 
 ## Browsers and Repository Services
 

@@ -794,6 +794,49 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       ).length,
       22,
     );
+    const mergeInput = {
+      ...completed.input,
+      completionRules: { [completed.input.snapshot.name]: "merge" },
+    };
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.coding_run SET input=$2,github_checked_at=NULL WHERE id=$1",
+        [published.id, JSON.stringify(mergeInput)],
+      );
+    const noWorkflowRead = async (): Promise<
+      import("../src/github-workflows.ts").MainWorkflows
+    > => {
+      throw new Error("Merge-only completion must not query Actions");
+    };
+    await refreshGitHub(
+      boss,
+      { runId: published.id },
+      new AbortController().signal,
+      randomUUID(),
+      async () => ({ ...merged, baseRefName: "prod" }),
+      noWorkflowRead,
+    );
+    assert.equal(
+      (await original()).status,
+      "awaiting_main",
+      "A merge to prod does not complete a merge-only run",
+    );
+    await refreshGitHub(
+      boss,
+      { runId: published.id },
+      new AbortController().signal,
+      randomUUID(),
+      async () => merged,
+      noWorkflowRead,
+    );
+    assert.equal((await original()).status, "done");
+    await initializeCoding(boss);
+    assert.equal(
+      (await original()).status,
+      "done",
+      "Startup preserves explicitly recorded merge-only completion",
+    );
     await assert.rejects(
       completeWorkItem(boss, ticket.id, randomUUID(), "owner"),
       /published work/,

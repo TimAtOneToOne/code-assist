@@ -19,10 +19,12 @@ import {
   loadRepositoryProfile,
   profileEnvironment,
   type RuntimeProfile,
+  type CompletionRule,
 } from "./repository-settings.ts";
 
 export class WorkspaceApprovalError extends Error {}
 export type WorkspaceInput = {
+  completionRules?: Record<string, CompletionRule>;
   issueId: string;
   planningId: string;
   version: number;
@@ -85,7 +87,7 @@ export async function approvedWorkspaceInput(
   const { rows } = await db.executeSql(
     `
     SELECT p.id AS planning_id, p.current_version, v.hash AS plan_hash,
-      p.input_hash, d.snapshots
+      p.input_hash, d.snapshots, d.repository_setups
     FROM code_assist.intake_issue i
     JOIN code_assist.discovery_run d ON d.id=i.current_discovery_id
     JOIN code_assist.planning_run p ON p.discovery_id=d.id
@@ -115,8 +117,19 @@ export async function approvedWorkspaceInput(
       !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(snapshot.name)
     )
       throw new Error("Invalid approved repository or source commit.");
+  const completionRules: Record<string, CompletionRule> = {};
+  for (const snapshot of snapshots) {
+    const rule =
+      row.repository_setups?.[snapshot.source]?.configuration?.completionRule;
+    if (rule !== undefined) {
+      if (rule !== "merge" && rule !== "main_workflows")
+        throw new Error("Invalid recorded repository completion rule.");
+      completionRules[snapshot.name] = rule;
+    }
+  }
   return {
     issueId,
+    ...(Object.keys(completionRules).length ? { completionRules } : {}),
     planningId: row.planning_id,
     version: row.current_version,
     planHash: row.plan_hash,

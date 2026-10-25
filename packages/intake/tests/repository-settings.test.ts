@@ -11,7 +11,30 @@ import {
   readRepositorySetup,
   validateRepositorySetup,
   writeRepositorySetup,
+  profileHash,
 } from "../src/repository-settings.ts";
+
+test("completion choices survive setup persistence without changing legacy profile hashes", () => {
+  const directory = fixture();
+  const config = { ...emptyRepositorySetup(), validationScript: "make test" };
+  try {
+    assert.deepEqual(validateRepositorySetup(config), config);
+    const legacyHash = profileHash(config);
+    writeRepositorySetup(directory, "/repos/app", {
+      ...config,
+      completionRule: "merge",
+    });
+    const saved = readRepositorySetup(directory, "/repos/app").configuration!;
+    assert.equal(saved.completionRule, "merge");
+    assert.notEqual(profileHash(saved), legacyHash);
+    assert.throws(
+      () => validateRepositorySetup({ ...config, completionRule: "unknown" }),
+      /completion rule/,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 function fixture() {
   const root = join(

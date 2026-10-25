@@ -16,6 +16,8 @@ Automatic candidate tests run within the existing durable discovery job, with `d
 
 ## Fields
 
+- **Completion Rule:** Merged into Main completes after observing the PR merge into `main`; Successful Main Workflows also requires successful GitHub Actions push runs for that exact merge commit. Existing profiles default to Successful Main Workflows. Automatic setup discovery chooses from repository instructions and actual workflow triggers, asking when ambiguous. Discovery records the choice for planning and the approved coding run; change it before new discovery, not during an approved run. Both choices retain all implementation validation and acceptance requirements.
+
 - **Working Directory:** relative to the repository; use `.` for its root.
 - **Additional System Dependencies:** optional installation script, run as root inside the isolated OrbStack guest. The shared bootstrap already installs Node, pnpm, Git, Make, a PostgreSQL client, a private container engine, and the agent MCP browser with its Chromium system libraries.
 - **Pinned Git Dependencies:** a JSON array of synced repository names and full commit hashes, for example `[{"repository":"gitops","commits":["41f4871cc6820b2f33b1c5d2089aae557779b541"]}]`. The controller exports Git bundles from sibling synced clones. Native Git URL rewriting lets tools such as Terraform clone the pinned modules locally without guest GitHub credentials. Bundles include the requested commits and their Git history, not untracked files, host Git configuration, hooks, or credentials. The guest copies are root-owned under `/opt/code-assist/dependencies`; they are dependency sources, not approved coding targets. When multiple selected repositories need the same dependency, its requested commits share one bundle. Missing commits fail setup explicitly; sync the source clone and update the pins when requirements change.
@@ -48,14 +50,14 @@ The setup-test records are in `code_assist.repository_setup_test`; the worker co
 
 The October 20 setup record covers saved profiles on Mia for these six repositories. This table is a dated configuration summary, not a fresh live inventory. Edit profiles in the UI; the saved configuration and each setup test's frozen copy are the source of truth.
 
-| Repository | Runtime and Local Services | Validation |
-| --- | --- | --- |
-| `internal-chat-ui` | SvelteKit in `sveltekit`; PostgreSQL 5435, LocalStack 4566, app 5173 | Lint, Svelte checks, unit/component tests, build, startup and a real browser password-sign-in with a synthetic local account |
-| `workplace-agents` | Root Makefile; portal 6001, PostgreSQL 65432 | `make validate`, startup and Microsoft sign-in-page rendering |
-| `elation_companion` | Unpacked Chrome extension | `bash ./build.sh`; paired browser acceptance belongs to the approved feature's tests |
-| `windmill-work` | Elation Router 4178 and Windmill Catalog 4182; both apps and Chromium installed | Root lint/flow tests, `make app-check`, `make catalog-check` including browser/generated-bundle tests; app startup |
-| `windmill` | Terraform 1.16.3, Python 3.12, uv, Ruff 0.14.0, actionlint 1.7.12, ShellCheck | `make lint`, `make test`, backend-disabled Terraform validation and mocked tests; pinned GitOps dependencies |
-| `medusa-api` | Python 3.12/uv; private PostgreSQL 5433 and Valkey 6380; API 8000 | Non-mutating Ruff checks, mypy, `make test-all`; health/Swagger/OpenAPI checks |
+| Repository          | Runtime and Local Services                                                      | Validation                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `internal-chat-ui`  | SvelteKit in `sveltekit`; PostgreSQL 5435, LocalStack 4566, app 5173            | Lint, Svelte checks, unit/component tests, build, startup and a real browser password-sign-in with a synthetic local account |
+| `workplace-agents`  | Root Makefile; portal 6001, PostgreSQL 65432                                    | `make validate`, startup and Microsoft sign-in-page rendering                                                                |
+| `elation_companion` | Unpacked Chrome extension                                                       | `bash ./build.sh`; paired browser acceptance belongs to the approved feature's tests                                         |
+| `windmill-work`     | Elation Router 4178 and Windmill Catalog 4182; both apps and Chromium installed | Root lint/flow tests, `make app-check`, `make catalog-check` including browser/generated-bundle tests; app startup           |
+| `windmill`          | Terraform 1.16.3, Python 3.12, uv, Ruff 0.14.0, actionlint 1.7.12, ShellCheck   | `make lint`, `make test`, backend-disabled Terraform validation and mocked tests; pinned GitOps dependencies                 |
+| `medusa-api`        | Python 3.12/uv; private PostgreSQL 5433 and Valkey 6380; API 8000               | Non-mutating Ruff checks, mypy, `make test-all`; health/Swagger/OpenAPI checks                                               |
 
 Medusa's development database is `fastapi`; tests must unset `OLIVE_DB_PASSWORD` and the explicit reader/writer URL overrides so `ENVIRONMENT=test` selects `fastapi_test`. Python dependencies live outside the source checkout. Mypy diagnostics remain informational, matching Medusa's Makefile; Ruff and pytest failures fail validation. Olive integration destinations are local; a full Olive schema and synthetic fixtures are separate from Medusa's own migrations.
 

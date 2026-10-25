@@ -1,10 +1,11 @@
 import { readPrChecks, type PrChecks } from "./github-pr-checks.ts";
 import { queuePrRepair } from "./coding-pr-repair.ts";
-import { repositories } from "./coding-repositories.ts";
+import { repositories, completionRule } from "./coding-repositories.ts";
 import { recordRepositoryObservation } from "./github-repositories.ts";
 import {
   failedMainWorkflows,
   mainFailureKey,
+  mergedCompletionStatus,
   mainWorkflowStatus,
   parseMainWorkflows,
   type MainWorkflows,
@@ -173,9 +174,11 @@ export async function recordGitHubObservation(
     if (current.merged_at && pr.state !== "MERGED") return false;
     const status =
       pr.state === "MERGED"
-        ? observation.main
-          ? mainWorkflowStatus(observation.main)
-          : "awaiting_main"
+        ? mergedCompletionStatus(
+            completionRule(run),
+            pr.baseRefName,
+            observation.main,
+          )
         : pr.state === "CLOSED"
           ? "pr_closed"
           : "pr_open";
@@ -191,7 +194,7 @@ export async function recordGitHubObservation(
         observation.main ? JSON.stringify(observation.main) : null,
         observation.main?.evidenceError ??
           (pr.state === "MERGED" && pr.baseRefName !== "main"
-            ? `This PR merged into ${pr.baseRefName}, not main. A main merge and successful main workflows are required for Done.`
+            ? `This PR merged into ${pr.baseRefName}, not main. Done requires a merge into main.`
             : null),
       ],
     );
@@ -424,7 +427,11 @@ export async function refreshGitHub(
       let checks: PrChecks | undefined;
       try {
         pr = await read(run, signal, log);
-        if (pr.state === "MERGED" && pr.baseRefName === "main")
+        if (
+          pr.state === "MERGED" &&
+          pr.baseRefName === "main" &&
+          completionRule(run) === "main_workflows"
+        )
           main = await readWorkflows(run, pr, signal, log);
         if (pr.state === "OPEN" && pr.headRefOid) {
           checks = await readChecks(run, pr, signal, log);

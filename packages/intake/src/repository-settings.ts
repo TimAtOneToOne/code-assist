@@ -13,7 +13,9 @@ import {
   repositoryEnvironment,
 } from "./repository-profiles.ts";
 
+export type CompletionRule = "merge" | "main_workflows";
 export type RepositorySetup = {
+  completionRule?: CompletionRule;
   gitDependencies?: { repository: string; commits: string[] }[];
   workingDirectory: string;
   systemSetupScript: string;
@@ -121,6 +123,11 @@ export function validateRepositorySetup(value: unknown): RepositorySetup {
     throw new RepositorySettingsError(
       "Working and browser directories must stay inside the repository (use . for its root).",
     );
+  if (
+    v.completionRule !== undefined &&
+    !["merge", "main_workflows"].includes(v.completionRule)
+  )
+    throw new RepositorySettingsError("Choose a supported completion rule.");
   if (!v.validationScript.trim())
     throw new RepositorySettingsError(
       "Add the repository's validation commands.",
@@ -179,6 +186,9 @@ export function validateRepositorySetup(value: unknown): RepositorySetup {
       "Git dependencies need unique synced repository names and full commit hashes.",
     );
   return structuredClone({
+    ...(v.completionRule !== undefined
+      ? { completionRule: v.completionRule }
+      : {}),
     ...Object.fromEntries(
       Object.keys(template).map((k) => [k, v[k as keyof RepositorySetup]]),
     ),

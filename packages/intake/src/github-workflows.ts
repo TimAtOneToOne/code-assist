@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { CompletionRule } from "./repository-settings.ts";
 
 export type MainWorkflow = {
   id: number;
@@ -82,6 +83,15 @@ export function mainWorkflowStatus(main: MainWorkflows) {
   if (failedMainWorkflows(main).length) return "main_failed";
   if (main.runs.some((r) => r.status !== "completed")) return "main_running";
   return "done";
+}
+export function mergedCompletionStatus(
+  rule: CompletionRule,
+  base: string,
+  main?: MainWorkflows,
+) {
+  if (base !== "main") return "awaiting_main";
+  if (rule === "merge") return "done";
+  return main ? mainWorkflowStatus(main) : "awaiting_main";
 }
 export function mainFailureKey(main: MainWorkflows) {
   const identities = failedMainWorkflows(main)

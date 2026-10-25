@@ -156,7 +156,7 @@
 			</h3>
 			<p class="text-muted-foreground">
 				Repositories run one at a time. Claude reviews the combined implementation before PR
-				publication. Done requires every repository’s main workflow to succeed.
+				publication. Done requires every repository to satisfy its recorded completion rule.
 			</p>
 			{#each run.repositories as repository, index (repository.name)}
 				<div class="space-y-2 rounded-md border p-3">
@@ -194,6 +194,11 @@
 						{/if}
 					</div>
 					{#if repository.github_error}<p role="alert">{repository.github_error}</p>{/if}
+					<p class="text-muted-foreground">
+						Completion: {run.input.completionRules?.[repository.name] === 'merge'
+							? 'Merged into Main'
+							: 'Successful Main Workflows'}.
+					</p>
 					{#if repository.pr_checks}<PrChecks
 							checks={repository.pr_checks}
 							currentCommit={repository.commit}
@@ -245,6 +250,11 @@
 			checkpoint without running the agent again.
 		</p>{/if}
 	{#if run.pr_url}
+		{#if !run.repositories}<p class="text-sm text-muted-foreground">
+				Completion: {run.input.completionRules?.[run.input.snapshot.name] === 'merge'
+					? 'Merged into Main'
+					: 'Successful Main Workflows'}.
+			</p>{/if}
 		<p class="text-xs text-muted-foreground">
 			{#if run.github_checked_at}GitHub checked {new Date(
 					run.github_checked_at
@@ -254,7 +264,9 @@
 		{#if run.merged_at && run.merge_commit}
 			<p class="text-sm">
 				Merged {new Date(run.merged_at).toLocaleString()} · Commit {run.merge_commit.slice(0, 7)}.
-				{#if run.status === 'done'}All observed push-to-main workflows for this merge commit
+				{#if run.input.completionRules?.[run.input.snapshot.name] === 'merge'}This repository
+					completes when its PR is merged into main.
+				{:else if run.status === 'done'}All observed push-to-main workflows for this merge commit
 					succeeded.{:else}Done waits for successful push-to-main workflows for this exact merge
 					commit.{/if}
 			</p>

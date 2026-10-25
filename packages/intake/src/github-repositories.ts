@@ -7,9 +7,10 @@ import {
   aggregateStatus,
   repositories,
   repositoryIndex,
+  completionRule,
 } from "./coding-repositories.ts";
 import {
-  mainWorkflowStatus,
+  mergedCompletionStatus,
   mainFailureKey,
   type MainWorkflows,
 } from "./github-workflows.ts";
@@ -41,9 +42,7 @@ export async function recordRepositoryObservation(
     if (state.merged_at && pr.state !== "MERGED") return false;
     state.status =
       pr.state === "MERGED"
-        ? main
-          ? mainWorkflowStatus(main)
-          : "awaiting_main"
+        ? mergedCompletionStatus(completionRule(run), pr.baseRefName, main)
         : pr.state === "CLOSED"
           ? "pr_closed"
           : "pr_open";
@@ -51,7 +50,7 @@ export async function recordRepositoryObservation(
     state.github_error =
       main?.evidenceError ??
       (pr.state === "MERGED" && pr.baseRefName !== "main"
-        ? "Done requires a merge into main and successful main workflows."
+        ? "Done requires a merge into main."
         : null);
     state.merged_at = pr.state === "MERGED" ? pr.mergedAt : null;
     state.merge_commit = pr.state === "MERGED" ? pr.mergeCommit!.oid : null;

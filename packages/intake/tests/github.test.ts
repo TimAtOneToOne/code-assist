@@ -35,6 +35,7 @@ import {
   parseMainWorkflows,
   mainWorkflowStatus,
   mainFailureKey,
+  mergedCompletionStatus,
 } from "../src/github-workflows.ts";
 
 const workflow = {
@@ -48,6 +49,28 @@ const workflow = {
   status: "completed",
   conclusion: "success",
 };
+test("merge-only completion is explicit and still requires main", () => {
+  assert.equal(mergedCompletionStatus("merge", "main"), "done");
+  assert.equal(mergedCompletionStatus("merge", "prod"), "awaiting_main");
+  assert.equal(
+    mergedCompletionStatus("main_workflows", "main"),
+    "awaiting_main",
+  );
+  assert.equal(
+    mergedCompletionStatus("main_workflows", "main", { runs: [] }),
+    "awaiting_main",
+  );
+  assert.equal(
+    mergedCompletionStatus("main_workflows", "main", { runs: [workflow] }),
+    "done",
+  );
+  assert.equal(
+    mergedCompletionStatus("main_workflows", "main", {
+      runs: [{ ...workflow, conclusion: "failure" }],
+    }),
+    "main_failed",
+  );
+});
 test("Done requires successful main runs for the exact merge, not PR checks or prod promotion", () => {
   const parse = (run: unknown) =>
     parseMainWorkflows(

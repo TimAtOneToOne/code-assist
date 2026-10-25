@@ -83,6 +83,26 @@ test("workspace approval preserves ordered repositories and rejects duplicate id
   assert.equal(input.snapshots, undefined);
   assert.equal(input.version, 3);
   assert.equal(input.snapshot.commit, "a".repeat(40));
+  assert.equal(
+    input.completionRules,
+    undefined,
+    "Legacy approved inputs retain their identity",
+  );
+  const recorded = {
+    ...row,
+    repository_setups: {
+      "/repos/internal-chat-ui": { configuration: { completionRule: "merge" } },
+    },
+  };
+  const pinned = await approvedWorkspaceInput(db([recorded]), "ticket");
+  assert.deepEqual(pinned.completionRules, { "internal-chat-ui": "merge" });
+  recorded.repository_setups[
+    "/repos/internal-chat-ui"
+  ].configuration.completionRule = "invalid";
+  await assert.rejects(
+    approvedWorkspaceInput(db([recorded]), "ticket"),
+    /completion rule/,
+  );
 });
 
 test("LocalStack fixture keys do not redact test commands or filenames, while real provider keys remain", async () => {

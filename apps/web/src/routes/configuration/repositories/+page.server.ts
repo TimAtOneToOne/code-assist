@@ -49,6 +49,7 @@ export const actions = {
 			return fail(400, { error: 'Choose an available repository.' });
 		try {
 			const configuration = {
+				completionRule: String(form.get('completionRule') ?? 'main_workflows'),
 				...Object.fromEntries(
 					[
 						'workingDirectory',
