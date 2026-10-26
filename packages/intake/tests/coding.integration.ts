@@ -76,7 +76,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     await initializeIntake(boss);
     const ticket = {
       id: randomUUID(),
-      identifier: "ONE-999999",
+      identifier: "AGENTS-999999",
       title: "Fixture",
       description: "Fixture",
       url: "https://example.invalid",
@@ -136,6 +136,41 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     }
     const plan = (await readPlanning(boss.getDb(), ticket.id))[0];
     assert.equal((await readCoding(boss.getDb(), ticket.id)).length, 0);
+    for (const identifier of [
+      "AGENTS/../3",
+      "AGENTS-3;echo bad",
+      "AGENTS-3\n",
+    ]) {
+      await boss
+        .getDb()
+        .executeSql(
+          "UPDATE code_assist.intake_issue SET ticket=jsonb_set(ticket,'{identifier}',$2::jsonb) WHERE id=$1",
+          [ticket.id, JSON.stringify(identifier)],
+        );
+      await assert.rejects(
+        approvePlan(
+          boss,
+          ticket.id,
+          plan.id,
+          1,
+          plan.versions[0].hash,
+          [],
+          "fixture-owner",
+        ),
+        /valid Linear ticket identifier/,
+      );
+      assert.equal(
+        (await readPlanning(boss.getDb(), ticket.id))[0].status,
+        "awaiting_approval",
+      );
+      assert.equal((await readCoding(boss.getDb(), ticket.id)).length, 0);
+    }
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.intake_issue SET ticket=jsonb_set(ticket,'{identifier}',$2::jsonb) WHERE id=$1",
+        [ticket.id, JSON.stringify(ticket.identifier)],
+      );
     await approvePlan(
       boss,
       ticket.id,
@@ -153,7 +188,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       { repository: source.name, script: "npm test" },
     ]);
     assert.equal(runs[0].steps.length, 1);
-    assert.equal(runs[0].branch, "feature/one-999999");
+    assert.equal(runs[0].branch, "feature/agents-999999");
     async function next() {
       const [job] = await boss.fetch<{ stepId: string }>(codingQueue);
       assert(job);
@@ -211,12 +246,12 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
       ticket.id,
       b.run.id,
       b.step.id,
-      "feature/one-999999-code-assist",
+      "feature/agents-999999-code-assist",
     );
     await assert.rejects(retryCoding(boss, ticket.id, b.run.id, b.step.id));
     const c = await next();
     assert.notEqual(c.step.id, b.step.id);
-    assert.equal(c.run.branch, "feature/one-999999-code-assist");
+    assert.equal(c.run.branch, "feature/agents-999999-code-assist");
     await mkdir(join(directory, "coding", c.run.id), { recursive: true });
     await writeFile(
       join(directory, "coding", c.run.id, "publication.json"),
@@ -229,7 +264,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
         ticket.id,
         c.run.id,
         c.step.id,
-        "feature/one-999999-another",
+        "feature/agents-999999-another",
       ),
       /Reconcile/,
     );
@@ -518,7 +553,7 @@ test("coding binds approval, advances exact checkpoints, rejects duplicate/stale
     assert.equal(repair.repair!.baseCommit, merged.mergeCommit!.oid);
     assert.deepEqual(repair.input, published.input);
     assert.notEqual(repair.branch, published.branch);
-    assert.match(repair.branch, /^feature\/one-999999-main-fix-/);
+    assert.match(repair.branch, /^feature\/agents-999999-main-fix-/);
     assert.equal(repair.status, "prepare");
     assert.equal((await dashboard(boss)).issues[0].coding_status, "prepare");
     await observe(failure);

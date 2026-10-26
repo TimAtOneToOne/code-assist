@@ -58,3 +58,16 @@ The subsequent multi-select change was tested with 105 synthetic repository clon
 The removal workflow was also exercised through Playwright MCP with a disposable database: the ticket disappears from Home, its direct page shows Removed and history without a selection form, and restoring Plan brings it back with its saved repository choice. No browser console errors were reported.
 
 Optional optimizations and controls: Tim requested hiding tickets after their Plan label is removed. This applies to Home and pending attention prompts, retaining history and restoring visibility if Plan returns. Stable identity, atomic events/outbox, owner authorization and stale-input validation implement the stated durability and human-selection requirements.
+
+## Ticket Team Compatibility
+
+The October 26 AGENTS-3 exercise exposed a coding-start restriction to `ONE` ticket
+IDs even though intake and planning accept all accessible teams. Coding now accepts
+uppercase alphanumeric Linear team keys with a numeric issue suffix and derives
+`feature/<lowercase identifier>`, including `feature/agents-3`. Invalid identifiers
+still fail before a coding run is created; approval rolls back and the UI presents
+the conflict instead of an internal error. The PostgreSQL coding lifecycle fixture
+uses an AGENTS ticket, while the other suites retain ONE coverage.
+
+This changes execution compatibility, not permission to create tickets in arbitrary
+teams or repositories. Exact-version approval and repository scope still apply.

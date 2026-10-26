@@ -198,8 +198,10 @@ export async function syncCoding(boss: PgBoss, db: Db, issueId: string) {
     [input.planningId, input.version, issueId],
   );
   const identifier = rows[0].ticket.identifier as string;
-  if (!/^ONE-\d+$/.test(identifier))
-    throw new CodingConflict("Coding requires a ONE ticket identifier.");
+  if (!/^[A-Z][A-Z0-9]*-\d+$/.test(identifier))
+    throw new CodingConflict(
+      "Coding requires a valid Linear ticket identifier.",
+    );
   const id = randomUUID();
   await db.executeSql(
     "INSERT INTO code_assist.coding_run(id,issue_id,planning_id,version,input,plan,identifier,title,branch,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'prepare')",

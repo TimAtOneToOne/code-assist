@@ -261,7 +261,8 @@ export const actions = {
 				);
 				return { message: 'Feedback saved. Codex will create a new version for Claude to review.' };
 			} catch (cause) {
-				if (cause instanceof PlanningConflict) return fail(409, { error: cause.message });
+				if (cause instanceof PlanningConflict || cause instanceof CodingConflict)
+					return fail(409, { error: cause.message });
 				throw cause;
 			}
 		}

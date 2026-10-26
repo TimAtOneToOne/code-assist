@@ -161,3 +161,14 @@ the normal publisher. Check the deployed release before assuming template change
 are live; see [Coding](coding.md#external-publication-privacy).
 
 Optional optimizations and controls: Tim approved the repeated-validation pause on October 22, 2026. It applies to all coding runs and requires a reply when another implementation attempt leaves the same candidates and failing command outcomes; validation and review remain required. See [Coding](coding.md#repeated-validation-failures) for its comparison scope and transient-failure tradeoff.
+
+## October 26 Agents-Team Exercise
+
+AGENTS-3 exposed an approval-to-coding failure caused by a hard-coded `ONE` ticket
+prefix. The source fix accepts valid Linear team identifiers and displays coding
+conflicts during approval. Its regression fixture checks approval rollback for
+invalid identifiers and the full coding lifecycle for an AGENTS ticket; ONE
+coverage remains in the other integration suites. Deployment and live continuation
+are recorded under `.tmp/2026-10-26-connect-four/`. The exercise must count this
+operator product fix separately from normal scope/plan approval. No game code or
+agent direction was changed to resolve it. Optional optimizations and controls: none.
