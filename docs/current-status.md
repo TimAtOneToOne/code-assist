@@ -4,6 +4,19 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+October 27 configurable discovery parallelism: **Configuration → Agent Execution**
+sets the maximum simultaneous discovery tickets, default **3**. The setting includes
+automatic setup work and leaves planning/coding queues unchanged. File changes use the
+native pg-boss worker lifecycle: active discoveries finish before the saved maximum
+takes effect, without a restart. A real PostgreSQL/pg-boss regression verified 3 → 2 → 3,
+queued work, no active-job cancellation and watcher shutdown. Desktop/mobile checks
+verified the real settings form, persistence and invalid-input rejection. `make verify`
+passed 102 unit tests; database integration passed 12 tests with two opt-in guest tests skipped. See
+[Discovery Parallelism](worker.md#discovery-parallelism) for behavior and validation limits.
+Source implementation and local fixture verification do not establish live deployment.
+**Optional optimizations and controls:** Tim requested the discovery concurrency maximum;
+excess tickets wait and higher values use more resources. No other optional controls added.
+
 October 26 Rerun Step implementation: the current Initial Discovery exposes an action
 beside Refresh when awaiting answers or after a failure. It queues a fresh attempt
 without answering obsolete questions and preserves the previous result in history.

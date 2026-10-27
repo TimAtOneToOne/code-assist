@@ -40,6 +40,12 @@ Optional optimizations and controls: none.
 
 Confirming repository selection atomically queues `initial-discovery`. Worker startup also picks up previously selected, eligible tickets. Subsequent Linear checks reconcile changed inputs. `Plan` without `Code` is required. Removed tickets stay hidden and cannot accept answers or publish a current discovery result.
 
+Discovery runs up to the maximum in **Configuration → Agent Execution**, default **3**.
+Each slot includes that ticket's automatic setup test. Additional discoveries show
+Discovery Queued until a slot is available. Changing the setting lets active discoveries
+finish before applying the new maximum, without restarting the service. Planning and
+coding use separate queues. See [Discovery Parallelism](worker.md#discovery-parallelism).
+
 Before ticket investigation, the worker reuses configured repositories and gathers/tests missing repository setups with Codex. See [Automatic Setup During Intake](repository-setup.md#automatic-setup-during-intake). Setup progress and test links appear on the ticket. Setup questions use the existing questions/answers checkpoint with `setup_pending=true`; answering them queues another discovery attempt instead of planning. Normal scope confirmation occurs after setup completes. Recorded repository setup commands and hashes accompany discovery into planning, without environment values.
 
 Private Git dependencies are resolved separately from the selected change repositories.

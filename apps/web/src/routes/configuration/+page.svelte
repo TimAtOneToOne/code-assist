@@ -12,6 +12,15 @@
 <h1>Configuration</h1>
 <p class="intro">A home for connections and workspace preferences.</p>
 <Card.Root class="panel">
+	<Card.Title>Agent Execution</Card.Title>
+	<Card.Description>Set how many tickets can run discovery at the same time.</Card.Description>
+	<div>
+		<Button href={resolve('/configuration/execution')} variant="outline"
+			>Configure Execution →</Button
+		>
+	</div>
+</Card.Root>
+<Card.Root class="panel">
 	<Card.Title>Agent Models</Card.Title>
 	<Card.Description>Choose the Codex and Claude models used for new agent steps.</Card.Description>
 	<div>

@@ -47,7 +47,11 @@ try {
   await registerSetupTestWorker(boss, dataDirectory, stopping.signal);
   await registerProbeWorker(boss, release);
   await registerIntakeWorker(boss, dataDirectory);
-  await registerDiscoveryWorker(boss, dataDirectory, stopping.signal);
+  const stopDiscoverySettings = await registerDiscoveryWorker(
+    boss,
+    dataDirectory,
+    stopping.signal,
+  );
   await registerPlanningWorker(boss, dataDirectory, stopping.signal);
   await registerCodingWorker(boss, dataDirectory, stopping.signal);
   await registerGitHubWorker(boss, stopping.signal);
@@ -55,6 +59,7 @@ try {
   logger.event("info", "worker.ready", "Worker ready");
   const signal = await shutdown;
   logger.event("info", "worker.draining", "Worker draining", { signal });
+  await stopDiscoverySettings();
   await boss.offWork(setupTestQueue);
   await boss.offWork(codingQueue);
   await boss.offWork(cleanupQueue);
@@ -65,6 +70,7 @@ try {
   await boss.offWork(intakeQueue);
   await boss.offWork(notificationQueue);
 } finally {
+  stopping.abort();
   await boss.stop();
   logger.event("info", "worker.stopped", "Worker stopped");
 }

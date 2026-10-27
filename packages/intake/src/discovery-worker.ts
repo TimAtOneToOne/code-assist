@@ -1,7 +1,8 @@
 import { readPromptSettings } from "./prompt-settings.ts";
 import { readModelSettings } from "./model-settings.ts";
+import { registerDiscoveryConcurrency } from "./discovery-concurrency.ts";
 import { dirname, join } from "node:path";
-import type { PgBoss } from "pg-boss";
+import type { PgBoss, WorkHandler } from "pg-boss";
 import { createLogger } from "@code-assist/observability";
 import {
   findSecretByName,
@@ -24,7 +25,6 @@ import {
   type DependencyScan,
 } from "./repository-dependencies.ts";
 import {
-  discoveryQueue,
   startDiscovery,
   finishDiscovery,
   isCurrentDiscovery,
@@ -45,7 +45,7 @@ export async function registerDiscoveryWorker(
 ) {
   await reconcileDiscoveryFailures(boss);
   await syncSelectedDiscoveries(boss);
-  await boss.work<{ runId: string }>(discoveryQueue, async ([job]) => {
+  const handler: WorkHandler<{ runId: string }> = async ([job]) => {
     if (shutdown.aborted) throw new Error("Worker is stopping.");
     const run = await startDiscovery(boss, job.data.runId, job.id);
     if (!run) return;
@@ -55,7 +55,11 @@ export async function registerDiscoveryWorker(
     let log = createLogger(
       "discovery",
       {},
-      { attempt_id: run.id, job_id: job.id, ticket_id: run.ticket.identifier },
+      {
+        attempt_id: run.id,
+        job_id: job.id,
+        ticket_id: run.ticket.identifier,
+      },
     );
     let pending = Promise.resolve();
     try {
@@ -403,5 +407,6 @@ export async function registerDiscoveryWorker(
         `Discovery failed during ${stage}. See the discovery log.`,
       );
     }
-  });
+  };
+  return registerDiscoveryConcurrency(boss, directory, shutdown, handler);
 }

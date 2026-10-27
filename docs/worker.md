@@ -39,7 +39,7 @@ The worker loads `CODE_ASSIST_DATABASE_URL` from the operator-managed `~/Library
 
 The diagnostic queue explicitly sets `retryLimit: 0`, matching the brief's visible failure/manual Retry behavior. Its remaining queue/worker settings use pg-boss defaults: one handler per process for this queue, one job per poll, a two-second poll, a 15-minute active-job expiration, 14-day queued-job retention and seven-day completed-job retention. Human waits and checkpoint history are in application tables and do not expire with queue records. A failed job can be retried explicitly with the CLI while its queue record remains available.
 
-These are diagnostic-queue settings, not a global ticket concurrency policy or an agent execution budget. Discovery also uses native queue defaults and explicit failure/manual Retry. Its reconciliation detects missing worker PIDs and expired jobs; durable application history retains questions and answers after queue retention. Queue durability does not provide exactly-once external effects.
+These are diagnostic-queue settings, not a global ticket concurrency policy or an agent execution budget. Discovery uses the configured parallelism below and otherwise native queue defaults with explicit failure/manual Retry. Its reconciliation detects missing worker PIDs and expired jobs; durable application history retains questions and answers after queue retention. Queue durability does not provide exactly-once external effects.
 
 Coding jobs have Tim's approved 60-minute expiration per step. Checkpoint and evidence-collection jobs additionally allow two retries with a ten-second delay to recover saved output. Other stages do not inherit these retries: validation findings can return to implementation, while execution failures expose recovery actions. These settings are local to those jobs, not a global retry or concurrency policy. See [coding recovery](coding.md#recovery-and-publication) for receipts, checkpoint replay and process ownership.
 
@@ -48,6 +48,41 @@ Coding jobs have Tim's approved 60-minute expiration per step. Checkpoint and ev
 Immediately before a push or restart that deploys Code Assist, operators must verify no active workflow or queued continuation remains. Recovery support does not waive this check. The worker process normally stays running; process existence alone does not establish active work or idleness.
 
 ## Operations
+
+### Discovery Parallelism
+
+**Configuration → Agent Execution → Maximum Parallel Discoveries** controls concurrent
+discovery tickets on Mia, including automatic repository setup inside each discovery.
+The default is **3**, as requested October 27, 2026. Values must be positive whole numbers.
+Planning, coding and manually requested setup tests keep their separate worker settings;
+this is not a host-wide process limit or a CPU/memory measurement.
+
+The setting is atomically saved to `data/execution.json`. The worker watches that file
+and uses pg-boss's native `localConcurrency` option. On a change, native `offWork()`
+stops fetching more discoveries and waits for current handlers to finish, then registers
+the workers at the latest saved maximum. This applies to increases and decreases:
+queued tickets wait during the transition, active jobs are not cancelled, and no service
+restart is required. Saved settings survive deployment and worker restart. Existing
+per-ticket locks and stale-attempt checks remain in place. Independent tickets can test
+the same repository in separate disposable guests; saved-profile publication retains its
+existing lock and precedence rules.
+
+The implementation uses the installed pg-boss 12.38 native worker lifecycle; official
+[worker APIs](https://pgboss.io/api/workers) and [release notes](https://github.com/timgit/pg-boss/releases/tag/12.38.0)
+were checked before implementation. No custom scheduler or library patch is needed.
+`discovery-concurrency.integration.ts` exercises actual pg-boss workers at 3, then 2,
+then 3, proving queued work waits, active jobs finish without cancellation, and shutdown
+closes configuration watching. This fixture does not prove live agent throughput or
+Mia's resource capacity.
+
+**Optional optimizations and controls:**
+
+- **Requested by Tim:** configurable maximum discovery concurrency, default 3. This
+  replaces accidental one-at-a-time processing; excess tickets wait, and higher values
+  consume more host resources. Changes wait for current discoveries to finish. Scope:
+  discovery only, including its repository setup. No other optional controls added.
+
+### Commands
 
 Run on Mia with Node 24 on PATH:
 
