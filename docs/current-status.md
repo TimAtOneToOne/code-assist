@@ -4,6 +4,17 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+October 26 Rerun Step implementation: the current Initial Discovery exposes an action
+beside Refresh when awaiting answers or after a failure. It queues a fresh attempt
+without answering obsolete questions and preserves the previous result in history.
+The existing current-attempt and eligibility checks reject stale submissions; queued,
+running and answered attempts remain unavailable for rerun. Local desktop/mobile browser
+checks verified submission with blank answers and visibility by status. `make verify`
+and the database integration suite passed, including new-attempt/history and stale-submit
+coverage. Deployment observation is recorded separately under `.tmp/2026-10-27-rerun-step/`.
+See [Discovery](discovery.md).
+Optional optimizations and controls: none.
+
 October 26 dependency-access implementation: discovery resolves private Git dependencies
 and recursive submodules through the controller's existing host access, then supplies
 read-only archives and credential-free local Git copies. Selected repositories remain
@@ -14,8 +25,9 @@ Mia's native read-only probes resolved Connect's Causeway sources and produced a
 without credential questions. An isolated container using Connect's Dockerfile runtime
 passed real `mix deps.get --only prod`, with both Causeway Git commits verified and no
 GitHub credentials. `make verify` passed 101 unit tests; database integration passed
-11 tests with two opt-in guest probes skipped. Full Connect setup and deployment
-acceptance are still pending at this point.
+11 tests with two opt-in guest probes skipped. Release `2e18964` was observed selected
+and running in web, worker and HTTP health at 11:54 PM EDT October 26. Full Connect
+setup acceptance remains pending; deployment did not regenerate the saved attempts.
 See [Repository Setup](repository-setup.md) and [Discovery](discovery.md).
 Optional optimizations and controls: none.
 
