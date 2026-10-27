@@ -14,7 +14,7 @@ import {
   writeExecutionSettings,
 } from "../src/execution-settings.ts";
 
-test("discovery parallelism defaults to three, persists changes and rejects invalid settings", () => {
+test("execution limits default to three, preserve legacy discovery settings and validate both fields", () => {
   const root = join(
     import.meta.dirname,
     "../../../.tmp/execution-settings-tests",
@@ -24,10 +24,27 @@ test("discovery parallelism defaults to three, persists changes and rejects inva
   try {
     assert.deepEqual(readExecutionSettings(directory), {
       maxParallelDiscoveries: 3,
+      maxParallelCodingSessions: 3,
     });
-    writeExecutionSettings(directory, { maxParallelDiscoveries: 2 });
+    writeExecutionSettings(directory, {
+      maxParallelDiscoveries: 2,
+      maxParallelCodingSessions: 3,
+    });
     assert.equal(readExecutionSettings(directory).maxParallelDiscoveries, 2);
     const file = join(directory, "execution.json");
+    writeFileSync(file, JSON.stringify({ maxParallelDiscoveries: 2 }));
+    assert.deepEqual(readExecutionSettings(directory), {
+      maxParallelDiscoveries: 2,
+      maxParallelCodingSessions: 3,
+    });
+    writeExecutionSettings(directory, {
+      maxParallelDiscoveries: 4,
+      maxParallelCodingSessions: 2,
+    });
+    assert.deepEqual(readExecutionSettings(directory), {
+      maxParallelDiscoveries: 4,
+      maxParallelCodingSessions: 2,
+    });
     const before = readFileSync(file, "utf8");
     for (const value of [
       0,
@@ -43,6 +60,15 @@ test("discovery parallelism defaults to three, persists changes and rejects inva
         () =>
           writeExecutionSettings(directory, {
             maxParallelDiscoveries: value as number,
+            maxParallelCodingSessions: 3,
+          }),
+        /whole number/,
+      );
+      assert.throws(
+        () =>
+          writeExecutionSettings(directory, {
+            maxParallelDiscoveries: 3,
+            maxParallelCodingSessions: value as number,
           }),
         /whole number/,
       );

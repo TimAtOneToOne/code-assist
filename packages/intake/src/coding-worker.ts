@@ -3,6 +3,7 @@ import {
   descriptionHashes,
   publicationDescriptionPath,
 } from "./coding-description.ts";
+import { registerCodingConcurrency } from "./coding-concurrency.ts";
 import { finishAcceptance } from "./acceptance-outcome.ts";
 import { acceptancePrompt } from "./acceptance-prompt.ts";
 import { assessAcceptance } from "./acceptance.ts";
@@ -188,10 +189,11 @@ export async function registerCodingWorker(
 ) {
   await reconcileCodingFailures(boss, directory);
   await syncApprovedCoding(boss);
-  await boss.work<{ stepId: string }, unknown, { includeMetadata: true }>(
-    codingQueue,
-    { includeMetadata: true },
-    async ([job]) => {
+  return registerCodingConcurrency(
+    boss,
+    directory,
+    shutdown,
+    async function codingStepHandler([job]) {
       const startedAt = performance.now();
       if (shutdown.aborted) throw new Error("Worker is stopping.");
       const started = await startCoding(

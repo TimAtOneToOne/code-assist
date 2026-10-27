@@ -53,13 +53,18 @@ try {
     stopping.signal,
   );
   await registerPlanningWorker(boss, dataDirectory, stopping.signal);
-  await registerCodingWorker(boss, dataDirectory, stopping.signal);
+  const stopCodingSettings = await registerCodingWorker(
+    boss,
+    dataDirectory,
+    stopping.signal,
+  );
   await registerGitHubWorker(boss, stopping.signal);
   await registerCleanupWorker(boss, dataDirectory, stopping.signal);
   logger.event("info", "worker.ready", "Worker ready");
   const signal = await shutdown;
   logger.event("info", "worker.draining", "Worker draining", { signal });
   await stopDiscoverySettings();
+  await stopCodingSettings();
   await boss.offWork(setupTestQueue);
   await boss.offWork(codingQueue);
   await boss.offWork(cleanupQueue);

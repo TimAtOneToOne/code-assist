@@ -13,7 +13,9 @@
 <p class="intro">A home for connections and workspace preferences.</p>
 <Card.Root class="panel">
 	<Card.Title>Agent Execution</Card.Title>
-	<Card.Description>Set how many tickets can run discovery at the same time.</Card.Description>
+	<Card.Description
+		>Set how many discovery and coding sessions can run at the same time.</Card.Description
+	>
 	<div>
 		<Button href={resolve('/configuration/execution')} variant="outline"
 			>Configure Execution →</Button

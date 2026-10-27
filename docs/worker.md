@@ -54,8 +54,9 @@ Immediately before a push or restart that deploys Code Assist, operators must ve
 **Configuration → Agent Execution → Maximum Parallel Discoveries** controls concurrent
 discovery tickets on Mia, including automatic repository setup inside each discovery.
 The default is **3**, as requested October 27, 2026. Values must be positive whole numbers.
-Planning, coding and manually requested setup tests keep their separate worker settings;
-this is not a host-wide process limit or a CPU/memory measurement.
+Planning and manually requested setup tests keep their separate worker settings;
+coding has its own configurable maximum below.
+This is not a host-wide process limit or a CPU/memory measurement.
 
 The setting is atomically saved to `data/execution.json`. The worker watches that file
 and uses pg-boss's native `localConcurrency` option. On a change, native `offWork()`
@@ -70,7 +71,7 @@ existing lock and precedence rules.
 The implementation uses the installed pg-boss 12.38 native worker lifecycle; official
 [worker APIs](https://pgboss.io/api/workers) and [release notes](https://github.com/timgit/pg-boss/releases/tag/12.38.0)
 were checked before implementation. No custom scheduler or library patch is needed.
-`discovery-concurrency.integration.ts` exercises actual pg-boss workers at 3, then 2,
+`execution-concurrency.integration.ts` exercises actual pg-boss workers at 3, then 2,
 then 3, proving queued work waits, active jobs finish without cancellation, and shutdown
 closes configuration watching. This fixture does not prove live agent throughput or
 Mia's resource capacity.
@@ -81,6 +82,37 @@ Mia's resource capacity.
   replaces accidental one-at-a-time processing; excess tickets wait, and higher values
   consume more host resources. Changes wait for current discoveries to finish. Scope:
   discovery only, including its repository setup. No other optional controls added.
+
+### Coding Parallelism
+
+**Configuration → Agent Execution → Maximum Parallel Coding Sessions** controls
+concurrent coding steps across independent ticket runs. Tim requested this on
+October 27, 2026; the default is **3**, including for existing discovery-only
+`execution.json` files. Discovery and coding maxima are saved independently.
+
+The same native pg-boss lifecycle described above applies: changing the maximum
+waits for active steps to finish, then starts queued work at the latest saved value.
+No restart is needed for later settings changes. Workspace preparation, implementation,
+checkpoints, validation, acceptance, review and publication share the coding limit.
+A ticket's existing transactional continuation and current-step checks keep its
+steps sequential. Its repositories remain together in its isolated workspace;
+other ticket runs have separate guests, services, working copies and evidence.
+This setting does not parallelize repositories or stages within one ticket.
+
+`execution-concurrency.integration.ts` exercises both actual native queues at
+3 → 2 → 3, including active-job draining, queued work, no duplicate claims,
+coding retry metadata and watcher shutdown. The existing coding lifecycle suite
+checks approval, continuation, duplicate/stale results and recovery. These fixtures
+do not run concurrent live SDK sessions or establish Mia's sustained capacity;
+see [Concurrent Isolation Proof](concurrent-isolation-proof.md) for the separate
+two-guest evidence and its limits.
+
+**Optional optimizations and controls:**
+
+- **Requested by Tim:** configurable maximum coding concurrency, default 3, replacing
+  one-at-a-time processing across tickets. Excess steps wait; higher values consume
+  more host and provider resources. Changes wait for active coding steps to finish.
+  Scope: the full coding queue, separate from discovery. No other controls added.
 
 ### Commands
 

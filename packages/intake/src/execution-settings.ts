@@ -9,14 +9,31 @@ import {
 import { join } from "node:path";
 
 export const executionSettingsFile = "execution.json";
-export type ExecutionSettings = { maxParallelDiscoveries: number };
+export type ExecutionSettings = {
+  maxParallelDiscoveries: number;
+  maxParallelCodingSessions: number;
+};
 export class ExecutionSettingsError extends Error {}
 
 function validate(value: unknown): ExecutionSettings {
-  const count = (value as ExecutionSettings | null)?.maxParallelDiscoveries;
-  if (!Number.isSafeInteger(count) || (count ?? 0) < 1)
-    throw new ExecutionSettingsError("Enter a whole number of at least 1.");
-  return { maxParallelDiscoveries: count! };
+  const settings = value as Partial<ExecutionSettings> | null;
+  const discovery = settings?.maxParallelDiscoveries;
+  const coding =
+    settings?.maxParallelCodingSessions === undefined
+      ? 3
+      : settings.maxParallelCodingSessions;
+  for (const [label, count] of [
+    ["discoveries", discovery],
+    ["coding sessions", coding],
+  ] as const)
+    if (!Number.isSafeInteger(count) || (count ?? 0) < 1)
+      throw new ExecutionSettingsError(
+        `Enter a whole number of at least 1 for maximum parallel ${label}.`,
+      );
+  return {
+    maxParallelDiscoveries: discovery!,
+    maxParallelCodingSessions: coding,
+  };
 }
 
 export function readExecutionSettings(directory: string): ExecutionSettings {
@@ -25,7 +42,7 @@ export function readExecutionSettings(directory: string): ExecutionSettings {
     text = readFileSync(join(directory, executionSettingsFile), "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT")
-      return { maxParallelDiscoveries: 3 };
+      return { maxParallelDiscoveries: 3, maxParallelCodingSessions: 3 };
     throw error;
   }
   try {

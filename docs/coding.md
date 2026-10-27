@@ -2,6 +2,11 @@
 
 Approved plans enter the `approved-coding` pg-boss queue. [Repository Setup](repository-setup.md) supplies editable, saved runtime profiles; `internal-chat-ui`, `elation_companion`, and `workplace-agents` also have built-in defaults. Other repositories can run through a configured profile. A repository with no saved profile or built-in default produces a visible preparation failure rather than silently leaving an approved plan idle.
 
+Coding runs for independent tickets can execute concurrently. **Configuration → Agent
+Execution → Maximum Parallel Coding Sessions** defaults to **3** and covers all coding
+stages. Each run retains its own workspace and sequential steps. Changes wait for active
+steps to finish and apply without a restart. See [Coding Parallelism](worker.md#coding-parallelism).
+
 ## Lifecycle
 
 Each run is bound to the approved plan version, plan hash, requirements hash and source commit. Each step has a separate ID, job, input commit, result and logs. The stages are workspace preparation, Codex implementation, saving the code checkpoint, collecting evidence, repository validation, scenario acceptance for structured plans, Claude adversarial review, preserving the review result/evidence, and controller-owned GitHub publication. Findings of critical, high or medium severity return to implementation; a material decision pauses for Tim. There is no review-round budget or provider fallback.

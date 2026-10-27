@@ -18,9 +18,12 @@ export const actions = {
 		await requireSettingsAccess(event);
 		const form = await event.request.formData();
 		const value = form.get('maxParallelDiscoveries');
+		const coding = form.get('maxParallelCodingSessions');
 		try {
 			writeExecutionSettings(dataDirectory(), {
-				maxParallelDiscoveries: typeof value === 'string' && value.trim() ? Number(value) : NaN
+				maxParallelDiscoveries: typeof value === 'string' && value.trim() ? Number(value) : NaN,
+				maxParallelCodingSessions:
+					typeof coding === 'string' && coding.trim() ? Number(coding) : NaN
 			});
 			return { saved: true };
 		} catch (error) {

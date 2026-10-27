@@ -4,7 +4,21 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
-October 27 PR-description sequencing correction: implementation now saves proposed PR descriptions per repository, acceptance and independent review inspect the same supplied text, and publication retains it. Description hashes bind that text to review alongside existing candidate checks. Planning/global guidance separates PR opening from operator-managed secret creation and deployment/live verification. Mia's Global override was saved through the UI. Release `53d6a5a` was observed selected and running in web, worker and HTTP health at 12:46 AM EDT. ONE-5372 resumed through the normal reply action at 12:46:53 AM; its implementation preserved candidate `ddd1bc1`, supplied the pending-secret PR description and passed its three approved commands. Controller validation passed at 1:02 AM EDT; acceptance is queued behind other active coding work. Acceptance/review/publication are not yet claimed as verified. Existing approved plan v2 is preserved. Local publication/acceptance regression verifies pending-secret wording, lost-response recovery, changed-text rejection and repository isolation. `make verify` passed 103 tests plus lint, formatting, types and build; PostgreSQL integration passed 12 tests with two opt-in guest tests skipped. Results are recorded under `.tmp/2026-10-27-one-5372-question/`. Optional optimizations and controls: none.
+October 27 configurable coding parallelism: **Configuration → Agent Execution** now
+has an independent **Maximum Parallel Coding Sessions**, default **3**, using native
+pg-boss workers across ticket runs. Each ticket retains sequential steps and its own
+workspace. The full coding queue shares this maximum; changes wait for active steps
+without cancellation or restart. PostgreSQL integration passed 13 tests with two
+opt-in guest tests skipped, including real discovery/coding workers at 3 → 2 → 3.
+Local browser checks verified defaults, independent persistence and invalid-input
+rejection. `make verify` passed 103 unit tests, lint, formatting, types and build.
+Deployment is pending Mia's required idle check; no live throughput claim
+is made. See [Coding Parallelism](worker.md#coding-parallelism).
+**Optional optimizations and controls:** Tim requested the coding concurrency maximum;
+excess steps wait, higher values use more resources, and changed limits wait for active
+steps to finish. No other optional controls added.
+
+October 27 PR-description sequencing correction: implementation now saves proposed PR descriptions per repository, acceptance and independent review inspect the same supplied text, and publication retains it. Description hashes bind that text to review alongside existing candidate checks. Planning/global guidance separates PR opening from operator-managed secret creation and deployment/live verification. Mia's Global override was saved through the UI. Release `53d6a5a` was observed selected and running in web, worker and HTTP health at 12:46 AM EDT. ONE-5372 resumed through the normal reply action at 12:46:53 AM; its implementation preserved candidate `ddd1bc1`, supplied the pending-secret PR description and passed its three approved commands. Controller validation passed at 1:02 AM EDT. All five acceptance scenarios passed at 1:11 AM; independent review completed with no critical/high/medium findings at 1:18 AM. Review evidence collection remains queued behind another ticket; PR publication is not yet claimed as verified. Existing approved plan v2 is preserved. Local publication/acceptance regression verifies pending-secret wording, lost-response recovery, changed-text rejection and repository isolation. `make verify` passed 103 tests plus lint, formatting, types and build; PostgreSQL integration passed 12 tests with two opt-in guest tests skipped. Results are recorded under `.tmp/2026-10-27-one-5372-question/`. Optional optimizations and controls: none.
 
 
 October 27 Connect setup repair: the shared profile saved on Mia uses the repository
