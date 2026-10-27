@@ -84,6 +84,42 @@ test("workspace approval preserves ordered repositories and rejects duplicate id
   assert.equal(input.version, 3);
   assert.equal(input.snapshot.commit, "a".repeat(40));
   assert.equal(
+    input.dependencyPins,
+    undefined,
+    "Legacy inputs retain their identity",
+  );
+  const pins = [{ repository: "library", commits: ["b".repeat(40)] }];
+  const withDependencies = await approvedWorkspaceInput(
+    db([
+      {
+        ...row,
+        dependency_snapshots: [
+          {
+            name: "library",
+            commit: "b".repeat(40),
+            source: "/repos/library",
+            directory: "/snapshots/.dependencies/library",
+          },
+        ],
+        repository_setups: {
+          "/repos/internal-chat-ui": {
+            configuration: { gitDependencies: pins },
+          },
+        },
+      },
+    ]),
+    "ticket",
+  );
+  assert.deepEqual(withDependencies.dependencyPins, {
+    "internal-chat-ui": pins,
+  });
+  assert.equal(withDependencies.snapshot.name, "internal-chat-ui");
+  assert.equal(
+    withDependencies.snapshots,
+    undefined,
+    "Dependencies do not become coding/PR repositories",
+  );
+  assert.equal(
     input.completionRules,
     undefined,
     "Legacy approved inputs retain their identity",

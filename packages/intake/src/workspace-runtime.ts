@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Readable } from "node:stream";
 
+export const guestImage = "ubuntu:24.04";
+
 type GuestCommand = (
   args: string[],
   input?: string | Readable,

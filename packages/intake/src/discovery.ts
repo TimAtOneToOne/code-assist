@@ -58,6 +58,7 @@ export type DiscoveryRun = {
   setup_pending?: boolean;
   setup_progress?: SetupProgress[];
   repository_setups?: Record<string, RepositorySetupContext>;
+  dependency_snapshots?: RepositorySnapshot[] | null;
 };
 
 export async function initializeDiscovery(boss: PgBoss) {
@@ -73,6 +74,7 @@ export async function initializeDiscovery(boss: PgBoss) {
     ALTER TABLE code_assist.discovery_run ADD COLUMN IF NOT EXISTS setup_pending boolean NOT NULL DEFAULT false;
     ALTER TABLE code_assist.discovery_run ADD COLUMN IF NOT EXISTS setup_progress jsonb NOT NULL DEFAULT '[]';
     ALTER TABLE code_assist.discovery_run ADD COLUMN IF NOT EXISTS repository_setups jsonb NOT NULL DEFAULT '{}';
+    ALTER TABLE code_assist.discovery_run ADD COLUMN IF NOT EXISTS dependency_snapshots jsonb;
   `);
   await boss.createQueue(discoveryQueue, { retryLimit: 0 });
   await initializePlanning(boss);

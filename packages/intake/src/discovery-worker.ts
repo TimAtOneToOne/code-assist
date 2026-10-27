@@ -18,6 +18,12 @@ import { requestSetupTest, runSetupTest } from "./repository-setup-tests.ts";
 import { writeRepositorySetupLocked } from "./repository-settings.ts";
 import { discoverRepositories } from "./repositories.ts";
 import {
+  dependencyScanPrompt,
+  dependencyScanSchema,
+  inspectRepositoryDependencies,
+  type DependencyScan,
+} from "./repository-dependencies.ts";
+import {
   discoveryQueue,
   startDiscovery,
   finishDiscovery,
@@ -125,6 +131,76 @@ export async function registerDiscoveryWorker(
                 [run.id, JSON.stringify(entries)],
               );
           },
+          dependencies: async (snapshot, configuration) => {
+            stage = `dependency inspection for ${snapshot.name}`;
+            const resolved = await inspectRepositoryDependencies(
+              available,
+              join(prepared.workspace, ".dependencies"),
+              signal,
+              async (sources) => {
+                await current();
+                const prompt = dependencyScanPrompt(
+                  snapshot,
+                  available,
+                  sources,
+                  configuration,
+                );
+                log.payload(
+                  "repository_dependencies.input",
+                  "Read-only dependency inspection",
+                  { snapshot, prompt, model },
+                );
+                const result = await runAgentProcess(
+                  {
+                    apiKey,
+                    model,
+                    workspace: prepared.workspace,
+                    home: join(
+                      directory,
+                      "discovery",
+                      run.id,
+                      "dependencies",
+                      snapshot.name,
+                    ),
+                    prompt,
+                    outputSchema: dependencyScanSchema,
+                  },
+                  signal,
+                  (event) => {
+                    log.payload("codex.dependencies.event", event.type, event);
+                    pending = pending
+                      .then(current)
+                      .catch((error) => cancelled.abort(error));
+                  },
+                );
+                await pending;
+                await current();
+                log.payload(
+                  "repository_dependencies.result",
+                  "Required dependency sources",
+                  result,
+                );
+                return result as DependencyScan;
+              },
+            );
+            await current();
+            run.dependency_snapshots = [
+              ...(run.dependency_snapshots ?? []).filter(
+                (s) =>
+                  !resolved.sources.some(
+                    (r) => r.source === s.source && r.commit === s.commit,
+                  ),
+              ),
+              ...resolved.sources,
+            ];
+            await boss
+              .getDb()
+              .executeSql(
+                "UPDATE code_assist.discovery_run SET dependency_snapshots=$2 WHERE id=$1",
+                [run.id, JSON.stringify(run.dependency_snapshots)],
+              );
+            return resolved;
+          },
           scan: async (snapshot) => {
             stage = `repository setup scan for ${snapshot.name}`;
             const mapped = listConfiguration(directory)
@@ -139,6 +215,7 @@ export async function registerDiscoveryWorker(
               mapped,
               available.map((repo) => repo.name),
               readPromptSettings(directory),
+              run.dependency_snapshots ?? [],
             );
             log.payload("repository_setup.input", "Repository setup scan", {
               snapshot,
@@ -149,7 +226,7 @@ export async function registerDiscoveryWorker(
               {
                 apiKey,
                 model,
-                workspace: snapshot.directory,
+                workspace: prepared.workspace,
                 home: join(
                   directory,
                   "discovery",

@@ -36,6 +36,16 @@ Confirming repository selection atomically queues `initial-discovery`. Worker st
 
 Before ticket investigation, the worker reuses configured repositories and gathers/tests missing repository setups with Codex. See [Automatic Setup During Intake](repository-setup.md#automatic-setup-during-intake). Setup progress and test links appear on the ticket. Setup questions use the existing questions/answers checkpoint with `setup_pending=true`; answering them queues another discovery attempt instead of planning. Normal scope confirmation occurs after setup completes. Recorded repository setup commands and hashes accompany discovery into planning, without environment values.
 
+Private Git dependencies are resolved separately from the selected change repositories.
+The controller reads the requested versions through its configured clones, fetches missing
+versions with host Git access, and follows nested Git submodules. Setup, discovery and
+planning receive immutable dependency archives inside their read-only workspace.
+The test/coding guest receives local Git copies without download credentials. Dependency
+repositories never become coding or PR targets through this process. New discoveries
+resolve versions again from their own source; they reuse tested setup commands, not stale
+dependency pins. An absent catalog repository or an actual retrieval failure remains an
+explicit blocker. Discovery records `dependency_snapshots` separately from `snapshots`.
+
 `queued → running → questions → ready`
 
 - `questions` means findings are ready for human review. Codex may return zero questions when the evidence is sufficient; Tim still confirms scope.

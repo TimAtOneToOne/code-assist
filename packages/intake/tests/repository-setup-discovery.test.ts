@@ -308,3 +308,47 @@ test("an owner save during testing wins over the tested proposal", async () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("later tickets reuse setup commands with newly resolved dependency pins without rewriting the saved recipe", async () => {
+  const directory = fixture();
+  const saved = {
+    ...config,
+    gitDependencies: [{ repository: "library", commits: ["a".repeat(40)] }],
+  };
+  writeRepositorySetup(directory, snapshot.source, saved);
+  try {
+    const pins = [{ repository: "library", commits: ["b".repeat(40)] }];
+    const result = await prepareRepositorySetups(directory, [snapshot], {
+      current: async () => {},
+      progress: async () => {},
+      dependencies: async (_source, configuration) => {
+        assert.deepEqual(configuration, saved);
+        return { pins, questions: [] };
+      },
+      scan: async () => {
+        throw new Error("must reuse setup recipe");
+      },
+      test: async () => {
+        throw new Error("setup is already configured");
+      },
+      publish: async () => {
+        throw new Error("must not rewrite saved setup");
+      },
+    });
+    assert.deepEqual(
+      result.contexts[snapshot.source].configuration.gitDependencies,
+      pins,
+    );
+    assert.equal(
+      result.contexts[snapshot.source].configuration.validationScript,
+      saved.validationScript,
+    );
+    assert.deepEqual(
+      readRepositorySetup(directory, snapshot.source).configuration,
+      saved,
+    );
+    assert.deepEqual(Object.keys(result.contexts), [snapshot.source]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

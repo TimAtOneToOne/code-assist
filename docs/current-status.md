@@ -4,6 +4,21 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+October 26 dependency-access implementation: discovery resolves private Git dependencies
+and recursive submodules through the controller's existing host access, then supplies
+read-only archives and credential-free local Git copies. Selected repositories remain
+the only change/PR targets. Saved setup commands are reused while each discovery pins
+its own dependency versions for later coding. Regression coverage includes nested Git
+clones, missing-version fetches, changing versions, saved-setup reuse and legacy approvals.
+Mia's native read-only probes resolved Connect's Causeway sources and produced a setup
+without credential questions. An isolated container using Connect's Dockerfile runtime
+passed real `mix deps.get --only prod`, with both Causeway Git commits verified and no
+GitHub credentials. `make verify` passed 101 unit tests; database integration passed
+11 tests with two opt-in guest probes skipped. Full Connect setup and deployment
+acceptance are still pending at this point.
+See [Repository Setup](repository-setup.md) and [Discovery](discovery.md).
+Optional optimizations and controls: none.
+
 October 26 discovery presentation update: setup scans now receive the ticket, and both setup and
 feature discovery explain the requested change in plain language and pseudocode
 before asking concrete, decision-focused questions. Technical findings and setup

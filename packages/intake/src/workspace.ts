@@ -11,12 +11,18 @@ import { resolveRepositoryEnvironment } from "@code-assist/secrets";
 import type { RepositorySnapshot } from "./discovery.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { bootstrap, environmentLauncher } from "./workspace-bootstrap.ts";
-import { ensureGuestRuntime, verifyGuestBrowser } from "./workspace-runtime.ts";
+import {
+  ensureGuestRuntime,
+  verifyGuestBrowser,
+  guestImage,
+} from "./workspace-runtime.ts";
 import { bundleGitDependency } from "./workspace-git-dependencies.ts";
 
 import { snapshots } from "./coding-repositories.ts";
 import {
   loadRepositoryProfile,
+  compileRepositoryProfile,
+  type RepositorySetup,
   profileEnvironment,
   type RuntimeProfile,
   type CompletionRule,
@@ -25,6 +31,10 @@ import {
 export class WorkspaceApprovalError extends Error {}
 export type WorkspaceInput = {
   completionRules?: Record<string, CompletionRule>;
+  dependencyPins?: Record<
+    string,
+    NonNullable<RepositorySetup["gitDependencies"]>
+  >;
   issueId: string;
   planningId: string;
   version: number;
@@ -34,6 +44,7 @@ export type WorkspaceInput = {
   snapshots?: RepositorySnapshot[];
 };
 export type WorkspaceSources = {
+  dependencyPins?: WorkspaceInput["dependencyPins"];
   snapshot: RepositorySnapshot;
   snapshots?: RepositorySnapshot[];
 };
@@ -87,7 +98,7 @@ export async function approvedWorkspaceInput(
   const { rows } = await db.executeSql(
     `
     SELECT p.id AS planning_id, p.current_version, v.hash AS plan_hash,
-      p.input_hash, d.snapshots, d.repository_setups
+      p.input_hash, d.snapshots, d.repository_setups, d.dependency_snapshots
     FROM code_assist.intake_issue i
     JOIN code_assist.discovery_run d ON d.id=i.current_discovery_id
     JOIN code_assist.planning_run p ON p.discovery_id=d.id
@@ -130,6 +141,17 @@ export async function approvedWorkspaceInput(
   return {
     issueId,
     ...(Object.keys(completionRules).length ? { completionRules } : {}),
+    ...(Array.isArray(row.dependency_snapshots)
+      ? {
+          dependencyPins: Object.fromEntries(
+            snapshots.map((snapshot) => [
+              snapshot.name,
+              row.repository_setups?.[snapshot.source]?.configuration
+                ?.gitDependencies ?? [],
+            ]),
+          ),
+        }
+      : {}),
     planningId: row.planning_id,
     version: row.current_version,
     planHash: row.plan_hash,
@@ -239,10 +261,18 @@ export async function provisionWorkspace<T extends WorkspaceSources>(
   const profiles =
     frozenProfiles ??
     Object.fromEntries(
-      repositories.map((s) => [
-        s.name,
-        loadRepositoryProfile(directory, s.source),
-      ]),
+      repositories.map((s) => {
+        const profile = loadRepositoryProfile(directory, s.source);
+        return [
+          s.name,
+          input.dependencyPins && Object.hasOwn(input.dependencyPins, s.name)
+            ? compileRepositoryProfile(s.name, {
+                ...profile.configuration,
+                gitDependencies: input.dependencyPins[s.name],
+              })
+            : profile,
+        ];
+      }),
     );
   const source = sources[0];
   const environments = Object.fromEntries(
@@ -309,7 +339,7 @@ export async function provisionWorkspace<T extends WorkspaceSources>(
       "create",
       "--isolated",
       "--isolate-network",
-      "ubuntu:24.04",
+      guestImage,
       workspace.machine,
     ]);
     await stage("installing toolchain and private container engine");
@@ -429,6 +459,16 @@ export async function provisionWorkspace<T extends WorkspaceSources>(
       } finally {
         await rm(bundle, { force: true });
       }
+    }
+    if (dependencies.size) {
+      // Native submodule updates must be able to clone the controller's local Git copies.
+      await guest([
+        "git",
+        "config",
+        "--system",
+        "protocol.file.allow",
+        "always",
+      ]);
     }
     for (const source of sources) {
       const profile = profiles[source.name];

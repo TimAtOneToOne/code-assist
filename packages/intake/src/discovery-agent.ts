@@ -179,6 +179,9 @@ ${JSON.stringify(priorAnswers)}
 
 Saved repository setup (environment values withheld):
 ${JSON.stringify(run.repository_setups ?? {})}
+Read-only dependency sources (not selected repositories, coding targets or PR targets):
+${JSON.stringify(run.dependency_snapshots ?? [])}
+Use these sources when needed to understand dependencies. Their exact Git versions are supplied by the controller without guest GitHub credentials. Do not ask for library-download credentials for already supplied dependencies or expand change scope to their repositories.
 Use these repository-specific setup and validation commands as evidence alongside the source. Identify any changes the requested feature will require; do not assume these commands run newly added tests automatically.`;
 }
 
