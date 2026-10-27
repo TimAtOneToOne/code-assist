@@ -86,6 +86,29 @@ On synced commit `eb8b6fbe5906b837dca8a6d303121423c640019d`, the isolated setup 
 
 A separate disposable [runtime probe](http://100.91.0.83:3000/logs?attempt=5499937a-c4d8-4a72-afda-4d55ddc8aacd) verifies startup plus `/health`, `/docs`, and `/openapi.json`. This proves basic runtime readiness, not authenticated Entra or full Olive integration. Both probe machines were removed afterward.
 
+### Connect Setup — October 27, 2026
+
+The first two dependency-equipped discovery attempts reached separate setup failures:
+ONE-5370 proposed `workingDirectory: "connect"`, which incorrectly resolved to
+`/work/connect/connect`; ONE-5371 reached 1,979 tests but failed 20 SAML tests because
+Ubuntu 24.04 supplied xmlsec1 1.2.39 without the `--lax-key-search` option used by
+Connect. Private Git dependencies and their submodules downloaded successfully.
+
+The corrected shared profile uses `.` for the repository root and builds upstream
+xmlsec1 1.3.12 with its required development libraries, verifying the release archive's
+SHA-256 and checking the required CLI option. It retains Connect's full validation
+commands. These are isolated environment settings, not changes to Connect's source
+or permissions to modify dependency repositories.
+
+The corrected profile passed on source `d79aa980a182d91166a53f94ccb958622fc1f02a`
+in setup test `13c7ffc4-0d99-429d-bc1f-39844353c8c1`: 14 properties and 1,979 tests
+with zero failures, compile/format/Credo/Dialyzer/unused-code checks, native MCP
+browser readiness, application startup, and database-backed MDM health. The guest
+was removed and the exact tested profile was saved on Mia. See the
+[passing setup logs](http://100.91.0.83:3000/logs?attempt=b6916250-8835-4b38-a791-cc8f15754210).
+This proves isolated setup readiness, not completion of either ticket or live
+provider integration. The failed attempts remain in history.
+
 ## Verification
 
 `make verify` runs normal validation. Database integration coverage lives in `repository-setup.integration.ts`. To exercise fresh OrbStack provisioning without a repository-specific browser installer, real MCP interaction, app startup, validation failure, a missing-browser failure caused by an environment override, and machine cleanup on Mia:

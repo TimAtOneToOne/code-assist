@@ -4,6 +4,14 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+October 27 Connect setup repair: the shared profile saved on Mia uses the repository
+root and xmlsec1 1.3.12, correcting a duplicated working directory and Ubuntu's older
+XML tool without changing Connect source. The disposable setup test passed 14
+properties and 1,979 tests with zero failures, all configured static checks, native
+browser readiness, startup and database-backed health. This is setup acceptance,
+not feature completion. See [Connect Setup](repository-setup.md#connect-setup--october-27-2026).
+Optional optimizations and controls: none.
+
 October 27 configurable discovery parallelism: **Configuration → Agent Execution**
 sets the maximum simultaneous discovery tickets, default **3**. The setting includes
 automatic setup work and leaves planning/coding queues unchanged. File changes use the
@@ -13,7 +21,9 @@ queued work, no active-job cancellation and watcher shutdown. Desktop/mobile che
 verified the real settings form, persistence and invalid-input rejection. `make verify`
 passed 102 unit tests; database integration passed 12 tests with two opt-in guest tests skipped. See
 [Discovery Parallelism](worker.md#discovery-parallelism) for behavior and validation limits.
-Source implementation and local fixture verification do not establish live deployment.
+Release `61f2068` was observed selected and running in web, worker and HTTP health at
+12:19 AM EDT October 27. The live form saved and reloaded **3**, and the running
+pg-boss `initial-discovery` worker reported `localConcurrency: 3`.
 **Optional optimizations and controls:** Tim requested the discovery concurrency maximum;
 excess tickets wait and higher values use more resources. No other optional controls added.
 
