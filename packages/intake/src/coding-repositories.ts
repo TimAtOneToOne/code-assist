@@ -1,3 +1,7 @@
+import {
+  publicationDescriptions,
+  descriptionHashes,
+} from "./coding-description.ts";
 import { acceptanceReady, currentAcceptance } from "./acceptance.ts";
 import { isDeepStrictEqual } from "node:util";
 import { join } from "node:path";
@@ -65,6 +69,7 @@ export function repositoryRun(run: CodingRun, index: number): CodingRun {
 }
 export function publicationReady(run: CodingRun, steps: CodingStep[]) {
   if (!acceptanceReady(run, steps)) return false;
+  const hashes = descriptionHashes(publicationDescriptions(run, steps));
   steps = steps.filter(
     (step) =>
       (step.change_request_id ?? null) ===
@@ -76,6 +81,19 @@ export function publicationReady(run: CodingRun, steps: CodingStep[]) {
     (s) => s.kind === "review" && s.status === "completed",
   );
   if (!review) return false;
+  if (
+    !isDeepStrictEqual(
+      review.result?.publicationDescriptionHashes ?? {},
+      hashes,
+    ) ||
+    (run.plan.acceptanceScenarios !== undefined &&
+      !isDeepStrictEqual(
+        currentAcceptance(run, steps)?.result?.publicationDescriptionHashes ??
+          {},
+        hashes,
+      ))
+  )
+    return false;
   if (
     run.plan.acceptanceScenarios !== undefined &&
     steps.indexOf(review) <= steps.indexOf(currentAcceptance(run, steps)!)

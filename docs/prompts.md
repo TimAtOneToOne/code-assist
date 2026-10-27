@@ -32,6 +32,8 @@ failure scenario and evidence, and recommend the smallest correction. Speculativ
 future needs and optional improvements must not become blockers. Necessary
 correctness, authorization, security, and data-integrity requirements still apply.
 
+On October 27, Tim requested PR opening before operator-managed secret creation. The default Global prompt and Mia's saved Global override now distinguish PR-opening checks from prerequisites for merge, deployment, and live use. Required validation and honest evidence remain mandatory. PR-description checks inspect proposed publication text; agents must not require an already-open PR or ask Tim for artifacts the workflow should prepare. New planning prompts enforce the same phase distinction. Existing approved plans remain unchanged.
+
 ## Scopes
 
 | Scope | Applies To |

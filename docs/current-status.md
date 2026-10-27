@@ -4,6 +4,9 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+October 27 PR-description sequencing correction: implementation now saves proposed PR descriptions per repository, acceptance and independent review inspect the same supplied text, and publication retains it. Description hashes bind that text to review alongside existing candidate checks. Planning/global guidance separates PR opening from operator-managed secret creation and deployment/live verification. Mia's Global override was saved through the UI; source deployment and ONE-5372 resumption remain pending at this entry. Existing approved plan v2 is preserved. Local publication/acceptance regression verifies pending-secret wording, lost-response recovery, changed-text rejection and repository isolation. Full verification and PostgreSQL integration results are recorded under `.tmp/2026-10-27-one-5372-question/`. Optional optimizations and controls: none.
+
+
 October 27 Connect setup repair: the shared profile saved on Mia uses the repository
 root and xmlsec1 1.3.12, correcting a duplicated working directory and Ubuntu's older
 XML tool without changing Connect source. The disposable setup test passed 14

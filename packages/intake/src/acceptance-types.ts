@@ -23,6 +23,7 @@ export type AcceptanceResult = {
   }[];
 };
 export type AcceptanceReport = AcceptanceResult & {
+  publicationDescriptionHashes?: Record<string, string>;
   attemptId: string;
   planHash: string;
   commits: Record<string, string | null>;

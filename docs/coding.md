@@ -41,6 +41,14 @@ Evidence is not a hostile-agent attestation: copying old content into a current 
 
 See [Acceptance Evidence Rehearsal](acceptance-rehearsal.md) for verified scope and limitations.
 
+### Proposed PR Descriptions
+
+Implementation returns a complete repository-specific `pullRequestDescription` alongside its code result. The controller saves it with that candidate, supplies the descriptions read-only to acceptance and review at `/opt/code-assist/publication-descriptions.json`, and publishes the reviewed text with its normal commit/publication metadata. Acceptance and review record description hashes; publication requires the same descriptions as well as the existing exact-commit checks. Revisions return complete updated descriptions. Historical completed implementations without this field retain their publication behavior; a new implementation prepares the field when resumed.
+
+PR-text inspection uses this proposed text before a GitHub PR exists. Missing or incorrect wording returns to implementation. Operator-managed deployment secrets can remain uncreated when the PR opens; the description must accurately state required actions and whether they are due before merge, deployment, or live use. Local validation and review remain required, and no secret existence or deployed behavior is inferred. Planning keeps rollout prerequisites out of pre-publication scenarios. Acceptance pauses are labeled **Acceptance Blocked**, rather than presenting an observation as an agent-authored question.
+
+The publication regression covers pending-secret wording reaching a PR, recovery after a lost creation response, changed-description rejection, independent review, and separate repository/candidate descriptions. Optional optimizations and controls: none.
+
 ### Repeated Validation Failures
 
 A first failed validation returns to implementation. If a completed implementation attempt leaves the candidate commits unchanged and validation again returns the same command/exit-code results, the controller pauses in **Your Direction Needed** instead of repeating. It preserves both validation results, identifies the previous step, and uses the existing **Reply and Continue** flow. This compares command outcomes, not individual test identities or log text; inspect the logs to diagnose the actual failure.

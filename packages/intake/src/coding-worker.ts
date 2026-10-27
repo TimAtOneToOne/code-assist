@@ -1,3 +1,8 @@
+import {
+  publicationDescriptions,
+  descriptionHashes,
+  publicationDescriptionPath,
+} from "./coding-description.ts";
 import { finishAcceptance } from "./acceptance-outcome.ts";
 import { acceptancePrompt } from "./acceptance-prompt.ts";
 import { assessAcceptance } from "./acceptance.ts";
@@ -491,6 +496,11 @@ export async function registerCodingWorker(
           step.kind === "accept" ||
           step.kind === "review"
         ) {
+          const history = (await readCoding(boss.getDb(), run.issue_id)).find(
+            (r) => r.id === run.id,
+          )!.steps;
+          const descriptions = publicationDescriptions(run, history);
+          const publicationDescriptionHashes = descriptionHashes(descriptions);
           let completed = receipt;
           if (!completed) {
             const provider = step.kind === "review" ? "claude" : "codex",
@@ -519,10 +529,18 @@ export async function registerCodingWorker(
                 repository_commit: step.input_commit ?? undefined,
               },
             );
-            const model = readModelSettings(directory)[provider],
-              history = (await readCoding(boss.getDb(), run.issue_id)).find(
-                (r) => r.id === run.id,
-              )!.steps;
+            const model = readModelSettings(directory)[provider];
+            if (step.kind !== "implement")
+              await commands.root(
+                [
+                  "node",
+                  "--input-type=module",
+                  "-e",
+                  `import {readFileSync, writeFileSync, chmodSync} from "node:fs"; const path = process.argv[1]; writeFileSync(path, readFileSync(0)); chmodSync(path, 0o444);`,
+                  publicationDescriptionPath,
+                ],
+                JSON.stringify(descriptions, null, 2),
+              );
             const prompt =
               step.kind === "accept"
                 ? await acceptancePrompt(directory, run, step, history)
@@ -593,7 +611,7 @@ export async function registerCodingWorker(
             boss,
             run,
             step,
-            { ...safe, browserCalls, tools },
+            { ...safe, browserCalls, tools, publicationDescriptionHashes },
             "checkpoint",
             undefined,
             undefined,
@@ -603,6 +621,7 @@ export async function registerCodingWorker(
               agentStepId: step.recovery_step_id ?? step.id,
               kind: step.kind,
               result: safe,
+              publicationDescriptionHashes,
               browserCalls,
               tools,
             },
@@ -732,6 +751,8 @@ export async function registerCodingWorker(
               saved.result,
               saved.tools ?? [],
             );
+            report.publicationDescriptionHashes =
+              saved.publicationDescriptionHashes;
             const paths = report.scenarios.flatMap((s) => s.artifacts);
             if (
               !report.issues.some((issue) => issue.includes("artifact belongs"))
@@ -754,7 +775,13 @@ export async function registerCodingWorker(
               boss,
               run,
               step,
-              { ...result, evidence, commit: run.commit },
+              {
+                ...result,
+                evidence,
+                commit: run.commit,
+                publicationDescriptionHashes:
+                  saved.publicationDescriptionHashes,
+              },
               result.disposition === "needs_direction"
                 ? "needs_direction"
                 : codeReviewReady(result)
@@ -799,6 +826,8 @@ export async function registerCodingWorker(
             signal,
             log,
             assertCurrent,
+            undefined,
+            publicationDescriptions(run, history)[activeSnapshot(run).name],
           );
           const deployment = isWindmill(run)
             ? (await readWindmillIntent(directory, run))?.evidence

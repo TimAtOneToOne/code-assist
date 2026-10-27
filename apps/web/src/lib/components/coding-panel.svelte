@@ -115,7 +115,9 @@
 			aria-labelledby={'coding-question-' + run.id}
 			class="space-y-2 rounded-md border border-yellow-300 bg-yellow-50 p-4"
 		>
-			<h3 id={'coding-question-' + run.id} class="text-base font-medium">Agent Question</h3>
+			<h3 id={'coding-question-' + run.id} class="text-base font-medium">
+				{latest?.continuation?.kind === 'accept' ? 'Acceptance Blocked' : 'Agent Question'}
+			</h3>
 			{#if directionQuestion}
 				<Markdown html={html[`${run.current_step_id}:directionQuestion`] ?? ''} />
 			{:else}

@@ -120,6 +120,7 @@ export async function publishCoding(
   log: ReturnType<typeof createLogger>,
   assertCurrent: () => Promise<void>,
   execute = executeCoding,
+  description?: string,
 ) {
   run = publicationRun(run);
   if (!run.commit || !/^[a-f0-9]{40}$/.test(run.commit))
@@ -288,7 +289,9 @@ export async function publishCoding(
         );
     }
     const revisionMarker = `<!-- revision:${request.id} -->`;
-    let body = publicPublicationBody(prs[0].body);
+    let body = description
+      ? `${description.trim()}\n\n${publicationMarker(run.id)}\n`
+      : publicPublicationBody(prs[0].body);
     if (!body.includes(revisionMarker)) {
       for (const [name, commit] of Object.entries(commitSet(run)))
         if (request.baseCommits[name])
@@ -425,20 +428,28 @@ export async function publishCoding(
   const body = join(local, "pull-request.md");
   await writeFile(
     body,
-    `## Summary\n\n${run.repair ? "Repairs a failed main workflow for" : "Implements"} ${run.identifier}: ${run.title}.${
-      run.repair
-        ? `\n\nFailure evidence: ${run.repair.workflows.runs
-            .filter((r) => r.conclusion && r.conclusion !== "success")
-            .map((r) => `[${r.name}, attempt ${r.run_attempt}](${r.html_url})`)
-            .join(", ")}. Corrective base: ${run.repair.baseCommit}.`
-        : ""
-    }\n\nValidation: the repository’s configured checks passed; browser evidence and code review are recorded for the candidate commits below.\n\n${Object.entries(
-      commitSet(run),
-    )
-      .map(([name, commit]) => `- ${name}: ${commit}`)
-      .join(
-        "\n",
-      )}${deployment ? `\n\n[Windmill fork](${deployment.url}) · [Successful native Git Sync job](${deployment.jobUrl}). The fork synced the reviewed commit ${deployment.commit}; runtime business acceptance and operator-managed configuration are separate evidence.` : ""}\n\n**Optional optimizations and controls:** none.\n\n${marker}\n`,
+    description
+      ? `${description.trim()}\n\n${Object.entries(commitSet(run))
+          .map(([name, commit]) => `- ${name}: ${commit}`)
+          .join(
+            "\n",
+          )}${deployment ? `\n\n[Windmill fork](${deployment.url}) · [Successful native Git Sync job](${deployment.jobUrl}). The fork synced the reviewed commit ${deployment.commit}; runtime business acceptance and operator-managed configuration are separate evidence.` : ""}\n\n${marker}\n`
+      : `## Summary\n\n${run.repair ? "Repairs a failed main workflow for" : "Implements"} ${run.identifier}: ${run.title}.${
+          run.repair
+            ? `\n\nFailure evidence: ${run.repair.workflows.runs
+                .filter((r) => r.conclusion && r.conclusion !== "success")
+                .map(
+                  (r) => `[${r.name}, attempt ${r.run_attempt}](${r.html_url})`,
+                )
+                .join(", ")}. Corrective base: ${run.repair.baseCommit}.`
+            : ""
+        }\n\nValidation: the repository’s configured checks passed; browser evidence and code review are recorded for the candidate commits below.\n\n${Object.entries(
+          commitSet(run),
+        )
+          .map(([name, commit]) => `- ${name}: ${commit}`)
+          .join(
+            "\n",
+          )}${deployment ? `\n\n[Windmill fork](${deployment.url}) · [Successful native Git Sync job](${deployment.jobUrl}). The fork synced the reviewed commit ${deployment.commit}; runtime business acceptance and operator-managed configuration are separate evidence.` : ""}\n\n**Optional optimizations and controls:** none.\n\n${marker}\n`,
     { mode: 0o600 },
   );
   if (fork) {

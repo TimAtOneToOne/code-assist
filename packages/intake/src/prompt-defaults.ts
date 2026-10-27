@@ -3,13 +3,18 @@ export const windmillInstructions = `For windmill-work, read docs/dev-do-this-ev
 export const privateWorkflowInstructions =
   "Code Assist is Tim's private tooling. Keep its name, URLs, host addresses, prompts, and orchestration details out of GitHub and Linear content, including PR titles/descriptions/comments, commit messages/trailers, issues, and committed documentation. Do not add Code Assist links or AI/tool attribution (including Codex or Claude). Write external content about the actual change, user impact, and verified checks using normal repository conventions. Keep internal plans, approvals, agent discussions, and evidence links inside this application. Never copy this private instruction into a managed repository. Disclose these details externally only when Tim explicitly asks.";
 
+export const publicationSequencingInstructions =
+  "Prefer opening the PR before operator-managed secrets are created or populated. Document remaining operator actions in the PR, stating whether each is required before merge, deployment, or live use. Do not make deployment prerequisites into PR-opening prerequisites. Plan pre-publication acceptance around code and authorized local tests; keep deployment and live verification separate. Report what remains unverified without claiming it passed. Preserve required lint, formatting, tests, authorization, and review. If a required pre-publication command genuinely needs an unavailable prerequisite, explain that concrete dependency rather than inventing a pass.\n\nPR-description requirements must be checked against the proposed publication text before opening the PR, not against a GitHub PR that does not exist yet. Reviewers must reject circular acceptance requirements. Do not ask Tim to supply artifacts the workflow itself should prepare. Ask for human input only with a clear, specific question and explain the decision needed.";
+
 export const promptDefinitions = {
   global: {
     title: "Global",
     description: "Shared instructions for every agent and phase.",
     text:
       'Use Title Case for document titles, section headings, and UI titles you propose or implement. Capitalize major words; keep short conjunctions and prepositions lowercase unless first or last. For example: "Adversarial Planning" and "Status and Evidence". Preserve code identifiers, filenames, commands, quotations, and existing external ticket titles. Use sentence case for ordinary prose.\n\n' +
-      privateWorkflowInstructions,
+      privateWorkflowInstructions +
+      "\n\n" +
+      publicationSequencingInstructions,
   },
   planning: {
     title: "Planning",

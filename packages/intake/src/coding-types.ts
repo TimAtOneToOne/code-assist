@@ -92,6 +92,7 @@ export type CodingChangeRequest = {
   pullRequests: Record<string, string>;
 };
 export type CodingContinuation = {
+  publicationDescriptionHashes?: Record<string, string>;
   agentStepId: string;
   kind: "implement" | "accept" | "review";
   tools?: import("./acceptance-types.ts").ToolEvidence[];
@@ -159,6 +160,7 @@ export function missingBrowserEvidence(run: CodingRun, step?: CodingStep) {
   );
 }
 export type Implementation = {
+  pullRequestDescription?: string;
   summary: string;
   disposition: "implemented" | "needs_direction";
   directionQuestion: string;
@@ -167,8 +169,15 @@ export type Implementation = {
 export const implementationSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "disposition", "directionQuestion", "browserEvidence"],
+  required: [
+    "summary",
+    "disposition",
+    "directionQuestion",
+    "browserEvidence",
+    "pullRequestDescription",
+  ],
   properties: {
+    pullRequestDescription: { type: "string" },
     summary: { type: "string" },
     disposition: { type: "string", enum: ["implemented", "needs_direction"] },
     directionQuestion: { type: "string" },
@@ -185,6 +194,10 @@ export function parseImplementation(value: unknown): Implementation {
     typeof v.directionQuestion !== "string" ||
     !Array.isArray(v.browserEvidence) ||
     v.browserEvidence.some((x) => typeof x !== "string") ||
+    (v.pullRequestDescription !== undefined &&
+      (typeof v.pullRequestDescription !== "string" ||
+        (v.disposition === "implemented" &&
+          !v.pullRequestDescription.trim()))) ||
     (v.disposition === "needs_direction" && !v.directionQuestion.trim())
   )
     throw new Error("Invalid coding result.");

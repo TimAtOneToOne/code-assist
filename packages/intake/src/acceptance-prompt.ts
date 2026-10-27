@@ -1,3 +1,4 @@
+import { descriptionContext } from "./coding-description.ts";
 import type { CodingRun, CodingStep } from "./coding-types.ts";
 import { commitSet } from "./coding-repositories.ts";
 import { planMarkdown } from "./planning-types.ts";
@@ -10,11 +11,12 @@ export async function acceptancePrompt(
   directory: string,
   run: CodingRun,
   step: CodingStep,
-  history: unknown,
+  history: CodingStep[],
 ) {
   const workspace = await readWorkspace(directory, run.workspace_id!);
   const origin = step.recovery_step_id ?? step.id;
   return `You are Codex verifying acceptance for ${run.identifier}: ${run.title} after controller command validation. This is a verification attempt, not implementation. Do not edit tracked source, commit, switch branches, publish, merge, deploy, or change external systems. Run only the approved scenarios against the saved candidates and authorized local/synthetic fixtures. If prerequisites, credentials, services or authorized evidence are missing, report blocked with the concrete reason. Never turn inspection or a mock into a claim about a deployed production system.
+${descriptionContext(run, history)}
 Plan identity: ${run.input.planHash}. Candidate commits (all repositories): ${JSON.stringify(commitSet(run))}.
 Repository commands MUST use node /work/run.mjs --repo <name> <command> [args], which loads the pinned working directory/environment. Saved setup/startup/readiness instructions: ${JSON.stringify(Object.fromEntries(Object.entries(workspace.profiles ?? {}).map(([name, p]) => [name, repositorySetupContext(p.configuration)])))}.
 Run every approved scenario. Browser scenarios use native Playwright MCP against this guest's application. Start/restart the appropriate local test application from the candidate source using the repository's instructions so a previous process or build cannot stand in for current code; verify readiness. Command and API scenarios run the repository's own tests/tools with meaningful assertions; inspection scenarios read actual source/configuration and explain what that establishes. A browser navigation alone does not prove a behavior. Do not change tests or implementation to force a pass. Preserve legitimate test-generated local data outside tracked source.

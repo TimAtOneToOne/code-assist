@@ -8,6 +8,13 @@ import { createLogger } from "@code-assist/observability";
 import { checkCodingBranch, publishCoding } from "../src/coding-publish.ts";
 import { executeCoding, codingPrompt } from "../src/coding-runtime.ts";
 import { cleanupFixture } from "./fixtures/cleanup.ts";
+import {
+  publicationDescriptions,
+  descriptionHashes,
+  descriptionContext,
+} from "../src/coding-description.ts";
+import { assessAcceptance } from "../src/acceptance.ts";
+import type { CodingStep } from "../src/coding-types.ts";
 import { publicationReady } from "../src/coding-repositories.ts";
 
 test("new PR publication and lost-response recovery keep private tooling out of external content", async () => {
@@ -43,6 +50,8 @@ test("new PR publication and lost-response recovery keep private tooling out of 
       source,
       origin,
     ]);
+    const description =
+      "## Summary\n\nCapture GitHub deliveries.\n\nBefore merge: create staging and production webhook secrets. These have not been created; webhook registration and live delivery verification follow deployment.\n\n**Optional optimizations and controls:** none.\n";
     let body = "",
       title = "",
       creates = 0;
@@ -84,11 +93,27 @@ test("new PR publication and lost-response recovery keep private tooling out of 
       );
     };
     await assert.rejects(
-      publishCoding(directory, run, signal, log, async () => {}, execute),
+      publishCoding(
+        directory,
+        run,
+        signal,
+        log,
+        async () => {},
+        execute,
+        description,
+      ),
       /Lost PR response/,
     );
     assert.equal(
-      await publishCoding(directory, run, signal, log, async () => {}, execute),
+      await publishCoding(
+        directory,
+        run,
+        signal,
+        log,
+        async () => {},
+        execute,
+        description,
+      ),
       url,
     );
     assert.equal(creates, 1);
@@ -96,7 +121,13 @@ test("new PR publication and lost-response recovery keep private tooling out of 
       body + title,
       /Code Assist|code-assist|100\.91\.0\.83|Claude|Codex|approved plan/,
     );
-    assert(body.includes(run.identifier));
+    assert(body.startsWith(description.trim()));
+    assert(
+      body.includes(
+        "Before merge: create staging and production webhook secrets",
+      ),
+    );
+    assert(body.includes("These have not been created"));
     assert(body.includes(run.commit!));
     assert(body.includes("Optional optimizations and controls"));
   } finally {
@@ -395,6 +426,143 @@ test("code revisions fast-forward the owned PR, recover a lost push response, an
         ),
       );
     }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("PR text can pass acceptance before secrets or a GitHub PR exist and cannot change after review", async () => {
+  const { directory, run, steps } = await cleanupFixture();
+  try {
+    const description =
+      "## Summary\n\nCapture deliveries. Before merge: create both environment secrets; neither exists yet.\n\nOptional optimizations and controls: none.\n";
+    run.plan.acceptanceScenarios = [
+      {
+        id: "GH-05",
+        title: "Operator Prerequisites",
+        repositories: ["fixture"],
+        method: "inspection",
+        procedure: "Inspect the proposed PR description",
+        expectedOutcome:
+          "Both secrets must exist before merge; no live deployment claimed",
+      },
+    ];
+    const implementation = {
+      ...steps[0],
+      kind: "collect",
+      continuation: {
+        kind: "implement",
+        agentStepId: steps[0].id,
+        result: {},
+        browserCalls: [],
+      },
+      result: {
+        disposition: "implemented",
+        commit: run.commit,
+        pullRequestDescription: description,
+      },
+    } as CodingStep;
+    const history = [implementation, steps[1]];
+    assert.equal(run.pr_url, null);
+    const descriptions = publicationDescriptions(run, history);
+    assert.equal(descriptions.fixture, description);
+    assert.match(
+      descriptionContext(run, history),
+      /read-only.*publication-descriptions.json/,
+    );
+    const hashes = descriptionHashes(descriptions);
+    const result = {
+      summary: "Proposed description documents pending secrets",
+      scenarios: [
+        {
+          id: "GH-05",
+          status: "passed" as const,
+          observed:
+            "The proposed description requires both secrets before merge and says neither exists yet.",
+          toolCallIds: ["read-draft"],
+          artifacts: [],
+        },
+      ],
+    };
+    const tools = [
+      {
+        id: "read-draft",
+        name: "Read proposed PR description",
+        kind: "inspection" as const,
+        succeeded: true,
+      },
+    ];
+    const report = {
+      ...assessAcceptance(run, "acceptance", result, tools),
+      publicationDescriptionHashes: hashes,
+    };
+    assert(report.passed);
+    const attempt = {
+      ...steps[0],
+      id: "acceptance",
+      kind: "accept",
+    } as CodingStep;
+    const accepted = {
+      ...steps[0],
+      kind: "collect",
+      continuation: {
+        kind: "accept",
+        agentStepId: attempt.id,
+        result,
+        browserCalls: [],
+        tools,
+      },
+      result: report,
+    } as unknown as CodingStep;
+    const review = {
+      ...steps[2],
+      result: { ...steps[2].result, publicationDescriptionHashes: hashes },
+    };
+    const complete = [...history, attempt, accepted, review];
+    assert(publicationReady(run, complete));
+    assert.equal(
+      publicationReady(run, [...history, attempt, accepted, steps[2]]),
+      false,
+    );
+    implementation.result!.pullRequestDescription = description.replace(
+      "Before merge",
+      "After merge",
+    );
+    assert.equal(publicationReady(run, complete), false);
+    implementation.result!.pullRequestDescription = description;
+    assert(publicationReady(run, complete));
+    // A newer implementation with no draft must not reuse an older candidate's wording.
+    const newer = {
+      ...implementation,
+      result: { disposition: "implemented", commit: run.commit },
+    };
+    assert.deepEqual(publicationDescriptions(run, [...complete, newer]), {});
+    // Repositories retain their own description and candidate identity.
+    run.input.snapshots = [
+      run.input.snapshot,
+      { ...run.input.snapshot, name: "service" },
+    ];
+    run.repositories = [
+      { name: "fixture", commit: run.commit },
+      { name: "service", commit: "b".repeat(40) },
+    ] as typeof run.repositories;
+    const service = {
+      ...implementation,
+      repository_index: 1,
+      result: {
+        ...implementation.result,
+        commit: "b".repeat(40),
+        pullRequestDescription: "## Summary\n\nService only\n",
+      },
+    };
+    assert.deepEqual(publicationDescriptions(run, [...complete, service]), {
+      fixture: description,
+      service: "## Summary\n\nService only\n",
+    });
+    run.repositories![1].commit = "c".repeat(40);
+    assert.deepEqual(publicationDescriptions(run, [...complete, service]), {
+      fixture: description,
+    });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
