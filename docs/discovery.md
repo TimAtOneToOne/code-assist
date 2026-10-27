@@ -6,6 +6,12 @@ The UI provides discovery status, a scope-and-questions checkpoint, saved answer
 
 ## Explanation and Questions
 
+**Rerun Step** appears beside Refresh on the current Initial Discovery when it is
+awaiting answers or has failed. It starts a new attempt with the selected repositories
+without requiring answers to the old questions. The prior result remains in history.
+Running, queued, answered and historical discoveries cannot be restarted with this action;
+stale submissions are rejected. It does not approve scope or a plan.
+
 New discovery and setup scans start with **What I Understand**: a plain-language
 description and a short fenced pseudocode explanation using everyday WHEN / IF /
 THEN / OTHERWISE steps. It distinguishes current behavior from the requested

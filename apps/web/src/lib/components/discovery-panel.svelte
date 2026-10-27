@@ -35,6 +35,19 @@
 						? 'Working'
 						: 'Previous Discovery'}</Badge
 		>
+		{#if editable && ['questions', 'failed'].includes(run.status)}
+			<form method="POST" use:enhance>
+				<input type="hidden" name="intent" value="retry" />
+				<input type="hidden" name="runId" value={run.id} />
+				<Button
+					type="submit"
+					variant="outline"
+					size="sm"
+					title="Run discovery again with the selected repositories. This result stays in history."
+					>Rerun Step</Button
+				>
+			</form>
+		{/if}
 		<Button type="button" variant="outline" size="sm" onclick={() => invalidateAll()}
 			>Refresh</Button
 		>
@@ -46,14 +59,6 @@
 		</p>
 	{:else if run.status === 'failed'}
 		<p role="alert" class="text-destructive">{run.error}</p>
-		{#if editable}<form method="POST" use:enhance>
-				<input type="hidden" name="intent" value="retry" /><input
-					type="hidden"
-					name="runId"
-					value={run.id}
-				/>
-				<Button type="submit">Retry Discovery</Button>
-			</form>{/if}
 	{/if}
 	{#if run.result}
 		<section class="discovery-explanation space-y-3" aria-label="What I Understand">

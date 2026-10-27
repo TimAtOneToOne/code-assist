@@ -322,25 +322,60 @@ test("discovery snapshots, fenced results, answers, removal, retries and deploym
       current.current_discovery_id!,
     ))!;
     assert.equal(resumed.status, "queued");
+    await assert.rejects(
+      retryDiscovery(boss, ticket.id, resumed.id),
+      /awaiting answers/,
+    );
     assert.notEqual(resumed.id, retry.id);
     assert.deepEqual(resumed.snapshots, run.snapshots);
     assert.equal(await finishDiscovery(boss, retry, result), false);
     await boss.complete(discoveryQueue, retryJob.id);
     const [resumedJob] = await boss.fetch<{ runId: string }>(discoveryQueue);
     const resumedRun = (await startDiscovery(boss, resumed.id, resumedJob.id))!;
+    await assert.rejects(
+      retryDiscovery(boss, ticket.id, resumed.id),
+      /awaiting answers/,
+    );
     assert(
       await finishDiscovery(boss, resumedRun, { ...result, questions: [] }),
     );
+    const rerunId = (await retryDiscovery(boss, ticket.id, resumed.id))!;
+    assert.notEqual(rerunId, resumed.id);
+    const previous = (await readDiscovery(boss.getDb(), resumed.id))!;
+    assert.equal(previous.status, "superseded");
+    assert.deepEqual(previous.result, { ...result, questions: [] });
+    await assert.rejects(
+      retryDiscovery(boss, ticket.id, resumed.id),
+      /ticket changed/,
+    );
+    await assert.rejects(
+      answerDiscovery(boss, ticket.id, resumed.id, [], ""),
+      /scope changed/,
+    );
+    const [rerunJob] = await boss.fetch<{ runId: string }>(discoveryQueue);
+    assert.equal(rerunJob.data.runId, rerunId);
+    const rerun = (await startDiscovery(boss, rerunId, rerunJob.id))!;
+    assert.deepEqual(rerun.repositories, resumedRun.repositories);
+    assert.equal(rerun.answers, null);
+    rerun.snapshots = resumedRun.snapshots;
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.discovery_run SET snapshots=$2 WHERE id=$1",
+        [rerunId, JSON.stringify(rerun.snapshots)],
+      );
+    assert(await finishDiscovery(boss, rerun, { ...result, questions: [] }));
     await answerDiscovery(
       boss,
       ticket.id,
-      resumed.id,
+      rerunId,
       [],
       "Scope confirmed without extra questions.",
     );
-    assert.equal(
-      (await readDiscovery(boss.getDb(), resumed.id))!.status,
-      "ready",
+    assert.equal((await readDiscovery(boss.getDb(), rerunId))!.status, "ready");
+    await assert.rejects(
+      retryDiscovery(boss, ticket.id, rerunId),
+      /awaiting answers/,
     );
     const history = (await readWorkItem(boss.getDb(), ticket.id))!;
     assert.equal(

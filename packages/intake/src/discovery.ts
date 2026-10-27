@@ -320,9 +320,13 @@ export async function retryDiscovery(
         "This ticket changed. Refresh before restarting discovery.",
       );
     const run = await readDiscovery(tx.db, expectedRunId);
-    if (run?.status !== "failed")
-      throw new DiscoveryConflict("Only a failed discovery can be retried.");
+    if (!run || !["failed", "questions"].includes(run.status))
+      throw new DiscoveryConflict(
+        "Discovery can only be rerun while awaiting answers or after a failure.",
+      );
     const id = await syncDiscovery(boss, tx.db, issueId, true);
+    if (!id)
+      throw new DiscoveryConflict("This ticket can no longer rerun discovery.");
     await tx.commit();
     return id;
   } catch (error) {

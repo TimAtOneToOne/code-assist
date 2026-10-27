@@ -273,7 +273,7 @@ export const actions = {
 			try {
 				if (form.get('intent') === 'retry') {
 					await withController((boss) => retryDiscovery(boss, id, runId));
-					return { message: 'Codex discovery queued again.' };
+					return { message: 'Discovery queued again. The previous result is saved in history.' };
 				}
 				const answers = form.getAll('answer'),
 					notes = form.get('notes') ?? '';
