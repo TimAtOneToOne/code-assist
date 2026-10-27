@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import type { Ticket } from "../src/linear.ts";
 import {
   parseSetupScan,
   prepareRepositorySetups,
@@ -31,6 +32,16 @@ const snapshot = {
   source: "/repos/fixture",
   directory: "/snapshots/fixture",
   commit: "a".repeat(40),
+};
+const ticket: Ticket = {
+  id: "fixture-ticket",
+  identifier: "ONE-123",
+  title: "Remove document answers",
+  url: "https://linear.app/example/ONE-123",
+  description: "Remove document answers. Keep original uploaded documents.",
+  labels: ["Plan"],
+  comments: [],
+  updatedAt: "2026-10-26T00:00:00Z",
 };
 function fixture() {
   const root = join(
@@ -95,11 +106,11 @@ test("setup scans validate structured fields while allowing intentional optional
   assert(!JSON.stringify(context).includes("sensitive"));
   assert.equal(context.configuration.validationScript, config.validationScript);
   assert.match(
-    setupScanPrompt(snapshot, [], ["TOKEN"], ["fixture"]),
+    setupScanPrompt(snapshot, ticket, [], ["TOKEN"], ["fixture"]),
     /native Playwright MCP/,
   );
   assert.match(
-    setupScanPrompt(snapshot, [], [], [], {
+    setupScanPrompt(snapshot, ticket, [], [], [], {
       prompts: { global: "Saved global guidance" },
       repositories: {
         [snapshot.source]: { planning: "Repository-specific setup guidance" },
@@ -107,6 +118,27 @@ test("setup scans validate structured fields while allowing intentional optional
     }),
     /Repository-specific setup guidance/,
   );
+});
+
+test("setup receives the ticket and owner-facing guidance even with saved prompt overrides", () => {
+  const prompt = setupScanPrompt(
+    snapshot,
+    ticket,
+    [{ answers: ["Keep the original documents"] }],
+    ["EXISTING_ACCESS"],
+    ["company-library"],
+    { prompts: { planning: "Use detailed source evidence" }, repositories: {} },
+  );
+  assert(prompt.includes(JSON.stringify(ticket)));
+  assert.match(prompt, /Keep the original documents/);
+  assert.match(prompt, /EXISTING_ACCESS/);
+  assert.match(prompt, /company-library/);
+  assert.match(prompt, /Use detailed source evidence/);
+  assert.match(prompt, /WHEN \/ IF \/ THEN \/ OTHERWISE/);
+  assert.match(prompt, /preliminary understanding/);
+  assert.match(prompt, /feature questions come after setup/);
+  assert.match(prompt, /never request secret values in replies/);
+  assert.match(prompt, /Do not edit files/);
 });
 
 test("intake tests missing configurations before saving and reuses them for later tickets", async () => {

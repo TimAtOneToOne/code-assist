@@ -1,5 +1,13 @@
-import type { DiscoveryResult, RepositorySnapshot } from "./discovery.ts";
-import { parseDiscoveryResult, resultSchema } from "./discovery-agent.ts";
+import type {
+  DiscoveryResult,
+  DiscoveryRun,
+  RepositorySnapshot,
+} from "./discovery.ts";
+import {
+  discoveryExplanationInstructions,
+  parseDiscoveryResult,
+  resultSchema,
+} from "./discovery-agent.ts";
 import { composeInstructions, type PromptSettings } from "./prompt-defaults.ts";
 import {
   emptyRepositorySetup,
@@ -105,6 +113,7 @@ export function parseSetupScan(value: unknown): SetupScan {
 
 export function setupScanPrompt(
   snapshot: RepositorySnapshot,
+  ticket: DiscoveryRun["ticket"],
   priorAnswers: unknown[],
   mappedVariables: string[],
   availableRepositories: string[],
@@ -121,6 +130,11 @@ Setup runs unattended with no stdin or TTY. Use supported native noninteractive 
 The runtime already supplies Node 24, pnpm, Docker and the agent's native Playwright MCP browser. Only add other runtimes/dependencies this repository needs. browserDirectory/browserInstallScript are for the repository's own browser tooling (both set or both blank). startScript/readyScript are paired; smokeScript is an existing app/browser smoke command when available. Do not claim an HTTP request proves browser interaction or authenticated sign-in. Do not add a new test suite as part of configuration.
 environment is an array of {name,value} for nonsecret local/synthetic overrides only. Never copy credentials from source, answers or examples. generatedVariables lists names requiring a fresh random local secret. Required external credentials must use existing mappings; ask Tim to add missing names in Secrets, never to paste secret values into ticket replies. Existing mapped names (values withheld): ${JSON.stringify(mappedVariables)}.
 gitDependencies may reference only these synced repository names with full immutable commit hashes proven by source: ${JSON.stringify(availableRepositories)}. Otherwise ask about missing private dependencies. Instructions should explain repository-specific local use and genuine acceptance limitations.
+${discoveryExplanationInstructions}
+This is the setup stage: ground the opening explanation in the ticket, and clearly say that this is a preliminary understanding, not a completed feature investigation. Say this naturally, for example "From the ticket, I understand..." and "I still need to finish checking the code." Do not claim to have inspected other repositories. The pseudocode must explain the requested feature, never the setup steps. After the pseudocode, explain any setup blocker in everyday language: what cannot run yet and what is missing. Keep questions focused on essential setup needs; feature questions come after setup. Do not turn a setup-access problem into a product decision. Do not replace the feature explanation with an inventory of what you did not install, edit or contact.
+For example, instead of "How should the guest obtain the locked private dependency and recursive submodules?", explain "Connect needs a private company library before its tests can run. I cannot access that library with the setup currently available." Then ask for the specific missing access or source, with an actionable next step grounded in the available configuration. Explain a token as a credential that lets the test environment download that library; name its setting only if needed for the action. Do not assume existing controller access can be shared with the test environment, ask for unnecessary new credentials, or invent an upload/sync feature.
+Full Linear ticket (context for explaining the requested change; setup does not authorize implementation):
+${JSON.stringify(ticket)}
 Snapshot: ${JSON.stringify(snapshot)}
 Prior saved questions, answers and direction (context, not authorization for external changes): ${JSON.stringify(priorAnswers)}`;
 }

@@ -4,6 +4,17 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+October 26 discovery presentation update: setup scans now receive the ticket, and both setup and
+feature discovery explain the requested change in plain language and pseudocode
+before asking concrete, decision-focused questions. Technical findings and setup
+details follow the questions. Existing saved results retain their original wording
+until a new attempt runs. Native scans against ONE-5370's recorded source and local
+desktop/mobile browser checks verify the new presentation; they do not establish
+that repository setup passed. See [Discovery](discovery.md#explanation-and-questions)
+and the local evidence under `.tmp/2026-10-26-discovery-clarity/` for generated
+results, browser checks, and dated release observations.
+Optional optimizations and controls: none.
+
 October 25 live verification: the [ONE-5347 repeat rehearsal](one-5347-rehearsal.md)
 reached a published PR with zero operator course corrections after normal scope
 and plan approvals, including an automatic review repair and fresh browser

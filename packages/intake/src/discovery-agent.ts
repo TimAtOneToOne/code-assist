@@ -16,12 +16,26 @@ import type {
 
 const execute = promisify(execFile);
 export const agentPath = "/usr/bin:/bin:/usr/sbin:/sbin";
+export const discoveryExplanationInstructions = `Owner-Facing Explanation and Questions:
+The summary, question, context and options fields are for Tim to read, not an implementation agent. These presentation requirements also apply when saved task instructions ask for technical detail; put that detail in findings.
+summary: Start with a brief plain-language explanation of what you understand the requested change to be. Then include a short fenced text block of readable pseudocode using everyday WHEN / IF / THEN / OTHERWISE steps where they fit naturally. The pseudocode explains the REQUESTED FEATURE'S behavior, not your investigation, environment setup, or agent workflow. Describe the relevant current behavior, intended change, and what must keep working. Label current and intended behavior clearly; do not imply proposed work has happened. Explain meaningful permissions, data retention and failure behavior without inventing decisions. If a fact is unknown, say so. This is an understanding check before planning, not an implementation plan. Do not add a heading; the UI supplies "What I Understand".
+Use ordinary words. No unexplained acronyms, commit hashes, internal field names, file paths, command syntax or infrastructure vocabulary in the explanation or questions. Use a technical name only when Tim needs it to identify something or take the requested action, and explain what it is. Keep exact versions, commands, paths and source references in findings.
+For example, say "the test environment", "the copy of the code I can inspect", "other libraries it needs", or "connecting this credential to Connect" instead of "guest", "immutable snapshot", "recursive submodules", or "secret mapping". Avoid generic process labels such as "onboarding", "pinned", and "acceptance" in owner-facing text. Plain language must still describe the actual behavior and tradeoffs precisely.
+questions: Ask only unresolved decisions or missing facts that materially affect scope, behavior, acceptance, or the ability to proceed. First answer technical questions yourself using the supplied source, saved answers and available configuration. Do not ask Tim to repeat a decision already made in the ticket, choose an implementation detail you can establish, or translate your internal machinery. Return no questions when nothing needs his decision; there is no question quota.
+Do not turn routine investigation or verification work into a request for Tim to assign an owner when the ticket already assigns the work. Ask for the unavailable fact that would change the plan; otherwise record the required verification in findings for planning.
+Each question asks one concrete thing in a short everyday sentence. context briefly explains what you found, why his answer matters, and what the answer changes. Options are short, distinct answers in words a person would say; explain any meaningful consequence. Recommend an option only when the evidence supports it. Free-text answers are supported. Do not present an unavailable capability as an option or imply that selecting an answer performs setup or grants access. If Tim must take an action, say exactly where and what to do; never request secret values in replies.
+Write the question like a colleague asking it aloud: "Who can check whether anyone is still using this?", not "Who can provide current usage and unfinished-work evidence?"; "Can you give the test environment access to Causeway?", not a sentence containing the credential setting and every dependency detail. Put names/settings needed for the action and the specific checks in context. Do not compress technical jargon into a shorter sentence and call it simple.
+Before returning, read the explanation and questions as someone who has not seen your investigation: can they understand the change and answer without decoding a term or reading the supporting findings? Rewrite anything that fails that check.`;
 export const resultSchema = {
   type: "object",
   additionalProperties: false,
   required: ["summary", "findings", "questions"],
   properties: {
-    summary: { type: "string" },
+    summary: {
+      type: "string",
+      description:
+        "Plain-language understanding of the requested change with a fenced text pseudocode explanation; technical evidence belongs in findings.",
+    },
     findings: {
       type: "array",
       items: {
@@ -151,6 +165,8 @@ The supplied folders are immutable Git archives of the recorded commits, not the
 Previous answers are context, not permission to reuse stale scope without review.
 
 ${composeInstructions(prompts, "planning", "discovery", snapshots)}
+
+${discoveryExplanationInstructions}
 
 Selected repositories and commits:
 ${JSON.stringify(snapshots)}

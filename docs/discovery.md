@@ -1,10 +1,36 @@
-# Initial Codex discovery
+# Initial Codex Discovery
 
 This step reads a Plan ticket and its user-confirmed repositories, records initial findings and open questions, and saves Tim's answers as the planning baseline. Confirming the answers queues the [adversarial planning cycle](planning.md): Codex drafts and revises, Claude reviews, and Tim approves the exact plan.
 
 The UI provides discovery status, a scope-and-questions checkpoint, saved answers, and earlier activity; `docs/initial/index.html` preserves the original visual reference. Home uses compact ticket cards. Repository selection is collapsed after confirmation; it remains editable. A changed scope creates a new discovery, preserving earlier findings and answers.
 
-## Trigger and state
+## Explanation and Questions
+
+New discovery and setup scans start with **What I Understand**: a plain-language
+description and a short fenced pseudocode explanation using everyday WHEN / IF /
+THEN / OTHERWISE steps. It distinguishes current behavior from the requested
+outcome, preserves important permissions and data-handling requirements, and
+identifies unknowns without inventing decisions. Setup scans receive the ticket
+and label their understanding as preliminary; they do not claim a completed
+feature investigation.
+
+Questions ask only for unresolved decisions or facts that change the work. Each
+asks one concrete thing, explains why the answer matters, and offers understandable
+choices where useful. The agent must use source evidence and prior answers before
+asking, avoid repeating decisions already in the ticket, and explain any technical
+name needed for an action. Missing access must have a specific, actionable next
+step; selecting an answer does not itself supply credentials or perform setup.
+
+These presentation requirements are included in both runtime prompts, including
+when saved prompt overrides exist. The existing result format and saved answers
+are unchanged. Technical evidence remains available under **Supporting Findings**
+after the questions; setup status and logs are under **Repository Setup Details**.
+Existing saved results retain their original wording until a new attempt runs.
+This changes presentation, not the setup/approval sequence or agent permissions.
+
+Optional optimizations and controls: none.
+
+## Trigger and State
 
 Confirming repository selection atomically queues `initial-discovery`. Worker startup also picks up previously selected, eligible tickets. Subsequent Linear checks reconcile changed inputs. `Plan` without `Code` is required. Removed tickets stay hidden and cannot accept answers or publish a current discovery result.
 
@@ -40,6 +66,17 @@ A real crash test on Mia showed SDK 0.163.0 terminates the Codex CLI on AbortSig
 Worker IPC disconnect, explicit cancellation and runner SIGTERM invoke this cleanup. Interrupted discovery can restart from its recorded repository snapshots. Cleanup applies to the shared discovery/planning runner; a direct SIGKILL of the runner itself cannot execute a cleanup handler. The runner must stay alive long enough to handle its worker's disconnect or cancellation.
 
 ## Validation
+
+October 26 presentation verification used native setup and feature-discovery
+scans on ONE-5370's recorded Connect source with Mia's saved model and prompts.
+Setup received the ticket and separated its preliminary feature explanation from
+the missing library access. Feature discovery described the requested removal
+and retained documents. These were read-only probes, not passing setup tests or
+implementation approval. The local browser preview checked explanation ordering,
+pseudocode rendering and wrapping at desktop/phone widths, expandable evidence,
+free-text submission, and the existing zero-question scope confirmation. Evidence
+is under `.tmp/2026-10-26-discovery-clarity/`. Existing saved discovery content is
+not silently rewritten by a deployment.
 
 `make verify` covers lint, formatting, types, unit tests and the production web build. `TEST_DATABASE_URL=... make test-intake` uses disposable databases and synthetic Git repositories to verify:
 

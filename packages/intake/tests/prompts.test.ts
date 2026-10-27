@@ -126,6 +126,9 @@ test("discovery, Codex drafts and Claude reviews receive configured prompts whil
   assert.match(initial, /API_PLANNING/);
   assert.match(initial, /Saved answer/);
   assert.match(initial, /Do not write a plan, change code/);
+  assert.match(initial, /WHEN \/ IF \/ THEN \/ OTHERWISE/);
+  assert.match(initial, /Do not ask Tim to repeat a decision already made/);
+  assert.match(initial, /put that detail in findings/);
   const draft = planningPrompt(step, undefined, settings);
   assert.match(draft, /DRAFT_TASK/);
   assert.doesNotMatch(draft, /REVIEW_TASK/);

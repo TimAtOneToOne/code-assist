@@ -134,6 +134,7 @@ export async function registerDiscoveryWorker(
               .map((mapping) => mapping.variable);
             const setupPrompt = setupScanPrompt(
               snapshot,
+              run.ticket,
               priorAnswers,
               mapped,
               available.map((repo) => repo.name),

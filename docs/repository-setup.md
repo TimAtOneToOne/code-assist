@@ -10,6 +10,13 @@ The controller tests the proposed configuration against the same pinned commit i
 
 Missing essential information appears as setup questions on the ticket. **Save Answers and Continue Setup** starts another discovery attempt with those answers; it does not start planning or approve implementation. Add external credentials through Secrets and repository mappings, never in ticket answers. The scanning agent receives mapped variable names, not values. After setup succeeds, normal ticket discovery and explicit scope confirmation continue.
 
+Setup scans also receive the full ticket so **What I Understand** can explain the
+requested change in plain language and pseudocode before asking for help. This is
+explicitly a preliminary understanding. A blocker explains what cannot run, what
+is missing, and the concrete action needed. Questions avoid internal setup jargon;
+exact dependency versions, commands and source references remain in **Supporting
+Findings**. See [Explanation and Questions](discovery.md#explanation-and-questions).
+
 Discovery records the effective configuration and its hash, withholding local environment values. Planning receives that recorded context and must reconcile the commands with the source, GitHub workflows, and proposed tests. Coding receives its workspace's actual pinned setup and validation commands. Later settings edits affect new workspaces, not existing ones; recorded planning context remains historical evidence, not a claim that a later configuration or candidate passed.
 
 Automatic candidate tests run within the existing durable discovery job, with `discovery_id` on their test records; manual **Save and Test Setup** keeps its separate job. Worker restart marks interrupted candidate tests failed and cleans up their guests. Current-attempt checks prevent superseded discovery from accepting a proposal. There is no additional approval page, automatic workflow creation, or automatic retry loop for failed setup tests.

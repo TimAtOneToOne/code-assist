@@ -52,49 +52,19 @@
 					name="runId"
 					value={run.id}
 				/>
-				<Button type="submit">Retry discovery</Button>
+				<Button type="submit">Retry Discovery</Button>
 			</form>{/if}
 	{/if}
-	{#if run.setup_progress?.length}
-		<div class="space-y-2">
-			<h3 class="font-medium">Repository Setup</h3>
-			{#each run.setup_progress as setup (setup.repository)}
-				<div class="text-sm">
-					<a
-						class="underline"
-						href={resolve(
-							`/configuration/repositories?repository=${encodeURIComponent(setup.repository)}`
-						)}>{setup.name}</a
-					>
-					· {{
-						scanning: 'Scanning Repository',
-						testing: 'Testing Setup',
-						questions: 'Needs Your Input',
-						failed: 'Setup Test Failed',
-						saved: 'Tested and Saved',
-						reused: 'Using Existing Setup'
-					}[setup.status]}
-					{#if setup.summary}<p>{setup.summary}</p>{/if}
-					{#if setup.testId}<p class="text-muted-foreground">
-							Setup test results and logs are available from the repository link above.
-						</p>{/if}
-				</div>
-			{/each}
-		</div>
-	{/if}
 	{#if run.result}
-		<Markdown html={summaryHtml} />
-		{#if run.result.findings.length}<details>
-				<summary class="cursor-pointer text-sm font-medium"
-					>Supporting Findings · {run.result.findings.length}</summary
-				>
-				<ul class="mt-3 space-y-3">
-					{#each run.result.findings as finding, index (index)}<li class="text-sm">
-							<div class="font-medium break-words">{finding.repository} · {finding.file}</div>
-							<p>{finding.detail}</p>
-						</li>{/each}
-				</ul>
-			</details>{/if}
+		<section class="discovery-explanation space-y-3" aria-label="What I Understand">
+			<h3 class="font-medium">What I Understand</h3>
+			<Markdown html={summaryHtml} />
+		</section>
+		{#if run.setup_pending}
+			<p class="text-sm text-muted-foreground">
+				A setup issue needs your input before we can finish investigating this change.
+			</p>
+		{/if}
 		{#if run.answers}
 			{#each run.result.questions as question, index (index)}<div>
 					<h3 class="font-medium">{question.question}</h3>
@@ -111,6 +81,11 @@
 			</p>
 		{:else if run.status === 'questions' && editable}
 			<form method="POST" use:enhance class="space-y-6">
+				{#if run.result.questions.length}
+					<h3 class="font-medium">
+						{run.setup_pending ? 'Needed to Continue Setup' : 'Questions Before Planning'}
+					</h3>
+				{/if}
 				<input type="hidden" name="intent" value="answers" /><input
 					type="hidden"
 					name="runId"
@@ -138,10 +113,12 @@
 							name="answer"
 							required
 							bind:value={answers[index]}
-							placeholder="Your answer — choose an option above or write your own."
+							placeholder={question.options.length
+								? 'Choose an option above or write your own answer.'
+								: 'Your answer'}
 						/>
 					</div>{:else}<p>
-						Codex found no open questions. Review the findings and confirm the scope before
+						There are no open questions. Review the explanation and confirm the scope before
 						planning.
 					</p>{/each}
 				<div class="space-y-2">
@@ -156,8 +133,9 @@
 				{#if run.setup_pending}
 					<input type="hidden" name="scope" value="confirmed" />
 					<p class="text-sm text-muted-foreground">
-						Add credentials in Secrets and map them to the repository. Do not paste secret values
-						here.
+						If access credentials are needed, add them in
+						<a class="underline" href={resolve('/configuration/secrets')}>Secrets</a>
+						and connect them to this repository. Do not paste passwords or tokens here.
 					</p>
 				{:else}<label class="flex items-start gap-2 text-sm"
 						><input class="mt-1" type="checkbox" name="scope" value="confirmed" required /><span
@@ -170,7 +148,7 @@
 					<Button type="submit"
 						>{run.setup_pending
 							? 'Save Answers and Continue Setup'
-							: 'Confirm scope & save answers'}</Button
+							: 'Confirm Scope and Save Answers'}</Button
 					><span class="text-sm text-muted-foreground"
 						>{run.setup_pending
 							? 'Setup must finish before ticket discovery and planning.'
@@ -184,9 +162,53 @@
 					<p>{question.context}</p>
 				</div>{/each}
 		{/if}
+		{#if run.result.findings.length}<details>
+				<summary class="cursor-pointer text-sm font-medium"
+					>Supporting Findings · {run.result.findings.length}</summary
+				>
+				<ul class="mt-3 space-y-3">
+					{#each run.result.findings as finding, index (index)}<li class="text-sm">
+							<div class="font-medium break-words">{finding.repository} · {finding.file}</div>
+							<p>{finding.detail}</p>
+						</li>{/each}
+				</ul>
+			</details>{/if}
+	{/if}
+	{#if run.setup_progress?.length}
+		<details open={!run.result || run.status === 'failed'}>
+			<summary class="cursor-pointer text-sm font-medium">Repository Setup Details</summary>
+			<div class="mt-3 space-y-2">
+				{#each run.setup_progress as setup (setup.repository)}
+					<div class="text-sm">
+						<a
+							class="underline"
+							href={resolve(
+								`/configuration/repositories?repository=${encodeURIComponent(setup.repository)}`
+							)}>{setup.name}</a
+						>
+						· {{
+							scanning: 'Scanning Repository',
+							testing: 'Testing Setup',
+							questions: 'Needs Your Input',
+							failed: 'Setup Test Failed',
+							saved: 'Tested and Saved',
+							reused: 'Using Existing Setup'
+						}[setup.status]}
+						{#if setup.summary && setup.summary !== run.result?.summary}<p
+								class="whitespace-pre-wrap"
+							>
+								{setup.summary}
+							</p>{/if}
+						{#if setup.testId}<p class="text-muted-foreground">
+								Setup test results and logs are available from the repository link above.
+							</p>{/if}
+					</div>
+				{/each}
+			</div>
+		</details>
 	{/if}
 	<details>
-		<summary class="cursor-pointer text-sm text-muted-foreground">Run details</summary>
+		<summary class="cursor-pointer text-sm text-muted-foreground">Run Details</summary>
 		<div class="mt-3 space-y-2 text-sm text-muted-foreground">
 			<p>Started {new Date(run.created_at).toLocaleString()} · {run.status}</p>
 			{#each run.snapshots ?? [] as snapshot (snapshot.source)}<p class="break-all">
@@ -197,3 +219,9 @@
 		</div>
 	</details>
 </TicketSection>
+
+<style>
+	.discovery-explanation :global(pre) {
+		white-space: pre-wrap;
+	}
+</style>
