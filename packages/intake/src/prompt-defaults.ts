@@ -6,6 +6,9 @@ export const privateWorkflowInstructions =
 export const publicationSequencingInstructions =
   "Prefer opening the PR before operator-managed secrets are created or populated. Document remaining operator actions in the PR, stating whether each is required before merge, deployment, or live use. Do not make deployment prerequisites into PR-opening prerequisites. Plan pre-publication acceptance around code and authorized local tests; keep deployment and live verification separate. Report what remains unverified without claiming it passed. Preserve required lint, formatting, tests, authorization, and review. If a required pre-publication command genuinely needs an unavailable prerequisite, explain that concrete dependency rather than inventing a pass.\n\nPR-description requirements must be checked against the proposed publication text before opening the PR, not against a GitHub PR that does not exist yet. Reviewers must reject circular acceptance requirements. Do not ask Tim to supply artifacts the workflow itself should prepare. Ask for human input only with a clear, specific question and explain the decision needed.";
 
+export const singlePullRequestInstructions =
+  "Plan one implementation PR per selected repository per ticket. A ticket spanning multiple selected repositories may have one PR in each; do not plan two ordered PRs, stacked PRs, or separate retirement/cleanup releases in the same repository under one ticket. Prefer the simplest complete change that can be delivered in one PR. If source evidence shows the work truly requires separate releases, identify that during discovery or planning, before approval: explain why one PR cannot safely deliver it, recommend the exact scope of this ticket, and describe the remaining work for a separate ticket. Ask Tim a concrete scope question with a recommendation; do not create or modify Linear tickets without authorization. Reviewers must reject plans that require multiple planned PRs in the same repository or acceptance checks that depend on a later PR. Keep every acceptance check executable against this ticket's candidate before publication. For an existing approved plan that violates this boundary, request a revised plan and approval rather than silently dropping work or skipping checks. This rule does not prohibit revisions to the same open PR or the existing corrective-PR workflow after a failed deployment.";
+
 export const promptDefinitions = {
   global: {
     title: "Global",
@@ -14,7 +17,9 @@ export const promptDefinitions = {
       'Use Title Case for document titles, section headings, and UI titles you propose or implement. Capitalize major words; keep short conjunctions and prepositions lowercase unless first or last. For example: "Adversarial Planning" and "Status and Evidence". Preserve code identifiers, filenames, commands, quotations, and existing external ticket titles. Use sentence case for ordinary prose.\n\n' +
       privateWorkflowInstructions +
       "\n\n" +
-      publicationSequencingInstructions,
+      publicationSequencingInstructions +
+      "\n\n" +
+      singlePullRequestInstructions,
   },
   planning: {
     title: "Planning",

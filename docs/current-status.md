@@ -4,6 +4,15 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+October 27 planning scope rule: one planned implementation PR per selected repository
+per ticket. The live Global prompt has been updated while preserving other settings;
+defaults and controller drafting/review instructions carry the same workflow boundary.
+Discovery and planning must resolve any necessary split into separate tickets before
+approval. Existing approved plans and checks remain unchanged; this is prompt guidance,
+not a structural plan validator. See [One Planned PR Per Repository](prompts.md#one-planned-pr-per-repository).
+**Optional optimizations and controls:** Tim requested this restriction; separate
+releases in one repository require separate ticket scopes before approval.
+
 October 27 configurable coding parallelism: **Configuration → Agent Execution** now
 has an independent **Maximum Parallel Coding Sessions**, default **3**, using native
 pg-boss workers across ticket runs. Each ticket retains sequential steps and its own

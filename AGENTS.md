@@ -6,6 +6,18 @@ Code Assist is a standalone application deployed to a Mac mini. Run the UI, cont
 
 Start with `docs/current-status.md`, then `docs/initial/README.md` and `docs/initial/standalone-brief.md`. Current Status maps implemented features, source files, and remaining verification gaps; use the relevant workflow guide for details. Update it and affected guides when behavior or verified delivery status changes, distinguishing source implementation from observed deployment and live acceptance. Preserve historical plans and dated run evidence. The interactive prototype in `docs/initial/index.html` is a visual reference with simulated data, not a backend implementation. Tim expanded intake on October 20, 2026 to multiple user-confirmed repositories per ticket. Prefill the searchable multi-select with suggestions; preserve saved choices. Tim approves plans and merges PRs. Done follows each repository’s completion rule recorded during discovery and pinned in the approved run: observed merge into `main`, or additionally successful GitHub Actions push-to-main workflows for that exact merge commit. Existing configurations and runs without an explicit rule retain the workflow requirement. Configure this in Repository Setup before new discovery; never silently change an approved run’s rule. Separate production promotions are not part of this completion rule.
 
+## One Planned PR Per Repository
+
+Plan one implementation PR per selected repository per ticket. Multiple selected
+repositories may each have a PR; two ordered PRs or releases in the same repository
+require separate tickets. Prefer the simplest complete single-PR change. If code or
+deployment evidence requires a split, explain the reason, recommend the exact scope
+of this ticket and the follow-up, and resolve that scope with Tim before approval.
+Do not create Linear tickets without authorization. Reviewers must reject plans that
+require a later PR to satisfy this ticket's acceptance checks. Existing approved
+plans need revision and approval; do not silently drop work or waive checks. Revisions
+to an open PR and existing corrective-PR recovery remain supported.
+
 ## Initial development and deployment
 
 Tim authorized direct commits and pushes to `main` in this repository on October 19, 2026, until the initial application is working. This exception is specific to Code Assist; it does not authorize direct pushes in managed repositories or PR merges.

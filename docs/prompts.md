@@ -34,6 +34,28 @@ correctness, authorization, security, and data-integrity requirements still appl
 
 On October 27, Tim requested PR opening before operator-managed secret creation. The default Global prompt and Mia's saved Global override now distinguish PR-opening checks from prerequisites for merge, deployment, and live use. Required validation and honest evidence remain mandatory. PR-description checks inspect proposed publication text; agents must not require an already-open PR or ask Tim for artifacts the workflow should prepare. New planning prompts enforce the same phase distinction. Existing approved plans remain unchanged.
 
+## One Planned PR Per Repository
+
+On October 27, Tim requested one planned implementation PR per selected repository
+per ticket after a plan proposed retirement and cleanup PRs in the same repository
+and blocked the first candidate on the second candidate's acceptance checks. The
+default Global prompt and Mia's saved Global override now carry this rule, preserving
+existing prompt text and all other scopes. Discovery and planning must recommend a
+complete single-PR scope; if separate releases are demonstrably necessary, they must
+explain the exact ticket split and resolve scope with Tim before approval. They cannot
+create Linear tickets without authorization. Reviewers must reject plans that require
+multiple planned PRs in one repository or acceptance evidence from a later PR.
+
+The controller's drafting/review instructions also state the workflow boundary so
+custom task prompts retain it. Multi-repository tickets can still have one PR per
+repository. Open-PR revisions and corrective recovery remain supported. Existing
+approved plans are not rewritten or exempted from checks; they need a revised plan
+and approval. This is prompt guidance, not a structural multi-PR plan validator.
+
+**Optional optimizations and controls:** Tim requested this planning restriction to
+match the supported workflow. It applies to new discovery, planning and review steps;
+work requiring separate releases must be scoped into separate tickets before approval.
+
 ## Scopes
 
 | Scope | Applies To |
