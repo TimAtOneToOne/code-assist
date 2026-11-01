@@ -11,6 +11,7 @@ import { resolveRepositoryEnvironment } from "@code-assist/secrets";
 import type { RepositorySnapshot } from "./discovery.ts";
 import { workspaceLogEnvironment } from "./workspace-environment.ts";
 import { bootstrap, environmentLauncher } from "./workspace-bootstrap.ts";
+import { ensureGuestTerraform } from "./workspace-terraform.ts";
 import {
   ensureGuestRuntime,
   verifyGuestBrowser,
@@ -344,6 +345,10 @@ export async function provisionWorkspace<T extends WorkspaceSources>(
     ]);
     await stage("installing toolchain and private container engine");
     await guest(["bash", "-c", bootstrap]);
+    await stage("installing shared Terraform runtime");
+    await ensureGuestTerraform(guest, (args) =>
+      orb(["-m", workspace.machine, "-u", "workspace", ...args]),
+    );
     await stage("copying repository source");
     for (const source of sources) {
       await workspaceCommand(

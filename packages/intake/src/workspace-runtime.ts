@@ -5,6 +5,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Readable } from "node:stream";
+import { ensureGuestTerraform } from "./workspace-terraform.ts";
 
 export const guestImage = "ubuntu:24.04";
 
@@ -27,6 +28,7 @@ export async function ensureGuestRuntime(
   guest: GuestCommand,
   signal: AbortSignal,
 ) {
+  await ensureGuestTerraform(root, guest);
   const release = process.env.CODE_ASSIST_COMMIT ?? "development";
   const installed = await root([
     "bash",

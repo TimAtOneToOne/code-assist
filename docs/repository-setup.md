@@ -121,3 +121,20 @@ TEST_ORBSTACK=1 TEST_DATABASE_URL=<disposable-database-admin-url> \
 The integration test creates and drops its own database and uses synthetic fixtures under `.tmp/`. Existing single- and multi-repository coding integration suites cover approval/checkpoint behavior alongside the new profile integration.
 
 Optional optimizations and controls: none beyond the requested setup configuration/test lifecycle and existing job expiration and explicit retry behavior.
+
+## Shared Terraform Runtime
+
+Shared provisioning installs tfenv 3.2.2 and exposes `terraform` and `tfenv` on
+`/usr/local/bin` before repository setup commands run. Terraform 1.14.8 is the
+initial default. Native `.terraform-version` files and `TFENV_TERRAFORM_VERSION`
+select other versions; tfenv can install them as the workspace user without sudo.
+A repository that pins its version only in CI must still select that version in
+its recorded setup (for example, `tfenv install <version>; tfenv use <version>`).
+Terraform's `required_version` remains a compatibility check, not an exact pin.
+
+Resumed coding guests receive the same toolchain through the shared runtime
+upgrade path, including guests whose browser runtime is already current. Existing
+repository-installed Terraform binaries and selected tfenv defaults are preserved.
+This provisions local tooling only; it does not initialize a backend or apply
+infrastructure. Existing paused runs still need an explicit continuation after
+repair. Optional optimizations and controls: none.

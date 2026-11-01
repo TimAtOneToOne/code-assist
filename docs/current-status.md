@@ -4,6 +4,18 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+November 1 shared Terraform runtime: new guests and resumed coding runtime checks
+install tfenv 3.2.2 on the default PATH, with Terraform 1.14.8 initially selected.
+Repository version files and explicit tfenv selections support other versions
+without sudo. Repository-installed binaries and existing selections are preserved.
+A fresh Ubuntu ARM guest passed default-version execution, automatic installation
+from a repository version pin, environment override, and repeat provisioning.
+ONE-5373's existing guest now reports 1.14.8 through its normal command launcher.
+Local `make verify` passed; deployment and resumed acceptance are not yet verified.
+Evidence is under `.tmp/2026-11-01-terraform-runtime/`. See
+[Shared Terraform Runtime](repository-setup.md#shared-terraform-runtime).
+Optional optimizations and controls: none.
+
 November 1 planning presentation: removed text, Codex reasoning/responses, and
 the selected version's Claude review now use consistent collapsed accordions in
 that order. Labels identify the preceding review and selected plan version;
