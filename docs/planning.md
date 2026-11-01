@@ -6,6 +6,13 @@ New discovery baselines also include each repository's saved setup commands and 
 
 The ticket page shows the current plan, findings, agent activity, previous versions, feedback and approval history. Plans download as `plan_vN.md`; saved versions and reviews are never overwritten. Completed discovery is collapsed while planning is active. The original interactive reference is `docs/initial/index.html`.
 
+Below the plan, matching collapsed accordions show Removed Text, Codex Reasoning /
+Response to the preceding Claude review, then Claude Review for the selected
+version. Codex's change summary and individual responses stay together. The first
+version uses the label Codex Reasoning, and removed text appears only when the
+comparison has removals. Claude's summary, findings and direction question expand
+together; approval and change-request controls remain outside the accordions.
+
 ## Versioned Agent Handoffs
 
 Each round has separate named artifacts, rendered from the existing immutable

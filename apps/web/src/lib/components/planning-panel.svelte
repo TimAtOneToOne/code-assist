@@ -115,7 +115,6 @@
 		</div>{/if}
 	{#if version}
 		{#key `${run.id}:${version.number}`}
-			<p class="text-sm text-muted-foreground">{version.document.changeSummary}</p>
 			{#if showChanges && comparison}<p class="text-sm text-muted-foreground" role="status">
 					{#if comparison.addedCount || comparison.removedCount}Yellow marks added or changed words
 						since v{comparison.previousVersion}. Previous wording is available below.{:else}No
@@ -128,7 +127,8 @@
 			/>
 			{#if showChanges && comparison?.removedHtml.length}<details class="rounded-lg border p-3">
 					<summary class="cursor-pointer text-sm font-medium"
-						>Removed Text from v{comparison.previousVersion} · {comparison.removedCount} sections</summary
+						>Removed Text from v{comparison.previousVersion} - {comparison.removedCount}
+						{comparison.removedCount === 1 ? 'Section' : 'Sections'}</summary
 					>
 					<p class="mt-3 text-sm text-muted-foreground">
 						Previous wording that was removed or replaced in this version.
@@ -139,49 +139,59 @@
 							</div>{/each}
 					</div>
 				</details>{/if}
-			{#if version.document.responses.length}<details>
-					<summary class="cursor-pointer text-sm font-medium">Codex Reasoning and Responses</summary
+			<details class="rounded-lg border p-3">
+				<summary class="cursor-pointer text-sm font-medium">
+					{version.number > 1
+						? `Codex Reasoning / Response to Claude v${version.number - 1} Feedback`
+						: 'Codex Reasoning'}
+				</summary>
+				<div class="mt-3 space-y-3">
+					<p class="text-sm text-muted-foreground">{version.document.changeSummary}</p>
+					{#each version.document.responses as response, index (index)}<div class="text-sm">
+							<strong>{response.findingId}</strong>
+							{#if response.action}<Badge variant="outline"
+									>{findingActionLabels[response.action]}</Badge
+								>{/if}
+							<Markdown html={html[`${run.id}:${version.number}:response:${index}`] ?? ''} />
+						</div>{/each}
+				</div>
+			</details>
+			{#if review}
+				<details class="rounded-lg border p-3">
+					<summary class="cursor-pointer text-sm font-medium"
+						>Claude Review - v{version.number}</summary
 					>
 					<div class="mt-3 space-y-3">
-						{#each version.document.responses as response, index (index)}<div class="text-sm">
-								<strong>{response.findingId}</strong>
-								{#if response.action}<Badge variant="outline"
-										>{findingActionLabels[response.action]}</Badge
-									>{/if}
-								<Markdown html={html[`${run.id}:${version.number}:response:${index}`] ?? ''} />
-							</div>{/each}
-					</div>
-				</details>{/if}
-			{#if review}
-				<div class="border-t pt-4">
-					<h3 class="font-semibold">Claude’s Review · v{version.number}</h3>
-					<Markdown html={html[`${run.id}:${version.number}:summary`] ?? ''} />
-				</div>
-				{#each review.findings as finding, index (finding.id)}<div
-						class="space-y-2 rounded-lg border p-3"
-					>
-						<div class="flex flex-wrap items-center gap-2">
-							<Badge
-								variant={['critical', 'high'].includes(finding.severity)
-									? 'destructive'
-									: 'secondary'}>{finding.severity}</Badge
-							><strong class="text-sm">{finding.title}</strong><span
-								class="text-xs text-muted-foreground">{finding.id}</span
+						<Markdown html={html[`${run.id}:${version.number}:summary`] ?? ''} />
+						{#each review.findings as finding, index (finding.id)}<div
+								class="space-y-2 rounded-lg border p-3"
 							>
-						</div>
-						<Markdown html={html[`${run.id}:${version.number}:finding:${index}:detail`] ?? ''} />
-						<div>
-							<strong class="text-sm">Recommendation:</strong><Markdown
-								html={html[`${run.id}:${version.number}:finding:${index}:recommendation`] ?? ''}
-							/>
-						</div>
-					</div>{/each}
-				{#if !review.findings.length}<p class="text-sm">No unresolved findings.</p>{/if}
-				{#if review.directionQuestion}<div class="rounded-lg border p-3">
-						<strong>Decision needed:</strong><Markdown
-							html={html[`${run.id}:${version.number}:direction`] ?? ''}
-						/>
-					</div>{/if}
+								<div class="flex flex-wrap items-center gap-2">
+									<Badge
+										variant={['critical', 'high'].includes(finding.severity)
+											? 'destructive'
+											: 'secondary'}>{finding.severity}</Badge
+									><strong class="text-sm">{finding.title}</strong><span
+										class="text-xs text-muted-foreground">{finding.id}</span
+									>
+								</div>
+								<Markdown
+									html={html[`${run.id}:${version.number}:finding:${index}:detail`] ?? ''}
+								/>
+								<div>
+									<strong class="text-sm">Recommendation:</strong><Markdown
+										html={html[`${run.id}:${version.number}:finding:${index}:recommendation`] ?? ''}
+									/>
+								</div>
+							</div>{/each}
+						{#if !review.findings.length}<p class="text-sm">No unresolved findings.</p>{/if}
+						{#if review.directionQuestion}<div class="rounded-lg border p-3">
+								<strong>Decision needed:</strong><Markdown
+									html={html[`${run.id}:${version.number}:direction`] ?? ''}
+								/>
+							</div>{/if}
+					</div>
+				</details>
 				{#if current && editable && run.status === 'awaiting_approval'}
 					<form method="POST" use:enhance class="space-y-4 border-t pt-4">
 						<input type="hidden" name="intent" value="plan-approve" /><input

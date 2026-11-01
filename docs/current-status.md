@@ -4,6 +4,23 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+November 1 planning presentation: removed text, Codex reasoning/responses, and
+the selected version's Claude review now use consistent collapsed accordions in
+that order. Labels identify the preceding review and selected plan version;
+Codex's change summary is grouped with its responses. Approval and feedback forms
+remain outside. This is presentation only; saved artifacts and approval semantics
+are unchanged. Local verification and release observations are recorded under
+`.tmp/2026-11-01-planning-accordions/`. Optional optimizations and controls: none.
+
+November 1 acceptance-prompt correction: the default Global instructions now
+require checking acceptance invocations against the supplied runtime and testing
+the actual trigger, including automatic timer completion independently of submit
+or visibility handlers. This follows independent review of AGENTS-4 plan v2;
+the saved plan is not changed by a prompt edit. Live prompt verification is recorded
+under `.tmp/2026-11-01-validation-prompt/`. See [Prompt Management](prompts.md).
+**Optional optimizations and controls:** Tim requested this cross-phase validation
+guidance; it adds no runtime restriction or automated gate.
+
 November 1 planning handoff implementation: Codex plans, Claude feedback and Codex
 reasoning have separate versioned Markdown downloads. Each prompt receives the
 current handoff documents, full discovery and owner direction; older documents

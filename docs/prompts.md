@@ -56,6 +56,34 @@ and approval. This is prompt guidance, not a structural multi-PR plan validator.
 match the supported workflow. It applies to new discovery, planning and review steps;
 work requiring separate releases must be scoped into separate tickets before approval.
 
+## Runtime and Behavioral Validation
+
+On November 1, Tim requested stronger system guidance after AGENTS-4's plan repeated
+a browser-helper invocation incompatible with the supplied runtime and replaced a
+real-time expiry check with only submission/visibility-driven completion checks.
+The default Global prompt now requires runtime-supported acceptance procedures,
+honest reporting of invocation changes, and coverage of the actual trigger and
+execution path. Timer tests must cover scheduled updates and automatic completion
+as well as suspension/boundary cases. Planning remains read-only; execution claims
+require observed results. Mia's saved Global override receives the same guidance
+without changing other scopes. Existing plans require an explicit revision; saving
+the prompt does not rewrite them or restart running steps.
+
+**Optional optimizations and controls:** Tim requested this validation guidance.
+It applies across planning, implementation, acceptance and review; it may require
+correcting unsupported test procedures before readiness can be claimed. It adds
+no runtime restriction or automated gate.
+
+AGENTS-4's first owner-requested v3 draft addressed the corrections but failed
+checkpoint validation because it emitted owner-feedback labels as Claude finding
+IDs, although the preceding review had no findings. The Plan Drafting prompt now
+explicitly reserves `responses` for the preceding review's findings and places
+owner-feedback explanations in `changeSummary`; an empty prior review requires
+`responses: []`. The live custom drafting prompt was preserved and appended with
+this clarification before retrying through the normal UI. This clarifies the
+existing output contract without changing validation. Execution evidence is in
+`.tmp/2026-11-01-agents-4-revision/`.
+
 ## Scopes
 
 | Scope | Applies To |
