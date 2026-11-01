@@ -6,6 +6,56 @@ New discovery baselines also include each repository's saved setup commands and 
 
 The ticket page shows the current plan, findings, agent activity, previous versions, feedback and approval history. Plans download as `plan_vN.md`; saved versions and reviews are never overwritten. Completed discovery is collapsed while planning is active. The original interactive reference is `docs/initial/index.html`.
 
+## Versioned Agent Handoffs
+
+Each round has separate named artifacts, rendered from the existing immutable
+database records:
+
+- Codex: `plan_v1.md`.
+- Claude: `plan_v1_claude_feedback.md`, containing its disposition, summary,
+  unresolved findings with stable IDs, and any question for Tim.
+- Codex: `plan_v2.md` and `plan_v2_reasoning.md`, containing the change summary
+  and a response to every finding in the preceding feedback.
+- Claude: `plan_v2_claude_feedback.md`, after reviewing v2, its reasoning, and
+  the v1 feedback.
+
+The cycle repeats without loading all older plan bodies into every prompt.
+Codex receives the preceding plan, its reasoning (from v2 onward), and its Claude
+feedback. Claude receives the current plan, its reasoning (from v2 onward), and
+the preceding Claude feedback. Both still receive the full discovery baseline
+and all of Tim's chronological feedback and direction.
+
+Each new response identifies the finding as **Accepted**, **Partly Accepted**,
+**Not Accepted**, or **Needs Direction**, with a concise evidence-based rationale
+explaining what changed, what did not, and why. Newly queued steps require exactly
+one response per preceding finding; missing, duplicate or unknown finding IDs
+cannot save a new plan. This verifies coverage, not whether the rationale is
+correct. Claude independently evaluates the response and carries every unresolved
+concern into its next feedback. Unsettled decisions use the existing direction
+workflow; rejected recommendations are not automatically considered resolved.
+
+The controller places all earlier artifacts and a `README.md` index under
+`.planning/<run>/<step>/` in the read-only snapshot workspace before each agent
+starts. Older artifacts remain available through the existing native read tools
+for targeted historical inspection. The current handoff includes complete current
+documents inline and the archive path. Files are derived views of saved records,
+not a second editable source of truth. Retries never overwrite different content.
+The ticket's version selector provides plan, Codex reasoning and completed Claude
+feedback downloads using the same renderer.
+
+Existing saved plans, reviews, hashes and approvals remain unchanged. Legacy
+responses without an action still display and download; no rationale is invented
+for a missing historical response. Steps queued before this change retain their
+original response-validation contract; subsequent steps use the new one. Coding
+handoffs are unchanged.
+
+**Optional optimizations and controls:** Tim requested the focused planning
+handoff to reduce competing versions in context. It applies to planning prompts;
+older rounds require an explicit read, while discovery and owner direction remain
+inline. The per-finding response requirement implements his requested accounting
+of acted-on and rejected feedback; incomplete new responses fail the step and
+remain retryable. No history is deleted or summarized by another model.
+
 ## Acceptance Scenarios
 
 New model outputs require a nonempty `acceptanceScenarios` array. Each scenario defines a unique stable ID, title, confirmed repository names, procedure, expected outcome and method (`browser`, `command` or `inspection`). Derive these from the actual work: do not assume a game, frontend, JavaScript toolchain or shared CI convention. Review prerequisites and authorization during planning; missing services or credentials must not become an invented pass.

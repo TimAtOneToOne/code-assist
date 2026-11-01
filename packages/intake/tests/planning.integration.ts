@@ -63,7 +63,17 @@ test("adversarial planning preserves versions, checkpoints, exact approvals and 
   const plan = (number: number) => ({
     markdown: `# Plan v${number}\n\nCheck ownership and soft delete.`,
     changeSummary: `Version ${number}`,
-    responses: [],
+    responses:
+      number === 1
+        ? []
+        : [
+            {
+              findingId: "ownership",
+              action: "accepted",
+              response:
+                "Added ownership checks and foreign-thread validation to the plan.",
+            },
+          ],
     additionalValidation: [
       { repository: "web", script: `npm run test:v${number}` },
     ],
@@ -217,8 +227,17 @@ test("adversarial planning preserves versions, checkpoints, exact approvals and 
     step = await next();
     assert.equal(step.version, 2);
     assert.equal(step.input.versions[0].review!.findings[0].severity, "high");
+    await assert.rejects(
+      finishPlanningStep(boss, step, { ...plan(2), responses: [] }),
+      /respond exactly once/,
+    );
+    assert.equal((await current()).versions.length, 1);
     await complete(step, plan(2));
     step = await next();
+    assert.equal(
+      step.input.versions[1].document.responses[0].action,
+      "accepted",
+    );
     await restartPlanningStep(boss, step);
     assert.equal(await finishPlanningStep(boss, step, review(null)), false);
     await boss.complete(planningQueue, step.job_id);

@@ -1,4 +1,5 @@
 import { syncCoding } from "./coding.ts";
+import { validateFindingResponses } from "./planning-artifacts.ts";
 import { createHash, randomUUID } from "node:crypto";
 import type { Db, PgBoss } from "pg-boss";
 import type { DiscoveryRun } from "./discovery.ts";
@@ -14,8 +15,10 @@ import {
   type PlanVersion,
   type PlanFeedback,
   type PlanApproval,
+  type PlanDocument,
 } from "./planning-types.ts";
 export * from "./planning-types.ts";
+export { planningArtifact } from "./planning-artifacts.ts";
 export const planningQueue = "adversarial-planning";
 export class PlanningConflict extends Error {}
 const digest = (value: unknown) =>
@@ -115,6 +118,7 @@ async function inputFor(db: Db, run: PlanningRun): Promise<PlanningInput> {
     ])
   ).rows[0] as DiscoveryRun;
   return {
+    handoffVersion: 1,
     discovery,
     versions: await versions(db, run.id),
     feedback: await feedback(db, run.id),
@@ -298,6 +302,8 @@ export async function finishPlanningStep(
           step.input.discovery.snapshots?.map((s) => s.name) ?? [],
         )
       : parseReview(value);
+  if (step.kind === "draft")
+    validateFindingResponses(step, result as PlanDocument);
   return transaction(boss, async (db) => {
     let run: PlanningRun;
     try {

@@ -29,6 +29,12 @@
 	let current = $derived(version?.number === run.current_version);
 	let review = $derived(version?.review);
 	let approval = $derived(run.approvals.find((a) => a.version === version?.number));
+	const findingActionLabels = {
+		accepted: 'Accepted',
+		partially_accepted: 'Partly Accepted',
+		not_accepted: 'Not Accepted',
+		needs_direction: 'Needs Direction'
+	};
 	const label = {
 		drafting: 'Codex Drafting',
 		reviewing: 'Claude Reviewing',
@@ -88,7 +94,21 @@
 						run: run.id,
 						version: String(version.number)
 					})}>Download plan_v{version.number}.md</Button
-				>{/if}
+				>
+				{#each ['reasoning', ...(review ? ['claude_feedback'] : [])] as artifact (artifact)}
+					<Button
+						size="sm"
+						variant="outline"
+						download={`plan_v${version.number}_${artifact}.md`}
+						href={`${resolve('/tickets/[id]/plans/[run]/[version]', {
+							id: run.issue_id,
+							run: run.id,
+							version: String(version.number)
+						})}?artifact=${artifact}`}
+						>Download {artifact === 'reasoning' ? 'Codex Reasoning' : 'Claude Feedback'}</Button
+					>
+				{/each}
+			{/if}
 			{#if comparison}<label class="flex items-center gap-2 text-sm"
 					><input type="checkbox" bind:checked={showChanges} />Show changes since v{comparison.previousVersion}</label
 				>{/if}
@@ -120,14 +140,15 @@
 					</div>
 				</details>{/if}
 			{#if version.document.responses.length}<details>
-					<summary class="cursor-pointer text-sm font-medium"
-						>Codex Responses to Review Findings</summary
+					<summary class="cursor-pointer text-sm font-medium">Codex Reasoning and Responses</summary
 					>
 					<div class="mt-3 space-y-3">
 						{#each version.document.responses as response, index (index)}<div class="text-sm">
-								<strong>{response.findingId}</strong><Markdown
-									html={html[`${run.id}:${version.number}:response:${index}`] ?? ''}
-								/>
+								<strong>{response.findingId}</strong>
+								{#if response.action}<Badge variant="outline"
+										>{findingActionLabels[response.action]}</Badge
+									>{/if}
+								<Markdown html={html[`${run.id}:${version.number}:response:${index}`] ?? ''} />
 							</div>{/each}
 					</div>
 				</details>{/if}

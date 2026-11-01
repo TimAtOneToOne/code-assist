@@ -13,6 +13,7 @@ import {
 } from "./planning-aws.ts";
 import { readAwsSettings } from "./aws-settings.ts";
 import { planningPrompt } from "./planning-agent.ts";
+import { writePlanningArtifacts } from "./planning-artifacts.ts";
 import {
   planningQueue,
   planSchema,
@@ -112,7 +113,15 @@ export async function registerPlanningWorker(
           { ...awsEvidenceContext(aws), identity },
         );
       }
-      const prompt = planningPrompt(step, aws, readPromptSettings(directory));
+      stage = "preparing the planning handoff";
+      const workspace = dirname(snapshots[0].directory);
+      const historyDirectory = await writePlanningArtifacts(workspace, step);
+      const prompt = planningPrompt(
+        step,
+        aws,
+        readPromptSettings(directory),
+        historyDirectory,
+      );
       log.payload(
         "planning.input",
         `${provider} ${step.kind} for plan v${step.version}`,
@@ -129,7 +138,7 @@ export async function registerPlanningWorker(
           model,
           provider,
           anthropicWorkspaceId,
-          workspace: dirname(snapshots[0].directory),
+          workspace,
           home,
           aws,
           prompt,

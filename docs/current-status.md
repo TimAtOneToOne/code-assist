@@ -4,6 +4,25 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+November 1 planning handoff implementation: Codex plans, Claude feedback and Codex
+reasoning have separate versioned Markdown downloads. Each prompt receives the
+current handoff documents, full discovery and owner direction; older documents
+are available through native read tools in an indexed archive. New revisions
+account for each preceding finding with an action and rationale. Existing saved
+plans and approvals are preserved, and coding handoffs are unchanged. `make verify`
+passed lint, formatting, types, 106 unit tests and build; the PostgreSQL integration
+suite passed 13 tests with two opt-in guest tests skipped. Local browser checks
+verified the displayed rebuttal, all three named downloads, older-version feedback
+and desktop/mobile layout. Evidence is in `.tmp/2026-11-01-planning-handoff/`.
+Not deployed: local `main` also contains three earlier unpublished commits, so
+publication requires confirming that combined release. Mia was observed idle;
+the required check must be repeated immediately before any push. Native model
+behavior with this handoff remains unverified. See [Versioned Agent Handoffs](planning.md#versioned-agent-handoffs).
+**Optional optimizations and controls:** Tim requested the focused planning
+context and explicit accounting of feedback. Older rounds require a targeted
+read; incomplete new finding responses fail the step for retry. No other optional
+controls were added.
+
 October 27 planning scope rule: one planned implementation PR per selected repository
 per ticket. The live Global prompt has been updated while preserving other settings;
 defaults and controller drafting/review instructions carry the same workflow boundary.

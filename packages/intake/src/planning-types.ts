@@ -5,11 +5,21 @@ import {
 } from "./acceptance-types.ts";
 import type { DiscoveryRun } from "./discovery.ts";
 
+export const findingActions = {
+  accepted: "Accepted",
+  partially_accepted: "Partly Accepted",
+  not_accepted: "Not Accepted",
+  needs_direction: "Needs Direction",
+} as const;
 export type PlanDocument = {
   acceptanceScenarios?: AcceptanceScenario[];
   markdown: string;
   changeSummary: string;
-  responses: { findingId: string; response: string }[];
+  responses: {
+    findingId: string;
+    action?: keyof typeof findingActions;
+    response: string;
+  }[];
   additionalValidation?: { repository: string; script: string }[];
 };
 export type PlanReview = {
@@ -34,6 +44,7 @@ export type PlanVersion = {
 };
 export type PlanFeedback = { version: number; note: string; created_at: Date };
 export type PlanningInput = {
+  handoffVersion?: 1;
   discovery: DiscoveryRun;
   versions: PlanVersion[];
   feedback: PlanFeedback[];
@@ -116,9 +127,10 @@ export const planSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["findingId", "response"],
+        required: ["findingId", "action", "response"],
         properties: {
           findingId: { type: "string" },
+          action: { type: "string", enum: Object.keys(findingActions) },
           response: { type: "string" },
         },
       },
@@ -171,7 +183,12 @@ export function parsePlan(
     !text(p.markdown) ||
     !text(p.changeSummary) ||
     !Array.isArray(p.responses) ||
-    p.responses.some((r) => !text(r?.findingId) || !text(r?.response)) ||
+    p.responses.some(
+      (r) =>
+        !text(r?.findingId) ||
+        !text(r?.response) ||
+        (r.action !== undefined && !Object.hasOwn(findingActions, r.action)),
+    ) ||
     (p.additionalValidation !== undefined &&
       (!Array.isArray(p.additionalValidation) ||
         p.additionalValidation.some(
