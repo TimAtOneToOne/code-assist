@@ -14,10 +14,13 @@ passed lint, formatting, types, 106 unit tests and build; the PostgreSQL integra
 suite passed 13 tests with two opt-in guest tests skipped. Local browser checks
 verified the displayed rebuttal, all three named downloads, older-version feedback
 and desktop/mobile layout. Evidence is in `.tmp/2026-11-01-planning-handoff/`.
-Not deployed: local `main` also contains three earlier unpublished commits, so
-publication requires confirming that combined release. Mia was observed idle;
-the required check must be repeated immediately before any push. Native model
-behavior with this handoff remains unverified. See [Versioned Agent Handoffs](planning.md#versioned-agent-handoffs).
+On November 1, Tim approved publishing the combined release after review of all
+four unpublished commits and the remaining status note. No actionable bugs were
+found; an additional PostgreSQL probe passed simultaneous queues, rapid settings
+changes and shutdown during draining. Release observations are retained under
+`.tmp/2026-11-01-mia-release/`; check those receipts for the actual selected, web,
+worker and HTTP commits. Native model behavior with this handoff remains
+unverified. See [Versioned Agent Handoffs](planning.md#versioned-agent-handoffs).
 **Optional optimizations and controls:** Tim requested the focused planning
 context and explicit accounting of feedback. Older rounds require a targeted
 read; incomplete new finding responses fail the step for retry. No other optional
@@ -278,3 +281,21 @@ coverage remains in the other integration suites. Deployment and live continuati
 are recorded under `.tmp/2026-10-26-connect-four/`. The exercise must count this
 operator product fix separately from normal scope/plan approval. No game code or
 agent direction was changed to resolve it. Optional optimizations and controls: none.
+
+Release `c421950` was verified selected and running in web, worker, and health at
+10:10:59 EDT on October 26, under Tim's explicit one-time deployment exception
+for a separate desktop Playwright MCP process; workflow work was idle. The unchanged
+plan v1 then approved successfully. The workflow published test-repo PR #5 in
+7 minutes 34 seconds, passing 162 tests, all six acceptance scenarios, and independent
+browser review. Tim explicitly delegated the disposable-repo merge. Both PR CI and
+exact-merge main CI passed, and the normal scheduled monitor recorded Done at
+10:25:14 EDT for merge `e83cee2b382e441ef5eb9282259e31efc2e12aed`, without an
+operator GitHub refresh or owner override. This proves the configured main-workflow
+completion path live; fresh no-CI onboarding remains a separate unverified path.
+
+The exercise required the team-ID product repair before successful approval, then
+no operator coding corrections. The existing browser helper's documented dynamic
+import failed in the agent tool; agents adapted its export wrapper and independently
+ran the unchanged checks. That runner/documentation issue and the generic generated
+PR summary remain open. See the dated local run receipt and intervention inventory
+under `.tmp/` for exact identities and evidence.
