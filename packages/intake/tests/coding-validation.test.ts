@@ -116,3 +116,31 @@ test("legacy single-repository steps without commit sets still pause", () => {
     previous.id,
   );
 });
+
+test("file mutations remain repairable even when every command passed", () => {
+  const mutation = {
+    commit,
+    commands: { test: 0 },
+    passed: false,
+    sourceChanges: { status: " M lockfile", diff: "+linux-checksum" },
+  };
+  const prior = step({ id: "mutation", status: "completed", result: mutation });
+  assert.equal(
+    repeatedValidationFailure(step(), mutation, [prior, implementation]),
+    "mutation",
+  );
+  assert.equal(
+    repeatedValidationFailure(
+      step(),
+      {
+        ...mutation,
+        sourceChanges: {
+          ...mutation.sourceChanges,
+          diff: "+different-checksum",
+        },
+      },
+      [prior, implementation],
+    ),
+    undefined,
+  );
+});

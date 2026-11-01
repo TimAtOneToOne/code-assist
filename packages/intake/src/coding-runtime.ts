@@ -1,3 +1,4 @@
+import { validationSourceChanges } from "./coding-validation-outcome.ts";
 import { descriptionContext } from "./coding-description.ts";
 import { toolEvidenceCollector } from "./tool-evidence.ts";
 import { planMarkdown } from "./planning-types.ts";
@@ -691,19 +692,17 @@ export async function validation(
   ) as Record<string, number>;
   assertPlanValidationResults(additional, results);
   const commit = await command.git("rev-parse", "HEAD");
-  const dirty = await command.git("status", "--porcelain");
-  if (commit !== run.commit || dirty)
-    throw new Error(
-      "Validation changed the reviewed source; inspect the workspace.",
-    );
+  const sourceChanges = await validationSourceChanges(command.git, run.commit!);
   await writeFile(
     join(codingDirectory(directory, run.id), `${step.id}-validation.json`),
-    JSON.stringify({ commit, commands: results }),
+    JSON.stringify({ commit, commands: results, sourceChanges }),
     { mode: 0o600 },
   );
   return {
     commit,
     commands: results,
-    passed: Object.values(results).every((code) => code === 0),
+    passed:
+      !sourceChanges && Object.values(results).every((code) => code === 0),
+    ...(sourceChanges ? { sourceChanges } : {}),
   };
 }

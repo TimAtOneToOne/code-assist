@@ -339,6 +339,7 @@ export async function finishCoding(
     index: number;
   },
   continuation?: CodingContinuation,
+  recoveryStepId?: string,
 ) {
   return codingTransaction(boss, async (db) => {
     if (!(await currentCoding(db, run, step, true))) return false;
@@ -394,7 +395,14 @@ export async function finishCoding(
         true,
       );
     else
-      await enqueue(boss, db, await codingRun(db, run.id), next, continuation);
+      await enqueue(
+        boss,
+        db,
+        await codingRun(db, run.id),
+        next,
+        continuation,
+        recoveryStepId,
+      );
     return true;
   });
 }
@@ -653,20 +661,30 @@ export async function answerCodingDirection(
       requestedBy,
       createdAt: new Date().toISOString(),
     };
+    const resumeIndex = rows[0].result?.sourceChanges
+      ? repositoryIndex(run)
+      : indexes[0];
     await db.executeSql(
       "UPDATE code_assist.coding_run SET direction_responses=direction_responses || $2::jsonb,repository_index=$3,commit=$4 WHERE id=$1",
       [
         runId,
         JSON.stringify([response]),
-        indexes[0],
-        states[indexes[0]].commit,
+        resumeIndex,
+        states[resumeIndex].commit,
       ],
     );
     await recordIntakeEvent(boss, db, issueId, "coding_direction_answered", {
       codingId: runId,
       response,
     });
-    return enqueue(boss, db, await codingRun(db, runId), "implement");
+    return enqueue(
+      boss,
+      db,
+      await codingRun(db, runId),
+      "implement",
+      undefined,
+      rows[0].result?.sourceChanges ? stepId : undefined,
+    );
   });
 }
 

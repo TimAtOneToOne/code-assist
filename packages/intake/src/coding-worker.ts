@@ -805,7 +805,9 @@ export async function registerCodingWorker(
             log,
           );
           await assertCurrent();
-          await unchanged();
+          await unchanged(
+            result.sourceChanges ? repositoryIndex(run) : undefined,
+          );
           await finishValidation(boss, run, step, result);
         } else {
           const history = (await readCoding(boss.getDb(), run.issue_id)).find(

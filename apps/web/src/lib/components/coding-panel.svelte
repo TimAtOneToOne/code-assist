@@ -51,6 +51,13 @@
 			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(' ');
 	const latest = $derived(run.steps.find((s) => s.id === run.current_step_id));
+	const lastValidation = $derived(run.steps.findLast((s) => s.kind === 'validate'));
+	const validationRepair = $derived(
+		lastValidation?.result?.sourceChanges &&
+			['implement', 'checkpoint', 'collect', 'validate'].includes(run.status)
+			? lastValidation
+			: undefined
+	);
 	const deployments = $derived(
 		run.steps.filter(
 			(step) => step.kind === 'publish' && step.status === 'completed' && step.result?.deployment
@@ -109,6 +116,19 @@
 			onreveal={(target) => reveal(target, expand)}
 		/>
 	{/snippet}
+	{#if validationRepair}
+		<section aria-label="Validation Changes" class="space-y-2 rounded-lg border p-4">
+			<h3 class="font-semibold">Reviewing Changes From Validation</h3>
+			<p class="text-sm">{String(validationRepair.result?.summary)}</p>
+			<pre class="overflow-x-auto text-xs">{String(
+					(validationRepair.result?.sourceChanges as { status: string }).status
+				)}</pre>
+			<p class="text-sm text-muted-foreground">
+				Acceptance and independent review will use the new checkpoint after validation leaves the
+				files unchanged.
+			</p>
+		</section>
+	{/if}
 	<AcceptanceResults {run} />
 	{#if run.status === 'needs_direction'}
 		<section
@@ -373,7 +393,9 @@
 						<summary class="cursor-pointer text-sm font-medium"
 							>{titles[step.kind]}{run.repositories
 								? ` · ${run.repositories[step.repository_index ?? 0].name}`
-								: ''} · {workflowLabel(step.status)} · {new Date(
+								: ''} · {step.result?.sourceChanges
+								? 'Changes Need Review'
+								: workflowLabel(step.status)} · {new Date(
 								step.created_at
 							).toLocaleString()}</summary
 						>
@@ -397,6 +419,15 @@
 												{command}: {code === 0 ? 'Passed' : 'Failed'}
 											</li>{/each}
 									</ul>{/if}
+								{#if step.result.sourceChanges}
+									<details>
+										<summary>Changed Files and Diff</summary>
+										<pre class="overflow-x-auto text-xs whitespace-pre-wrap">{String(
+												(step.result.sourceChanges as { status: string }).status
+											)}
+{String((step.result.sourceChanges as { diff: string }).diff)}</pre>
+									</details>
+								{/if}
 								{#if Array.isArray(step.result.findings)}{#each step.result.findings as finding, index (finding.id)}<div
 											class="rounded-md border p-3"
 										>

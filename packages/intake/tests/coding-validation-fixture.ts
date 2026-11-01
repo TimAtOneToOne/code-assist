@@ -15,7 +15,7 @@ export async function exerciseValidationLoop(
   work: NonNullable<Awaited<ReturnType<typeof startCoding>>>,
   next: () => ReturnType<typeof startCoding>,
 ) {
-  async function validate(implementation: typeof work) {
+  async function validate(implementation: typeof work, mutation = false) {
     assert.equal(implementation.step.kind, "implement");
     for (const kind of ["checkpoint", "collect", "validate"] as const) {
       assert(
@@ -32,8 +32,11 @@ export async function exerciseValidationLoop(
     assert.equal(implementation.step.kind, "validate");
     const result = {
       commit: implementation.run.commit!,
-      commands: { lint: 0, test: 2 },
-      passed: false,
+      commands: { lint: 0, test: mutation ? 0 : 2 },
+      passed: mutation,
+      ...(mutation
+        ? { sourceChanges: { status: " M lockfile", diff: "+linux-checksum" } }
+        : {}),
     };
     assert(
       await finishValidation(
@@ -45,8 +48,24 @@ export async function exerciseValidationLoop(
     );
     return implementation;
   }
-  const first = await validate(work);
-  const second = await validate((await next())!);
+  const changed = await validate(work, true);
+  const repair = (await next())!;
+  assert.equal(repair.step.kind, "implement");
+  assert.equal(repair.step.recovery_step_id, changed.step.id);
+  assert.equal(repair.run.commit, changed.run.commit);
+  const savedChange = (await readCoding(boss.getDb(), work.run.issue_id))[0];
+  assert.equal(publicationReady(savedChange, savedChange.steps), false);
+  assert.equal(
+    savedChange.steps.find((s) => s.id === changed.step.id)!.result?.passed,
+    false,
+  );
+  assert.match(
+    savedChange.steps.find((s) => s.id === changed.step.id)!.result
+      ?.summary as string,
+    /Checks passed, but validation changed files/,
+  );
+  const first = changed;
+  const second = await validate(repair, true);
   const paused = (await readCoding(boss.getDb(), work.run.issue_id))[0];
   assert.equal(paused.status, "needs_direction");
   assert.equal(paused.current_step_id, second.step.id);
@@ -91,6 +110,7 @@ export async function exerciseValidationLoop(
   );
   await validate(resumed);
   const fresh = (await next())!;
+  assert.equal(resumed.step.recovery_step_id, second.step.id);
   assert.equal(fresh.step.kind, "implement");
   assert.equal(fresh.run.workspace_id, work.run.workspace_id);
   return fresh;

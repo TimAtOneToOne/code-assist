@@ -9,11 +9,26 @@ import {
   repositoryIndex,
 } from "./coding-repositories.ts";
 
-type ValidationResult = {
+export type ValidationResult = {
   commit: string;
   commands: Record<string, number>;
   passed: boolean;
+  sourceChanges?: { status: string; diff: string };
 };
+
+export async function validationSourceChanges(
+  git: (...args: string[]) => Promise<string>,
+  expectedCommit: string,
+) {
+  if ((await git("rev-parse", "HEAD")) !== expectedCommit)
+    throw new Error(
+      "Validation moved the saved commit; inspect the workspace before continuing.",
+    );
+  const status = await git("status", "--porcelain");
+  return status
+    ? { status, diff: await git("diff", "HEAD", "--binary") }
+    : undefined;
+}
 
 export function repeatedValidationFailure(
   step: CodingStep,
@@ -40,6 +55,7 @@ export function repeatedValidationFailure(
     previous.result.commit !== result.commit ||
     !isDeepStrictEqual(previous.input_commits, step.input_commits) ||
     !isDeepStrictEqual(previous.result.commands, result.commands) ||
+    !isDeepStrictEqual(previous.result.sourceChanges, result.sourceChanges) ||
     !relevant.slice(index + 1).some((s) => s.kind === "implement")
   )
     return undefined;
@@ -52,6 +68,7 @@ export async function finishValidation(
   step: CodingStep,
   result: ValidationResult,
 ) {
+  if (result.sourceChanges) result = { ...result, passed: false };
   const history = result.passed
     ? []
     : (await readCoding(boss.getDb(), run.issue_id)).find(
@@ -72,16 +89,24 @@ export async function finishValidation(
         ? "review"
         : "accept"
       : "implement";
-  const outcome = previousValidationStepId
+  const repair = result.sourceChanges
     ? {
         ...result,
+        summary: `${Object.values(result.commands).every((code) => code === 0) ? "Checks passed" : "Some checks failed"}, but validation changed files. Returning to implementation to review those changes, save a new checkpoint, and rerun validation.`,
+        repairInstructions:
+          "Inspect the saved sourceChanges status and diff and the preserved working tree. Incorporate required generated changes within approved scope, or fix the command's unintended mutation using established repository patterns. Do not blindly discard the diff, create commits, change the approved commands, or claim the previous checks validate a new candidate. The controller will checkpoint your result and rerun validation, acceptance and independent review.",
+      }
+    : result;
+  const outcome = previousValidationStepId
+    ? {
+        ...repair,
         previousValidationStepId,
         disposition: "needs_direction",
         summary:
-          "Validation is still failing after an implementation attempt left the candidate commits unchanged. Automatic implementation and validation have paused.",
-        directionQuestion: `Validation for ${activeSnapshot(run).name} failed again at commit ${result.commit}. The validation commands and exit codes match step ${previousValidationStepId}, and no candidate commits changed. Inspect the saved validation logs and implementation findings, then provide direction to resolve the blocker. Reply and Continue resumes from the saved workspace; passing validation and independent review are still required before publication.`,
+          "Validation reached the same unresolved outcome after another implementation attempt without a new candidate. Automatic repair has paused for direction.",
+        directionQuestion: `Validation for ${activeSnapshot(run).name} ${result.sourceChanges ? "changed the same files again" : "failed again"} at commit ${result.commit}. The command results${result.sourceChanges ? " and file changes" : ""} match step ${previousValidationStepId}, and no candidate commits changed. Inspect the saved validation logs and implementation findings, then provide direction to resolve the blocker. Reply and Continue resumes from the saved workspace; passing validation and independent review are still required before publication.`,
       }
-    : result;
+    : repair;
   return finishCoding(
     boss,
     run,
@@ -108,5 +133,7 @@ export async function finishValidation(
           index: result.passed ? (following ?? index) : index,
         }
       : undefined,
+    undefined,
+    result.sourceChanges && next === "implement" ? step.id : undefined,
   );
 }

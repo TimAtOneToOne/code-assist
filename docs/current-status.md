@@ -4,6 +4,18 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+November 1 validation repair: file changes produced by checks now return to
+implementation with command results, Git status, tracked diff and working tree
+preserved. A new candidate must pass unchanged validation, acceptance and review.
+The UI explains the repair and labels its validation activity Changes Need Review.
+The existing no-progress check also compares file changes; owner replies preserve
+the affected repository. Unexpected HEAD movement remains an inspection failure.
+Local Git regression and PostgreSQL single/multi-repository transition tests cover
+repair, blocked publication, repeated outcomes, replies and restart recovery.
+Delivery observations are in `.tmp/2026-11-01-validation-repair/`; consult them for
+live deployment and ONE-5373 status. See [Coding](coding.md#changes-produced-by-validation).
+Optional optimizations and controls: none.
+
 November 1 shared Terraform runtime: new guests and resumed coding runtime checks
 install tfenv 3.2.2 on the default PATH, with Terraform 1.14.8 initially selected.
 Repository version files and explicit tfenv selections support other versions

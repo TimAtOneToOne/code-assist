@@ -292,3 +292,22 @@ This proves eligible source content reached the fork. It does not prove live bus
 Validation uses real local Git repositories with synthetic Windmill/GitHub responses, including exact-commit publication, native PR adoption, restart recovery, ownership collisions, failed sync and cancellation. Live read-only inspection confirmed the configured account, production connection, automatic fork sync and existing fork deployment metadata on Windmill EE v1.845.0. A new real fork publication remains to be exercised by the first approved, reviewed Windmill coding run.
 
 Optional optimizations and controls: none. Fork ownership, exact-commit evidence and expected-head checks preserve the requested publication workflow.
+
+## Changes Produced by Validation
+
+Validation records command exit codes separately from whether the saved candidate
+remained unchanged. If checks modify files without moving HEAD, the controller
+saves Git status and the tracked diff in the validation result and returns to
+implementation with the working tree preserved. The agent reviews the changes
+within approved scope; normal checkpointing, validation, acceptance and independent
+review must then establish the new candidate. No generated change is automatically
+accepted or published.
+
+The ticket shows **Reviewing Changes From Validation**, the affected paths, and
+whether the commands passed. The validation activity reads **Changes Need Review**;
+its details retain command results and the diff. If another implementation attempt
+leaves the candidate unchanged and produces the same command results and diff,
+the existing no-progress check pauses for direction. A reply preserves the affected
+repository and working tree. Unexpected HEAD movement remains a failure requiring
+inspection. Older generic validation failures can be retried to enter this repair
+path. Optional optimizations and controls: none.
