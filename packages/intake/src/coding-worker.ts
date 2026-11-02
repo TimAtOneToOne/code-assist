@@ -1,3 +1,4 @@
+import { writeCodingHistory } from "./coding-history.ts";
 import {
   publicationDescriptions,
   descriptionHashes,
@@ -543,6 +544,7 @@ export async function registerCodingWorker(
                 ],
                 JSON.stringify(descriptions, null, 2),
               );
+            await writeCodingHistory(step, history, commands.root);
             const prompt =
               step.kind === "accept"
                 ? await acceptancePrompt(directory, run, step, history)

@@ -324,3 +324,22 @@ An unpublished branch gets its first PR; an existing PR is updated under its
 existing ownership and expected-head checks. A paused repository-specific repair
 keeps its repository scope. Closed/merged work and cleaned workspaces remain
 ineligible. Optional optimizations and controls: none.
+
+## Coding Handoffs and History
+
+Implementation, acceptance and review receive the latest completed handoff for
+each repository: implementation, validation, acceptance and review, plus the
+latest unresolved failure. Findings, decisions, command results and publication
+prerequisites remain inline. Execution metadata and full source diffs are linked
+to their complete records rather than repeated in every prompt. Approved plans
+and all saved owner requests/replies remain complete and authoritative.
+
+Before starting either agent, the controller writes every prior coding step to
+readable JSON files under `/work/evidence/coding-history/<attempt-id>/`, with a
+README index. Agents read these native files when a prior decision, tool reference
+or diff needs investigation. History is diagnostic context, not current acceptance
+proof. No stored step is deleted or truncated. This prevents repeated
+implementation/checkpoint/collection payloads from exhausting the SDK input limit
+as a ticket accumulates revisions. The ONE-5373 failing-input replay shrank from
+1,073,741 to 59,227 characters with all owner input preserved. Evidence is under
+`.tmp/2026-11-01-coding-handoff/`. Optional optimizations and controls: none.

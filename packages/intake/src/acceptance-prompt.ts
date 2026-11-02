@@ -1,3 +1,4 @@
+import { codingHistoryHandoff } from "./coding-history.ts";
 import { descriptionContext } from "./coding-description.ts";
 import type { CodingRun, CodingStep } from "./coding-types.ts";
 import { commitSet } from "./coding-repositories.ts";
@@ -23,5 +24,6 @@ Run every approved scenario. Browser scenarios use native Playwright MCP against
 Save any screenshots and other files under /work/evidence/${origin}/. Playwright's output directory is that directory. Do not cite files or tool calls from earlier attempts. The runtime records completed native tool calls in /work/evidence/${origin}/tool-events.json. Read that journal AFTER performing the checks to obtain the exact tool IDs for your result; inspect full tool outputs as needed in /work/logs/artifacts. Do not edit this journal. For every scenario return its approved ID, passed/failed/blocked status, concrete observed result, supporting toolCallIds from this attempt and any artifact paths. Include failures and blocked outcomes honestly. For passed scenarios cite successful supporting calls; rerun any failed supporting command before claiming proof. For negative cases, use a successful assertion command that checks the expected error/status rather than treating the failing tool invocation itself as a passing assertion. A successful tool invocation alone does not establish the expected outcome; compare actual assertions/observations to the plan.
 ${composeInstructions(readPromptSettings(directory), "coding", null, run.input.snapshots ?? [run.input.snapshot])}
 Approved plan:\n${planMarkdown(run.plan)}
-Prior steps and requests (history is diagnostic context, not fresh acceptance evidence):\n${JSON.stringify({ history, requests: run.change_requests, replies: run.direction_responses })}`;
+${codingHistoryHandoff(run, step, history)}
+Owner requests and replies (complete):\n${JSON.stringify({ requests: run.change_requests, replies: run.direction_responses })}`;
 }

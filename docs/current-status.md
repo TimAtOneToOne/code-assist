@@ -4,6 +4,16 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+November 1 coding handoffs: implementation, acceptance and review now receive
+current per-repository outcomes and failures instead of serializing all prior
+steps into every prompt. Full step records are written to indexed guest files;
+findings, command outcomes, publication prerequisites, approved plans and all owner
+requests/replies remain available. Native-file regression preserves historical
+payloads and exact source diffs. Replaying ONE-5373's rejected 1,073,741-character
+input produces 59,227 characters without changing owner input. Deployment and
+retry observations are in `.tmp/2026-11-01-coding-handoff/`.
+Optional optimizations and controls: none.
+
 November 1 branch reconciliation: Bring In Main now uses saved-branch/workspace
 eligibility rather than requiring an open PR. Failed and paused unpublished runs
 can request main; active steps, closed/merged work and cleaned workspaces remain
