@@ -2,6 +2,7 @@
 	import { enhance, type SubmitFunction } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import type { CodingDetail } from '@code-assist/intake/coding';
+	import { canBringInMain } from '@code-assist/intake/coding-types';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { toast } from 'svelte-sonner';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
@@ -36,12 +37,7 @@
 	);
 	const canRetry = $derived(editable && run.status === 'failed' && !!run.current_step_id);
 	const canReply = $derived(editable && run.status === 'needs_direction');
-	const canBringMain = $derived(
-		editable &&
-			!!run.pr_url &&
-			(run.status === 'pr_open' ||
-				(run.status === 'needs_direction' && !!run.change_requests?.length))
-	);
+	const canBringMain = $derived(editable && canBringInMain(run));
 	const reviewState = $derived(
 		['pr_open', 'pr_closed', 'done'].includes(run.status) && !!run.pr_url
 	);

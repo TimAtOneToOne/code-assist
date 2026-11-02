@@ -24,7 +24,7 @@ import type {
   CodingContinuation,
   CodingChangeRequest,
 } from "./coding-types.ts";
-import { missingBrowserEvidence } from "./coding-types.ts";
+import { missingBrowserEvidence, canBringInMain } from "./coding-types.ts";
 export * from "./coding-types.ts";
 export const codingQueue = "approved-coding";
 export class CodingConflict extends Error {}
@@ -538,8 +538,9 @@ export async function queueCodingChanges(
   const states = repositories(run);
   const resuming =
     kind === "bring_in_main" &&
-    run.status === "needs_direction" &&
+    ["needs_direction", "failed"].includes(run.status) &&
     !!run.change_requests?.length;
+  const bringingMain = kind === "bring_in_main" && canBringInMain(run);
   const indexes = prCi
     ? [snapshots(run.input).findIndex((s) => s.name === prCi.repository)]
     : resuming
@@ -555,22 +556,26 @@ export async function queueCodingChanges(
           run.status,
         )
       ) &&
-      !resuming) ||
+      !resuming &&
+      !bringingMain) ||
+    (kind === "bring_in_main" && !bringingMain) ||
     run.current_step_id !== stepId ||
     indexes.some((i) => i < 0) ||
     !run.workspace_id ||
     run.workspace_cleaned_at ||
     indexes.some(
       (index) =>
-        !states[index].pr_url ||
+        (!bringingMain && !states[index].pr_url) ||
         !states[index].commit ||
         states[index].merged_at ||
         states[index].pr_closed_at ||
-        (!resuming && states[index].status !== "pr_open"),
+        (!bringingMain && !resuming && states[index].status !== "pr_open"),
     )
   )
     throw new CodingConflict(
-      "Code changes require the current open, unmerged PR and its saved workspace. Refresh the ticket before trying again.",
+      kind === "bring_in_main"
+        ? "Bring In Main requires an idle saved branch and workspace with unmerged work. Refresh the ticket before trying again."
+        : "Code changes require the current open, unmerged PR and its saved workspace. Refresh the ticket before trying again.",
     );
   const request = {
     ...(kind ? { kind } : {}),
@@ -582,13 +587,15 @@ export async function queueCodingChanges(
     baseCommits: Object.fromEntries(
       indexes.map((i) => [
         states[i].name,
-        resuming
+        resuming && states[i].pr_url
           ? run.change_requests!.at(-1)!.baseCommits[states[i].name]
           : states[i].commit!,
       ]),
     ),
     pullRequests: Object.fromEntries(
-      indexes.map((i) => [states[i].name, states[i].pr_url!]),
+      indexes
+        .filter((i) => states[i].pr_url)
+        .map((i) => [states[i].name, states[i].pr_url!]),
     ),
   };
   await db.executeSql(
@@ -607,7 +614,14 @@ export async function queueCodingChanges(
       request,
     },
   );
-  return enqueue(boss, db, await codingRun(db, run.id), "implement");
+  return enqueue(
+    boss,
+    db,
+    await codingRun(db, run.id),
+    "implement",
+    undefined,
+    bringingMain && run.status !== "pr_open" ? stepId : undefined,
+  );
 }
 
 export async function answerCodingDirection(

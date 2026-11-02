@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { createLogger } from "@code-assist/observability";
+import { mainRef } from "../src/coding-main.ts";
 import { checkCodingBranch, publishCoding } from "../src/coding-publish.ts";
 import { executeCoding, codingPrompt } from "../src/coding-runtime.ts";
 import { cleanupFixture } from "./fixtures/cleanup.ts";
@@ -92,6 +93,25 @@ test("new PR publication and lost-response recovery keep private tooling out of 
         logger,
       );
     };
+    run.change_requests = [
+      {
+        id: randomUUID(),
+        kind: "bring_in_main",
+        text: "Bring in main before the first PR",
+        requestedBy: "owner",
+        createdAt: new Date().toISOString(),
+        baseCommits: { fixture: run.commit! },
+        pullRequests: {},
+      },
+    ];
+    execFileSync("/usr/bin/git", [
+      "--git-dir",
+      join(directory, "coding", run.id, "repository.git"),
+      "update-ref",
+      mainRef(run),
+      run.commit!,
+    ]);
+    await checkCodingBranch(run, signal, log, execute);
     await assert.rejects(
       publishCoding(
         directory,

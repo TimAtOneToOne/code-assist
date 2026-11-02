@@ -254,3 +254,40 @@ test("main snapshots survive interrupted delivery, conflicts preserve both paren
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("Bring In Main is available for saved idle branches before and after PR creation", async () => {
+  const { canBringInMain } = await import("../src/coding-types.ts");
+  const { directory, run } = await cleanupFixture();
+  try {
+    for (const status of ["failed", "needs_direction", "pr_open"] as const) {
+      assert.equal(canBringInMain({ ...run, status, pr_url: null }), true);
+      assert.equal(
+        canBringInMain({ ...run, status, pr_url: "https://example.test/pr/1" }),
+        true,
+      );
+    }
+    for (const status of [
+      "implement",
+      "validate",
+      "review",
+      "publish",
+      "done",
+      "superseded",
+      "pr_closed",
+    ] as const)
+      assert.equal(canBringInMain({ ...run, status }), false);
+    for (const fields of [
+      { workspace_id: null },
+      { commit: null },
+      { workspace_cleaned_at: new Date() },
+      { merged_at: new Date() },
+      { pr_closed_at: new Date() },
+    ])
+      assert.equal(
+        canBringInMain({ ...run, status: "failed", ...fields }),
+        false,
+      );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

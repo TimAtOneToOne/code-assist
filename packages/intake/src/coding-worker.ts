@@ -843,7 +843,7 @@ export async function registerCodingWorker(
             run,
             step,
             {
-              summary: run.change_requests?.length
+              summary: repositories(run)[repositoryIndex(run)].pr_url
                 ? "Requested changes validated, reviewed, and pushed to the existing pull request."
                 : "Pull request opened for Tim to review.",
               url,

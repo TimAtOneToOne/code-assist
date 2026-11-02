@@ -120,6 +120,30 @@ export type CodingStep = {
   finished_at: Date | null;
 };
 export type CodingDetail = CodingRun & { steps: CodingStep[] };
+
+export function canBringInMain(run: CodingRun) {
+  const saved = run.repositories ?? [
+    {
+      name: run.input.snapshot.name,
+      commit: run.commit,
+      merged_at: run.merged_at,
+      pr_closed_at: run.pr_closed_at,
+    },
+  ];
+  const request = run.change_requests?.at(-1);
+  const candidates =
+    request && ["failed", "needs_direction"].includes(run.status)
+      ? saved.filter((r) => Object.hasOwn(request.baseCommits, r.name))
+      : saved;
+  return (
+    !!run.branch &&
+    !!run.workspace_id &&
+    !run.workspace_cleaned_at &&
+    ["pr_open", "failed", "needs_direction"].includes(run.status) &&
+    candidates.length > 0 &&
+    candidates.every((r) => !!r.commit && !r.merged_at && !r.pr_closed_at)
+  );
+}
 export const browserEvidenceRequiredMessage =
   "This agent attempt did not run the required browser checks. Saved code and evidence are preserved. Run Browser Checks to continue from this checkpoint.";
 export function hasBrowserEvidence(paths: string[], completedTools: string[]) {

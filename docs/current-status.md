@@ -4,6 +4,17 @@ Updated October 25, 2026 against the source tree, including structured acceptanc
 
 ## Product and Runtime
 
+November 1 branch reconciliation: Bring In Main now uses saved-branch/workspace
+eligibility rather than requiring an open PR. Failed and paused unpublished runs
+can request main; active steps, closed/merged work and cleaned workspaces remain
+ineligible. Unpublished work follows first-PR publication after renewed checks and
+review; existing PR revisions keep ownership and expected-head protection. A
+paused repository-specific repair retains its scope. Unit tests exercise native
+first publication after a main request and lost-response recovery; database tests
+exercise unpublished requests, stale results and existing multi-repository repairs.
+Evidence is in `.tmp/2026-11-01-branch-main/`.
+Optional optimizations and controls: none.
+
 November 1 validation repair: file changes produced by checks now return to
 implementation with command results, Git status, tracked diff and working tree
 preserved. A new candidate must pass unchanged validation, acceptance and review.

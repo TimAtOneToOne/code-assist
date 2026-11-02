@@ -180,7 +180,7 @@ export const actions = {
 				);
 				return {
 					message: bringMain
-						? 'Bring In Main queued. Codex will merge main and resolve conflicts, then validation and Claude review will run before updating the existing PR.'
+						? 'Bring In Main queued. Codex will merge main and resolve conflicts, then rerun validation and Claude review before opening or updating the PR.'
 						: 'Code changes queued. Codex will revise, then validation and Claude review will run before updating the existing PR.'
 				};
 			} catch (cause) {

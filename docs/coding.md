@@ -311,3 +311,16 @@ the existing no-progress check pauses for direction. A reply preserves the affec
 repository and working tree. Unexpected HEAD movement remains a failure requiring
 inspection. Older generic validation failures can be retried to enter this repair
 path. Optional optimizations and controls: none.
+
+## Bring In Main Before Publication
+
+Bring In Main is a branch action. It is available for a saved, unmerged branch
+with a retained workspace while the run is failed, awaiting direction, or has an
+open PR. It does not require a PR. Active agent steps must finish or pause first.
+The controller checks the same eligibility as the UI, pins main once per request,
+and sends it to the workspace for conflict resolution. Saved work is preserved;
+new validation, acceptance and independent review are required before publication.
+An unpublished branch gets its first PR; an existing PR is updated under its
+existing ownership and expected-head checks. A paused repository-specific repair
+keeps its repository scope. Closed/merged work and cleaned workspaces remain
+ineligible. Optional optimizations and controls: none.

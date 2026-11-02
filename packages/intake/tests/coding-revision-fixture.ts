@@ -26,6 +26,59 @@ export async function exerciseCodeChanges(
 ) {
   const original = (await readCoding(boss.getDb(), issueId))[0];
   const indexes = codingIndexes(original);
+  for (const status of ["failed", "needs_direction"]) {
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.coding_run SET status=$2,pr_url=NULL,repositories=$3 WHERE id=$1",
+        [
+          original.id,
+          status,
+          original.repositories
+            ? JSON.stringify(
+                original.repositories.map((r) => ({
+                  ...r,
+                  pr_url: null,
+                  status,
+                })),
+              )
+            : null,
+        ],
+      );
+    await requestCodingChanges(
+      boss,
+      issueId,
+      original.id,
+      original.current_step_id,
+      "Bring main into the unpublished branch",
+      "owner",
+      "bring_in_main",
+    );
+    const work = (await next())!;
+    assert.equal(work.step.kind, "implement");
+    assert.equal(work.step.recovery_step_id, original.current_step_id);
+    assert.deepEqual(work.run.change_requests!.at(-1)!.pullRequests, {});
+    assert.equal(work.run.branch, original.branch);
+    assert.equal(publicationReady(work.run, original.steps), false);
+    await failCoding(boss, work.run, work.step, "End unpublished-main fixture");
+    await boss.fail("approved-coding", work.step.job_id);
+    await boss
+      .getDb()
+      .executeSql(
+        "UPDATE code_assist.coding_run SET status=$2,pr_url=$3,repositories=$4,current_step_id=$5,change_requests=$6,repository_index=$7,commit=$8,error=$9 WHERE id=$1",
+        [
+          original.id,
+          original.status,
+          original.pr_url,
+          original.repositories ? JSON.stringify(original.repositories) : null,
+          original.current_step_id,
+          JSON.stringify(original.change_requests ?? []),
+          original.repository_index ?? 0,
+          original.commit,
+          original.error,
+        ],
+      );
+  }
   for (const status of ["done", "pr_closed", "failed", "needs_direction"]) {
     await boss
       .getDb()

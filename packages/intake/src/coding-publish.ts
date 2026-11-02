@@ -68,7 +68,7 @@ export async function checkCodingBranch(
     log,
   );
   const request = run.change_requests?.at(-1);
-  if (request) {
+  if (request?.pullRequests[activeSnapshot(run).name]) {
     verifyRevisionPr(
       run,
       prs,
@@ -200,7 +200,7 @@ export async function publishCoding(
     ]),
   ) as PublishedPr[];
   const request = run.change_requests?.at(-1);
-  if (request) {
+  if (request?.pullRequests[activeSnapshot(run).name]) {
     const expectedHead = request.baseCommits[activeSnapshot(run).name];
     const intentFile = join(local, `publication-${request.id}.json`);
     const intent = {
@@ -400,6 +400,7 @@ export async function publishCoding(
     "FETCH_HEAD",
   ]);
   // A merge-tree conflict is a concrete reason to revise, never a license to overwrite main.
+  await requireMainAncestor(directory, run, signal, log, execute);
   await git(["merge-tree", "--write-tree", "FETCH_HEAD", run.commit]);
   await assertCurrent();
   if (!intent) {
